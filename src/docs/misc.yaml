@@ -1,0 +1,59 @@
+openapi: 3.0.0
+info:
+  title: Miscellaneous Routes
+  version: 1.0.0
+
+tags:
+  - name: misc
+    description: Routes utilitaires diverses
+
+paths:
+  /server-time:
+    get:
+      tags: [misc]
+      summary: Heure actuelle du serveur
+      description: Renvoie l'heure actuelle du serveur (format ISO 8601)
+      responses:
+        200:
+          description: Heure du serveur
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  server_time:
+                    type: string
+                    format: date-time
+                    example: "2025-06-29T12:00:00.000Z"
+
+  /server-time-offset:
+    get:
+      tags: [misc]
+      summary: Heure serveur avec calcul de décalage
+      description: |
+        Renvoie l'heure serveur + décalage par rapport à l'heure client.
+        Le paramètre `client_time` doit être une date ISO valide.
+      parameters:
+        - in: query
+          name: client_time
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Heure actuelle du client
+      responses:
+        200:
+          description: Heure serveur et décalage
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  server_time:
+                    type: string
+                    format: date-time
+                    example: "2025-06-29T12:00:00.000Z"
+                  offset_ms:
+                    type: integer
+                    example: -150
+                    description: Décalage entre client et serveur en millisecondes

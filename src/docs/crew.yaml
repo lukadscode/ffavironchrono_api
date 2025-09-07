@@ -1,0 +1,165 @@
+tags:
+  - name: crews
+    description: Gestion des équipages/bateaux associés à un événement et une catégorie
+
+paths:
+  /crews:
+    get:
+      tags: [crews]
+      summary: Liste des équipages
+      responses:
+        200:
+          description: Liste des équipages
+
+    post:
+      tags: [crews]
+      summary: Créer un équipage
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [event_id, category_id]
+              properties:
+                event_id:
+                  type: string
+                category_id:
+                  type: string
+                status:
+                  type: integer
+                club_name:
+                  type: string
+                club_code:
+                  type: string
+                coach_name:
+                  type: string
+      responses:
+        201:
+          description: Équipage créé
+
+  /crews/event/{event_id}:
+    get:
+      tags: [crews]
+      summary: Liste des équipages d’un événement
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: event_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID de l’événement
+      responses:
+        200:
+          description: Liste des équipages pour l’événement donné
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Crew"
+
+  /crews/{id}:
+    get:
+      tags: [crews]
+      summary: Obtenir un équipage par ID
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Détail de l’équipage
+        404:
+          description: Équipage non trouvé
+
+    put:
+      tags: [crews]
+      summary: Modifier un équipage
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                event_id:
+                  type: string
+                category_id:
+                  type: string
+                status:
+                  type: integer
+                club_name:
+                  type: string
+                club_code:
+                  type: string
+                coach_name:
+                  type: string
+      responses:
+        200:
+          description: Équipage mis à jour
+
+    delete:
+      tags: [crews]
+      summary: Supprimer un équipage
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Équipage supprimé
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Crew:
+      type: object
+      properties:
+        id:
+          type: string
+        event_id:
+          type: string
+        category_id:
+          type: string
+        status:
+          type: integer
+        club_name:
+          type: string
+        club_code:
+          type: string
+        coach_name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time

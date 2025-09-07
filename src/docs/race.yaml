@@ -1,0 +1,172 @@
+tags:
+  - name: races
+    description: Gestion des courses (configuration, phases, distances...)
+
+paths:
+  /races:
+    get:
+      tags: [races]
+      summary: Liste des courses
+      responses:
+        200:
+          description: Liste renvoyée
+
+    post:
+      tags: [races]
+      summary: Créer une course
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phase_id]
+              properties:
+                phase_id:
+                  type: string
+                name:
+                  type: string
+                race_type:
+                  type: string
+                lane_count:
+                  type: integer
+                  minimum: 1
+                race_number:
+                  type: integer
+                distance_id:
+                  type: string
+                status:
+                  type: string
+                  enum:
+                    - not_started
+                    - non_official
+                    - official
+                    - in_progress
+                    - delayed
+                    - cancelled
+                    - finished
+                start_time:
+                  type: string
+                  format: date-time
+      responses:
+        201:
+          description: Course créée
+
+  /races/event/{event_id}:
+    get:
+      tags: [races]
+      summary: Liste des courses d’un événement
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: event_id
+          required: true
+          schema:
+            type: string
+          description: ID de l’événement
+      responses:
+        200:
+          description: Liste des courses associées à l’événement
+
+  /races/generate:
+    post:
+      tags: [races]
+      summary: Génère les courses et affecte les équipages
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phase_id, lane_count]
+              properties:
+                phase_id:
+                  type: string
+                  format: uuid
+                lane_count:
+                  type: integer
+                  minimum: 1
+                start_time:
+                  type: string
+                  format: date-time
+                  description: Heure de départ de la première course
+                interval_minutes:
+                  type: integer
+                  minimum: 0
+                  description: Minutes entre chaque course
+      responses:
+        200:
+          description: Courses générées
+
+  /races/{id}:
+    get:
+      tags: [races]
+      summary: Obtenir une course par ID
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+          required: true
+      responses:
+        200:
+          description: Détail de la course
+        404:
+          description: Non trouvée
+
+    put:
+      tags: [races]
+      summary: Modifier une course
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phase_id:
+                  type: string
+                name:
+                  type: string
+                race_type:
+                  type: string
+                lane_count:
+                  type: integer
+                  minimum: 1
+                race_number:
+                  type: integer
+                distance_id:
+                  type: string
+      responses:
+        200:
+          description: Course mise à jour
+
+    delete:
+      tags: [races]
+      summary: Supprimer une course
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+          required: true
+      responses:
+        200:
+          description: Course supprimée
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

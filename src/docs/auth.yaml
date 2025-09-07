@@ -1,0 +1,281 @@
+openapi: 3.1.0
+info:
+  title: Aviron API
+  version: 1.0.0
+  description: Documentation du module Authentification
+
+tags:
+  - name: auth
+    description: Gestion de l'authentification et des utilisateurs
+
+paths:
+  /auth/register:
+    post:
+      tags: [auth]
+      summary: Création d’un compte utilisateur
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                num_license:
+                  type: string
+                  description: Numéro de licence (optionnel)
+                password:
+                  type: string
+              required: [name, email, password]
+      responses:
+        "201":
+          description: Utilisateur créé
+        "400":
+          description: Email déjà utilisé
+
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Connexion utilisateur (email ou numéro de licence)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                identifier:
+                  type: string
+                  description: Email ou numéro de licence
+                password:
+                  type: string
+              required: [identifier, password]
+      responses:
+        "200":
+          description: Tokens retournés
+        "401":
+          description: Identifiants invalides
+
+  /auth/refresh-token:
+    post:
+      tags: [auth]
+      summary: Renouvellement du jeton JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refresh_token:
+                  type: string
+              required: [refresh_token]
+      responses:
+        "200":
+          description: Jeton JWT renouvelé
+        "401":
+          description: Jeton de rafraîchissement invalide
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      summary: Déconnexion de l’utilisateur
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refresh_token:
+                  type: string
+              required: [refresh_token]
+      responses:
+        "200":
+          description: Déconnexion réussie
+        "400":
+          description: Jeton introuvable
+
+  /auth/me:
+    get:
+      tags: [auth]
+      summary: Informations du profil connecté
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Détails de l'utilisateur connecté
+        "401":
+          description: Accès non autorisé
+
+  /auth/verify-email:
+    get:
+      tags: [auth]
+      summary: Vérification de l’adresse email
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Email vérifié avec succès
+        "400":
+          description: Token invalide
+
+  /auth/request-password-reset:
+    post:
+      tags: [auth]
+      summary: Demande de réinitialisation de mot de passe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                identifier:
+                  type: string
+              required: [identifier]
+      responses:
+        "200":
+          description: Email envoyé
+        "404":
+          description: Utilisateur non trouvé
+
+  /auth/reset-password:
+    post:
+      tags: [auth]
+      summary: Réinitialisation du mot de passe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+                new_password:
+                  type: string
+              required: [token, new_password]
+      responses:
+        "200":
+          description: Mot de passe mis à jour
+        "400":
+          description: Token invalide ou expiré
+
+  /auth/sessions:
+    get:
+      tags: [auth]
+      summary: Lister les sessions actives de l'utilisateur
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Liste des sessions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        user_agent:
+                          type: string
+                        ip_address:
+                          type: string
+                        is_active:
+                          type: boolean
+                        expires_at:
+                          type: string
+                          format: date-time
+                        created_at:
+                          type: string
+                          format: date-time
+        "401":
+          description: Non autorisé
+
+  /auth/change-password:
+    post:
+      tags: [auth]
+      summary: Modifier le mot de passe (utilisateur connecté)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                currentPassword:
+                  type: string
+                newPassword:
+                  type: string
+              required: [currentPassword, newPassword]
+      responses:
+        "200":
+          description: Mot de passe mis à jour
+        "400":
+          description: Mot de passe actuel incorrect
+        "401":
+          description: Non autorisé
+
+  /auth/sessions/{id}:
+    delete:
+      tags: [auth]
+      summary: Déconnecter un appareil (invalider une session)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID de la session à invalider
+      responses:
+        "200":
+          description: Session déconnectée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: Session déconnectée
+        "404":
+          description: Session non trouvée ou déjà inactive
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  message:
+                    type: string
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

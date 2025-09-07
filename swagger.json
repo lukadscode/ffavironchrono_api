@@ -1,0 +1,3370 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "AvironApp API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Création d’un compte utilisateur",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string"
+                  },
+                  "num_license": {
+                    "type": "string",
+                    "description": "Numéro de licence (optionnel)"
+                  },
+                  "password": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "email",
+                  "password"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Utilisateur créé"
+          },
+          "400": {
+            "description": "Email déjà utilisé"
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Connexion utilisateur (email ou numéro de licence)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "identifier": {
+                    "type": "string",
+                    "description": "Email ou numéro de licence"
+                  },
+                  "password": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "identifier",
+                  "password"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tokens retournés"
+          },
+          "401": {
+            "description": "Identifiants invalides"
+          }
+        }
+      }
+    },
+    "/auth/refresh-token": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Renouvellement du jeton JWT",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "refresh_token": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "refresh_token"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Jeton JWT renouvelé"
+          },
+          "401": {
+            "description": "Jeton de rafraîchissement invalide"
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Déconnexion de l’utilisateur",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "refresh_token": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "refresh_token"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Déconnexion réussie"
+          },
+          "400": {
+            "description": "Jeton introuvable"
+          }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Informations du profil connecté",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Détails de l'utilisateur connecté"
+          },
+          "401": {
+            "description": "Accès non autorisé"
+          }
+        }
+      }
+    },
+    "/auth/verify-email": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Vérification de l’adresse email",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Email vérifié avec succès"
+          },
+          "400": {
+            "description": "Token invalide"
+          }
+        }
+      }
+    },
+    "/auth/request-password-reset": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Demande de réinitialisation de mot de passe",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "identifier": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "identifier"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Email envoyé"
+          },
+          "404": {
+            "description": "Utilisateur non trouvé"
+          }
+        }
+      }
+    },
+    "/auth/reset-password": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Réinitialisation du mot de passe",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string"
+                  },
+                  "new_password": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "token",
+                  "new_password"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Mot de passe mis à jour"
+          },
+          "400": {
+            "description": "Token invalide ou expiré"
+          }
+        }
+      }
+    },
+    "/auth/sessions": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Lister les sessions actives de l'utilisateur",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Liste des sessions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "user_agent": {
+                            "type": "string"
+                          },
+                          "ip_address": {
+                            "type": "string"
+                          },
+                          "is_active": {
+                            "type": "boolean"
+                          },
+                          "expires_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Non autorisé"
+          }
+        }
+      }
+    },
+    "/auth/change-password": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Modifier le mot de passe (utilisateur connecté)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "currentPassword": {
+                    "type": "string"
+                  },
+                  "newPassword": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "currentPassword",
+                  "newPassword"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Mot de passe mis à jour"
+          },
+          "400": {
+            "description": "Mot de passe actuel incorrect"
+          },
+          "401": {
+            "description": "Non autorisé"
+          }
+        }
+      }
+    },
+    "/auth/sessions/{id}": {
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Déconnecter un appareil (invalider une session)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID de la session à invalider"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Session déconnectée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Session déconnectée"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Session non trouvée ou déjà inactive",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events": {
+      "get": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Liste des événements",
+        "responses": {
+          "200": {
+            "description": "Liste des événements renvoyée"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Créer un événement",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "location",
+                  "start_date",
+                  "end_date"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "location": {
+                    "type": "string"
+                  },
+                  "start_date": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "end_date": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "race_type": {
+                    "type": "string"
+                  },
+                  "website_url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "image_url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "organiser_name": {
+                    "type": "string"
+                  },
+                  "organiser_code": {
+                    "type": "string"
+                  },
+                  "is_visible": {
+                    "type": "boolean"
+                  },
+                  "is_finished": {
+                    "type": "boolean"
+                  },
+                  "progression_template_id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Événement créé"
+          },
+          "400": {
+            "description": "Données invalides"
+          }
+        }
+      }
+    },
+    "/events/{id}": {
+      "get": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Obtenir un événement par ID",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Détail de l’événement"
+          },
+          "404": {
+            "description": "Événement non trouvé"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Modifier un événement",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "location": {
+                    "type": "string"
+                  },
+                  "start_date": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "end_date": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "race_type": {
+                    "type": "string"
+                  },
+                  "website_url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "image_url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "organiser_name": {
+                    "type": "string"
+                  },
+                  "organiser_code": {
+                    "type": "string"
+                  },
+                  "is_visible": {
+                    "type": "boolean"
+                  },
+                  "is_finished": {
+                    "type": "boolean"
+                  },
+                  "progression_template_id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Événement mis à jour"
+          },
+          "400": {
+            "description": "Données invalides"
+          },
+          "404": {
+            "description": "Événement non trouvé"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Supprimer un événement",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Événement supprimé"
+          },
+          "404": {
+            "description": "Événement non trouvé"
+          }
+        }
+      }
+    },
+    "/participants": {
+      "get": {
+        "tags": [
+          "participants"
+        ],
+        "summary": "Liste des participants",
+        "responses": {
+          "200": {
+            "description": "Liste renvoyée"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "participants"
+        ],
+        "summary": "Créer un participant",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "first_name",
+                  "last_name",
+                  "license_number",
+                  "gender"
+                ],
+                "properties": {
+                  "first_name": {
+                    "type": "string"
+                  },
+                  "last_name": {
+                    "type": "string"
+                  },
+                  "license_number": {
+                    "type": "string"
+                  },
+                  "gender": {
+                    "type": "string",
+                    "enum": [
+                      "Homme",
+                      "Femme"
+                    ]
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "club_name": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Participant créé"
+          }
+        }
+      }
+    },
+    "/participants/event/{event_id}": {
+      "get": {
+        "tags": [
+          "participants"
+        ],
+        "summary": "Liste des participants d’un événement",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "ID de l’événement"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Liste des participants de l’événement",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Participant"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/participants/{id}": {
+      "get": {
+        "tags": [
+          "participants"
+        ],
+        "summary": "Obtenir un participant par ID",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Détail du participant"
+          },
+          "404": {
+            "description": "Participant non trouvé"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "participants"
+        ],
+        "summary": "Modifier un participant",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "first_name": {
+                    "type": "string"
+                  },
+                  "last_name": {
+                    "type": "string"
+                  },
+                  "license_number": {
+                    "type": "string"
+                  },
+                  "gender": {
+                    "type": "string",
+                    "enum": [
+                      "Homme",
+                      "Femme"
+                    ]
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "club_name": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Participant mis à jour"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "participants"
+        ],
+        "summary": "Supprimer un participant",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Participant supprimé"
+          }
+        }
+      }
+    },
+    "/categories": {
+      "get": {
+        "tags": [
+          "categories"
+        ],
+        "summary": "Liste des catégories",
+        "responses": {
+          "200": {
+            "description": "Liste renvoyée"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "categories"
+        ],
+        "summary": "Créer une catégorie",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "label"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "age_group": {
+                    "type": "string"
+                  },
+                  "gender": {
+                    "type": "string",
+                    "enum": [
+                      "Homme",
+                      "Femme",
+                      "Mixte"
+                    ]
+                  },
+                  "boat_seats": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 8
+                  },
+                  "has_coxswain": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Catégorie créée"
+          }
+        }
+      }
+    },
+    "/categories/event/{event_id}/with-crews": {
+      "get": {
+        "tags": [
+          "categories"
+        ],
+        "summary": "Liste des catégories d’un événement avec équipages",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID de l’événement"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Liste des catégories et équipages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "code": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "age_group": {
+                            "type": "string"
+                          },
+                          "gender": {
+                            "type": "string"
+                          },
+                          "boat_seats": {
+                            "type": "integer"
+                          },
+                          "has_coxswain": {
+                            "type": "boolean"
+                          },
+                          "crew_count": {
+                            "type": "integer"
+                          },
+                          "crews": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/Crew"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/categories/{id}": {
+      "get": {
+        "tags": [
+          "categories"
+        ],
+        "summary": "Obtenir une catégorie par ID",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Détail de la catégorie"
+          },
+          "404": {
+            "description": "Non trouvée"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "categories"
+        ],
+        "summary": "Modifier une catégorie",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "age_group": {
+                    "type": "string"
+                  },
+                  "gender": {
+                    "type": "string",
+                    "enum": [
+                      "Homme",
+                      "Femme",
+                      "Mixte"
+                    ]
+                  },
+                  "boat_seats": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 8
+                  },
+                  "has_coxswain": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Mise à jour réussie"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "categories"
+        ],
+        "summary": "Supprimer une catégorie",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Supprimée avec succès"
+          }
+        }
+      }
+    },
+    "/event-categories": {
+      "post": {
+        "tags": [
+          "eventcategories"
+        ],
+        "summary": "Lier une catégorie à un événement",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "event_id",
+                  "category_id"
+                ],
+                "properties": {
+                  "event_id": {
+                    "type": "string"
+                  },
+                  "category_id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Liaison créée"
+          },
+          "400": {
+            "description": "Déjà lié"
+          }
+        }
+      }
+    },
+    "/event-categories/{event_id}": {
+      "get": {
+        "tags": [
+          "eventcategories"
+        ],
+        "summary": "Récupérer les catégories liées à un événement",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Liste des catégories liées"
+          }
+        }
+      }
+    },
+    "/event-categories/unlink/{id}": {
+      "delete": {
+        "tags": [
+          "eventcategories"
+        ],
+        "summary": "Supprimer une liaison événement ↔ catégorie",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lien supprimé"
+          }
+        }
+      }
+    },
+    "/crews": {
+      "get": {
+        "tags": [
+          "crews"
+        ],
+        "summary": "Liste des équipages",
+        "responses": {
+          "200": {
+            "description": "Liste des équipages"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "crews"
+        ],
+        "summary": "Créer un équipage",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "event_id",
+                  "category_id"
+                ],
+                "properties": {
+                  "event_id": {
+                    "type": "string"
+                  },
+                  "category_id": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "integer"
+                  },
+                  "club_name": {
+                    "type": "string"
+                  },
+                  "club_code": {
+                    "type": "string"
+                  },
+                  "coach_name": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Équipage créé"
+          }
+        }
+      }
+    },
+    "/crews/event/{event_id}": {
+      "get": {
+        "tags": [
+          "crews"
+        ],
+        "summary": "Liste des équipages d’un événement",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "ID de l’événement"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Liste des équipages pour l’événement donné",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Crew"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/crews/{id}": {
+      "get": {
+        "tags": [
+          "crews"
+        ],
+        "summary": "Obtenir un équipage par ID",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Détail de l’équipage"
+          },
+          "404": {
+            "description": "Équipage non trouvé"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "crews"
+        ],
+        "summary": "Modifier un équipage",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "event_id": {
+                    "type": "string"
+                  },
+                  "category_id": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "integer"
+                  },
+                  "club_name": {
+                    "type": "string"
+                  },
+                  "club_code": {
+                    "type": "string"
+                  },
+                  "coach_name": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Équipage mis à jour"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "crews"
+        ],
+        "summary": "Supprimer un équipage",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Équipage supprimé"
+          }
+        }
+      }
+    },
+    "/crew-participants": {
+      "post": {
+        "tags": [
+          "crewparticipants"
+        ],
+        "summary": "Ajouter un participant à un équipage",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "crew_id",
+                  "participant_id"
+                ],
+                "properties": {
+                  "crew_id": {
+                    "type": "string"
+                  },
+                  "participant_id": {
+                    "type": "string"
+                  },
+                  "is_coxswain": {
+                    "type": "boolean"
+                  },
+                  "coxswain_weight": {
+                    "type": "number"
+                  },
+                  "seat_position": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Participant affecté"
+          },
+          "400": {
+            "description": "Déjà affecté"
+          }
+        }
+      }
+    },
+    "/crew-participants/{crew_id}": {
+      "get": {
+        "tags": [
+          "crewparticipants"
+        ],
+        "summary": "Récupérer les participants d’un équipage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "crew_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Liste des membres de l’équipage"
+          }
+        }
+      }
+    },
+    "/crew-participants/{id}": {
+      "delete": {
+        "tags": [
+          "crewparticipants"
+        ],
+        "summary": "Retirer un participant d’un équipage",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Participant retiré"
+          }
+        }
+      }
+    },
+    "/races": {
+      "get": {
+        "tags": [
+          "races"
+        ],
+        "summary": "Liste des courses",
+        "responses": {
+          "200": {
+            "description": "Liste renvoyée"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "races"
+        ],
+        "summary": "Créer une course",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "phase_id"
+                ],
+                "properties": {
+                  "phase_id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "race_type": {
+                    "type": "string"
+                  },
+                  "lane_count": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "race_number": {
+                    "type": "integer"
+                  },
+                  "distance_id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Course créée"
+          }
+        }
+      }
+    },
+    "/races/event/{event_id}": {
+      "get": {
+        "tags": [
+          "races"
+        ],
+        "summary": "Liste des courses d’un événement",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID de l’événement"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Liste des courses associées à l’événement"
+          }
+        }
+      }
+    },
+    "/races/generate": {
+      "post": {
+        "tags": [
+          "races"
+        ],
+        "summary": "Génère les courses et affecte les équipages",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "phase_id",
+                  "lane_count"
+                ],
+                "properties": {
+                  "phase_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "lane_count": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Courses générées"
+          }
+        }
+      }
+    },
+    "/races/{id}": {
+      "get": {
+        "tags": [
+          "races"
+        ],
+        "summary": "Obtenir une course par ID",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Détail de la course"
+          },
+          "404": {
+            "description": "Non trouvée"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "races"
+        ],
+        "summary": "Modifier une course",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phase_id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "race_type": {
+                    "type": "string"
+                  },
+                  "lane_count": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "race_number": {
+                    "type": "integer"
+                  },
+                  "distance_id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Course mise à jour"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "races"
+        ],
+        "summary": "Supprimer une course",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Course supprimée"
+          }
+        }
+      }
+    },
+    "/race-phases": {
+      "post": {
+        "tags": [
+          "racephases"
+        ],
+        "summary": "Créer une phase de course",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "event_id",
+                  "name",
+                  "order_index"
+                ],
+                "properties": {
+                  "event_id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "order_index": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Phase créée"
+          }
+        }
+      }
+    },
+    "/race-phases/{event_id}": {
+      "get": {
+        "tags": [
+          "racephases"
+        ],
+        "summary": "Récupérer les phases d’un événement",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Liste des phases triée par ordre"
+          }
+        }
+      }
+    },
+    "/race-phases/{id}": {
+      "put": {
+        "tags": [
+          "racephases"
+        ],
+        "summary": "Modifier une phase",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "order_index": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Phase mise à jour"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "racephases"
+        ],
+        "summary": "Supprimer une phase",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Phase supprimée"
+          }
+        }
+      }
+    },
+    "/race-crews": {
+      "post": {
+        "tags": [
+          "racecrews"
+        ],
+        "summary": "Affecter un équipage à une course",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "race_id",
+                  "crew_id"
+                ],
+                "properties": {
+                  "race_id": {
+                    "type": "string"
+                  },
+                  "crew_id": {
+                    "type": "string"
+                  },
+                  "lane": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "status": {
+                    "type": "string",
+                    "description": "DNS, DNF, DSQ ou vide"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Équipage affecté"
+          },
+          "400": {
+            "description": "Déjà présent"
+          }
+        }
+      }
+    },
+    "/race-crews/{race_id}": {
+      "get": {
+        "tags": [
+          "racecrews"
+        ],
+        "summary": "Récupérer les équipages affectés à une course",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "race_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Liste des équipages"
+          }
+        }
+      }
+    },
+    "/race-crews/{id}": {
+      "delete": {
+        "tags": [
+          "racecrews"
+        ],
+        "summary": "Retirer un équipage d’une course",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Supprimé"
+          }
+        }
+      }
+    },
+    "/distances": {
+      "get": {
+        "tags": [
+          "distances"
+        ],
+        "summary": "Liste des distances disponibles",
+        "responses": {
+          "200": {
+            "description": "Liste renvoyée"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "distances"
+        ],
+        "summary": "Créer une nouvelle distance",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "event_id",
+                  "meters"
+                ],
+                "properties": {
+                  "event_id": {
+                    "type": "string",
+                    "example": "2000m"
+                  },
+                  "meters": {
+                    "type": "integer",
+                    "example": 2000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Distance créée"
+          }
+        }
+      }
+    },
+    "/distances/event/{event_id}": {
+      "get": {
+        "tags": [
+          "distances"
+        ],
+        "summary": "Liste des distances utilisées dans un événement",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Liste des distances"
+          }
+        }
+      }
+    },
+    "/distances/{id}": {
+      "delete": {
+        "tags": [
+          "distances"
+        ],
+        "summary": "Supprimer une distance",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Supprimée"
+          }
+        }
+      }
+    },
+    "/timings": {
+      "post": {
+        "tags": [
+          "timings"
+        ],
+        "summary": "Enregistrer un temps pour un équipage",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "race_crew_id",
+                  "timing_point_id",
+                  "time"
+                ],
+                "properties": {
+                  "race_crew_id": {
+                    "type": "string"
+                  },
+                  "timing_point_id": {
+                    "type": "string"
+                  },
+                  "time": {
+                    "type": "number",
+                    "example": 345.21
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Temps enregistré"
+          }
+        }
+      }
+    },
+    "/timings/{race_crew_id}": {
+      "get": {
+        "tags": [
+          "timings"
+        ],
+        "summary": "Liste des temps pour un équipage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "race_crew_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Liste des temps triée"
+          }
+        }
+      }
+    },
+    "/timings/{id}": {
+      "delete": {
+        "tags": [
+          "timings"
+        ],
+        "summary": "Supprimer un enregistrement de temps",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Supprimé"
+          }
+        }
+      }
+    },
+    "/timing-points": {
+      "post": {
+        "tags": [
+          "timingpoints"
+        ],
+        "summary": "Créer un point de chronométrage",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "event_id",
+                  "label",
+                  "order_index",
+                  "distance_m"
+                ],
+                "properties": {
+                  "event_id": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string",
+                    "example": "Arrivée"
+                  },
+                  "order_index": {
+                    "type": "integer",
+                    "example": 3
+                  },
+                  "distance_m": {
+                    "type": "integer",
+                    "example": 5000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Créé"
+          }
+        }
+      }
+    },
+    "/timing-points/event/{event_id}": {
+      "get": {
+        "tags": [
+          "timingpoints"
+        ],
+        "summary": "Récupérer les points d’une course",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Liste des points"
+          }
+        }
+      }
+    },
+    "/timing-points/{id}": {
+      "put": {
+        "tags": [
+          "timingpoints"
+        ],
+        "summary": "Modifier un point de chronométrage",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "order_index": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Mis à jour"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "timingpoints"
+        ],
+        "summary": "Supprimer un point de chronométrage",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Supprimé"
+          }
+        }
+      }
+    },
+    "/timing-assignments": {
+      "post": {
+        "tags": [
+          "timingassignments"
+        ],
+        "summary": "Assigner un timing à un équipage",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "timing_id",
+                  "crew_id"
+                ],
+                "properties": {
+                  "timing_id": {
+                    "type": "string"
+                  },
+                  "crew_id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Assignation créée"
+          }
+        }
+      }
+    },
+    "/timing-assignments/crew/{crew_id}": {
+      "get": {
+        "tags": [
+          "timingassignments"
+        ],
+        "summary": "Récupérer les timings assignés à un équipage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "crew_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Liste des assignations"
+          }
+        }
+      }
+    },
+    "/timing-assignments/{id}": {
+      "delete": {
+        "tags": [
+          "timingassignments"
+        ],
+        "summary": "Supprimer une assignation",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Supprimée"
+          }
+        }
+      }
+    },
+    "/users": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Liste des utilisateurs",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "role",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "user",
+                "admin",
+                "superadmin"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Utilisateurs récupérés",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserListResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Créer un utilisateur (admin)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "required": [
+                  "name",
+                  "email",
+                  "num_license"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string"
+                  },
+                  "num_license": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "user",
+                      "admin",
+                      "superadmin"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Utilisateur créé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserCreationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{identifier}": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Détail d’un utilisateur",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "identifier",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Email ou numéro de licence"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Détail utilisateur",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDetailResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{id}": {
+      "patch": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Modifier un utilisateur",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string"
+                  },
+                  "num_license": {
+                    "type": "string"
+                  },
+                  "avatar": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "active",
+                      "inactive"
+                    ]
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "user",
+                      "admin",
+                      "superadmin"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Utilisateur mis à jour"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Désactiver un utilisateur",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Utilisateur désactivé"
+          }
+        }
+      }
+    },
+    "/users/{id}/session-summary": {
+      "get": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Obtenir un résumé des sessions de l'utilisateur",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Résumé des sessions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "totalSessions": {
+                          "type": "integer"
+                        },
+                        "noShowSessions": {
+                          "type": "integer"
+                        },
+                        "points": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{userId}/sessions": {
+      "get": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Lister les séances auxquelles un utilisateur est inscrit",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "ID de l'utilisateur",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Liste des séances inscrites",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/UserSession"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Non autorisé"
+          },
+          "500": {
+            "description": "Erreur serveur"
+          }
+        }
+      }
+    },
+    "/users/me/session-summary": {
+      "get": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Obtenir un résumé des sessions pour l'utilisateur connecté",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Résumé des sessions de l'utilisateur connecté",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "totalSessions": {
+                          "type": "integer",
+                          "example": 12
+                        },
+                        "noShowSessions": {
+                          "type": "integer",
+                          "example": 3
+                        },
+                        "points": {
+                          "type": "integer",
+                          "example": -6
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/assign-club": {
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Associer un utilisateur à un club",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "required": [
+                  "user_id",
+                  "club_id"
+                ],
+                "properties": {
+                  "user_id": {
+                    "type": "string"
+                  },
+                  "club_id": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "member",
+                      "coach",
+                      "admin"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Utilisateur associé au club"
+          }
+        }
+      }
+    },
+    "/import/manifestation/{id}": {
+      "post": {
+        "tags": [
+          "Import"
+        ],
+        "summary": "Importer un événement avec ses épreuves, participants et bateaux",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID de la manifestation dans l'API source"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Importation réussie",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "event_id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user-events": {
+      "post": {
+        "tags": [
+          "UserEvents"
+        ],
+        "summary": "Ajouter ou mettre à jour un accès utilisateur à un événement",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "user_id",
+                  "event_id",
+                  "role"
+                ],
+                "properties": {
+                  "user_id": {
+                    "type": "string"
+                  },
+                  "event_id": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "viewer",
+                      "editor",
+                      "referee",
+                      "organiser"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Lien utilisateur-événement enregistré",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user-events/{id}": {
+      "delete": {
+        "tags": [
+          "UserEvents"
+        ],
+        "summary": "Supprimer un lien entre un utilisateur et un événement",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Supprimé avec succès"
+          }
+        }
+      }
+    },
+    "/user-events/event/{event_id}": {
+      "get": {
+        "tags": [
+          "UserEvents"
+        ],
+        "summary": "Lister tous les utilisateurs d’un événement",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Liste des utilisateurs avec rôles"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "ClubInfo": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          }
+        }
+      },
+      "GroupInfo": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "club_id": {
+            "type": "string"
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "num_license": {
+            "type": "string"
+          },
+          "avatar": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "inactive"
+            ]
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "admin",
+              "superadmin"
+            ]
+          },
+          "slug": {
+            "type": "string"
+          }
+        }
+      },
+      "UserDetailResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/User"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "clubs": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/ClubInfo"
+                    }
+                  },
+                  "groups": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/GroupInfo"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "UserListResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/User"
+            }
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "page": {
+                "type": "integer"
+              },
+              "limit": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      },
+      "UserCreationResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "auth",
+      "description": "Gestion de l'authentification et des utilisateurs"
+    },
+    {
+      "name": "Events",
+      "description": "Gestion des événements (courses, compétitions)"
+    },
+    {
+      "name": "participants",
+      "description": "Gestion des rameurs/rameuses et leurs informations"
+    },
+    {
+      "name": "categories",
+      "description": "Gestion des catégories (âge, sexe, type de bateau...)"
+    },
+    {
+      "name": "eventcategories",
+      "description": "Liaison entre événements et catégories"
+    },
+    {
+      "name": "crews",
+      "description": "Gestion des équipages/bateaux associés à un événement et une catégorie"
+    },
+    {
+      "name": "crewparticipants",
+      "description": "Affectation des participants à un équipage"
+    },
+    {
+      "name": "races",
+      "description": "Gestion des courses (configuration, phases, distances...)"
+    },
+    {
+      "name": "racephases",
+      "description": "Gestion des phases d’une compétition (Séries, Demi-finales, Finales, etc.)"
+    },
+    {
+      "name": "racecrews",
+      "description": "Affectation des équipages à une course, ligne d'eau et statut (DNS, DSQ…)"
+    },
+    {
+      "name": "distances",
+      "description": "Gestion des distances utilisées pour les courses"
+    },
+    {
+      "name": "timings",
+      "description": "Enregistrements de temps pour un équipage à un point donné"
+    },
+    {
+      "name": "timingpoints",
+      "description": "Points de chronométrage dans une course (Départ, Intermédiaire, Arrivée)"
+    },
+    {
+      "name": "timingassignments",
+      "description": "Assignation différée de temps brut à un équipage"
+    },
+    {
+      "name": "Import",
+      "description": "Importer une manifestation complète depuis l'API fédérale"
+    },
+    {
+      "name": "UserEvents",
+      "description": "Gestion des utilisateurs liés à un événement"
+    }
+  ],
+  "security": []
+}

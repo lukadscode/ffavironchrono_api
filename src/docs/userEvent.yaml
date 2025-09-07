@@ -1,0 +1,66 @@
+tags:
+  - name: UserEvents
+    description: Gestion des utilisateurs liés à un événement
+
+paths:
+  /user-events:
+    post:
+      tags: [UserEvents]
+      summary: Ajouter ou mettre à jour un accès utilisateur à un événement
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, event_id, role]
+              properties:
+                user_id:
+                  type: string
+                event_id:
+                  type: string
+                role:
+                  type: string
+                  enum: [viewer, editor, referee, organiser]
+      responses:
+        200:
+          description: Lien utilisateur-événement enregistré
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+
+  /user-events/{id}:
+    delete:
+      tags: [UserEvents]
+      summary: Supprimer un lien entre un utilisateur et un événement
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Supprimé avec succès
+
+  /user-events/event/{event_id}:
+    get:
+      tags: [UserEvents]
+      summary: Lister tous les utilisateurs d’un événement
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: event_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Liste des utilisateurs avec rôles

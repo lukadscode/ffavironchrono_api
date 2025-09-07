@@ -1,0 +1,115 @@
+tags:
+  - name: timing-assignments
+    description: Assignation des temps aux équipages
+
+paths:
+  /timing-assignments:
+    post:
+      tags: [timing-assignments]
+      summary: Assigner un temps à un équipage
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [timing_id, crew_id]
+              properties:
+                timing_id:
+                  type: string
+                crew_id:
+                  type: string
+      responses:
+        201:
+          description: Assignation créée
+
+  /timing-assignments/{id}:
+    put:
+      tags: [timing-assignments]
+      summary: Mettre à jour une assignation
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [timing_id, crew_id]
+              properties:
+                timing_id:
+                  type: string
+                crew_id:
+                  type: string
+      responses:
+        200:
+          description: Assignation mise à jour
+
+    delete:
+      tags: [timing-assignments]
+      summary: Supprimer une assignation
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Assignation supprimée
+
+  /timing-assignments/crew/{crew_id}:
+    get:
+      tags: [timing-assignments]
+      summary: Récupérer les assignations pour un équipage
+      parameters:
+        - in: path
+          name: crew_id
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Liste des assignations
+
+  /timing-assignments/event/{event_id}:
+    get:
+      tags: [timing-assignments]
+      summary: Récupérer toutes les assignations pour un événement
+      parameters:
+        - in: path
+          name: event_id
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Liste complète avec détails
+
+  /timing-assignments/race/{race_id}:
+    get:
+      tags: [timing-assignments]
+      summary: Récupérer toutes les assignations pour une course
+      parameters:
+        - in: path
+          name: race_id
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Liste complète avec détails
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

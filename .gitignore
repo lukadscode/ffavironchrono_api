@@ -1,0 +1,38 @@
+# Node modules
+node_modules/
+
+# Build files (si tu transpiles avec Babel, TypeScript, etc.)
+dist/
+build/
+
+# Environnement (⚠️ Ne jamais commit un .env contenant des secrets)
+.env
+.env.local
+.env.development
+.env.production
+
+# Logs
+logs/
+*.log
+
+# OS & IDE files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Tests output / coverage
+coverage/
+.nyc_output/
+
+# BDD locale (si tu stockes un SQLite ou fichier dump temporaire)
+*.sqlite
+*.sql
+dump.sql
+
+
+
+# Token JWT ou fichiers sensibles générés
+*.pem
+*.key
+*.crt

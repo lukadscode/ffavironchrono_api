@@ -1,0 +1,165 @@
+tags:
+  - name: categories
+    description: Gestion des catégories (âge, sexe, type de bateau...)
+
+paths:
+  /categories:
+    get:
+      tags: [categories]
+      summary: Liste des catégories
+      responses:
+        200:
+          description: Liste renvoyée
+
+    post:
+      tags: [categories]
+      summary: Créer une catégorie
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [label]
+              properties:
+                code:
+                  type: string
+                label:
+                  type: string
+                age_group:
+                  type: string
+                gender:
+                  type: string
+                  enum: [Homme, Femme, Mixte]
+                boat_seats:
+                  type: integer
+                  minimum: 1
+                  maximum: 8
+                has_coxswain:
+                  type: boolean
+      responses:
+        201:
+          description: Catégorie créée
+
+  /categories/event/{event_id}/with-crews:
+    get:
+      tags: [categories]
+      summary: Liste des catégories d’un événement avec équipages
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: event_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID de l’événement
+      responses:
+        200:
+          description: Liste des catégories et équipages
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        code:
+                          type: string
+                        label:
+                          type: string
+                        age_group:
+                          type: string
+                        gender:
+                          type: string
+                        boat_seats:
+                          type: integer
+                        has_coxswain:
+                          type: boolean
+                        crew_count:
+                          type: integer
+                        crews:
+                          type: array
+                          items:
+                            $ref: "#/components/schemas/Crew"
+
+  /categories/{id}:
+    get:
+      tags: [categories]
+      summary: Obtenir une catégorie par ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Détail de la catégorie
+        404:
+          description: Non trouvée
+
+    put:
+      tags: [categories]
+      summary: Modifier une catégorie
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                label:
+                  type: string
+                age_group:
+                  type: string
+                gender:
+                  type: string
+                  enum: [Homme, Femme, Mixte]
+                boat_seats:
+                  type: integer
+                  minimum: 1
+                  maximum: 8
+                has_coxswain:
+                  type: boolean
+      responses:
+        200:
+          description: Mise à jour réussie
+
+    delete:
+      tags: [categories]
+      summary: Supprimer une catégorie
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Supprimée avec succès
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

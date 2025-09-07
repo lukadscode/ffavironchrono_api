@@ -1,0 +1,94 @@
+tags:
+  - name: Import
+    description: Importer une manifestation complète depuis l'API fédérale
+  - name: Exports
+    description: Génération et téléchargement de documents PDF (start list, pesée, etc.)
+
+paths:
+  /import/manifestation/{id}:
+    post:
+      tags: [Import]
+      summary: Importer un événement avec ses épreuves, participants et bateaux
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID de la manifestation dans l'API source
+      responses:
+        201:
+          description: Importation réussie
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: object
+                    properties:
+                      event_id:
+                        type: string
+                      name:
+                        type: string
+
+  /exports/startlist/phase/{phase_id}:
+    get:
+      tags: [Exports]
+      summary: Exporter la start list d'une phase au format PDF
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: phase_id
+          required: true
+          schema:
+            type: string
+          description: ID de la phase
+      produces:
+        - application/pdf
+      responses:
+        200:
+          description: Fichier PDF de la start list
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        404:
+          description: Phase non trouvée
+
+  /exports/weighin/phase/{phase_id}:
+    get:
+      tags: [Exports]
+      summary: Exporter la liste de pesée d'une phase au format PDF
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: phase_id
+          required: true
+          schema:
+            type: string
+          description: ID de la phase
+      produces:
+        - application/pdf
+      responses:
+        200:
+          description: Fichier PDF de la pesée
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        404:
+          description: Phase non trouvée
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

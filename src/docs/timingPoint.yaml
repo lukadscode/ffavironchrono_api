@@ -1,0 +1,93 @@
+tags:
+  - name: timingpoints
+    description: Points de chronométrage dans une course (Départ, Intermédiaire, Arrivée)
+
+paths:
+  /timing-points:
+    post:
+      tags: [timingpoints]
+      summary: Créer un point de chronométrage
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [event_id, label, order_index, distance_m]
+              properties:
+                event_id:
+                  type: string
+                label:
+                  type: string
+                  example: "Arrivée"
+                order_index:
+                  type: integer
+                  example: 3
+                distance_m:
+                  type: integer
+                  example: 5000
+      responses:
+        201:
+          description: Créé
+
+  /timing-points/event/{event_id}:
+    get:
+      tags: [timingpoints]
+      summary: Récupérer les points d’une course
+      parameters:
+        - in: path
+          name: event_id
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Liste des points
+
+  /timing-points/{id}:
+    put:
+      tags: [timingpoints]
+      summary: Modifier un point de chronométrage
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                label:
+                  type: string
+                order_index:
+                  type: integer
+      responses:
+        200:
+          description: Mis à jour
+
+    delete:
+      tags: [timingpoints]
+      summary: Supprimer un point de chronométrage
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Supprimé
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

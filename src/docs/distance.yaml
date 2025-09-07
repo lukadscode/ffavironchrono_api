@@ -1,0 +1,71 @@
+tags:
+  - name: distances
+    description: Gestion des distances utilisées pour les courses
+
+paths:
+  /distances:
+    get:
+      tags: [distances]
+      summary: Liste des distances disponibles
+      responses:
+        200:
+          description: Liste renvoyée
+
+    post:
+      tags: [distances]
+      summary: Créer une nouvelle distance
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [event_id, meters]
+              properties:
+                event_id:
+                  type: string
+                  example: "2000m"
+                meters:
+                  type: integer
+                  example: 2000
+      responses:
+        201:
+          description: Distance créée
+
+  /distances/event/{event_id}:
+    get:
+      tags: [distances]
+      summary: Liste des distances utilisées dans un événement
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: event_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Liste des distances
+
+  /distances/{id}:
+    delete:
+      tags: [distances]
+      summary: Supprimer une distance
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Supprimée
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

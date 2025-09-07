@@ -1,0 +1,223 @@
+tags:
+  - name: timings
+    description: Gestion des enregistrements de chronométrage
+
+paths:
+  /timings:
+    get:
+      tags: [timings]
+      summary: Liste des chronométrages
+      responses:
+        200:
+          description: Liste des timings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Timing"
+
+    post:
+      tags: [timings]
+      summary: Créer un timing
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [timing_point_id, timestamp]
+              properties:
+                timing_point_id:
+                  type: string
+                timestamp:
+                  type: string
+                  format: date-time
+                manual_entry:
+                  type: boolean
+                entered_by:
+                  type: string
+                status:
+                  type: string
+                  enum: [pending, assigned, hidden]
+                  default: pending
+      responses:
+        201:
+          description: Timing enregistré
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    $ref: "#/components/schemas/Timing"
+
+  /timings/{id}:
+    get:
+      tags: [timings]
+      summary: Obtenir un timing par ID
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+          required: true
+          description: ID du timing
+      responses:
+        200:
+          description: Détail du timing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    $ref: "#/components/schemas/Timing"
+        404:
+          description: Timing non trouvé
+
+    put:
+      tags: [timings]
+      summary: Mettre à jour un timing
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+          required: true
+          description: ID du timing à mettre à jour
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                timing_point_id:
+                  type: string
+                timestamp:
+                  type: string
+                  format: date-time
+                manual_entry:
+                  type: boolean
+                entered_by:
+                  type: string
+                status:
+                  type: string
+                  enum: [pending, assigned, hidden]
+      responses:
+        200:
+          description: Mise à jour réussie
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    $ref: "#/components/schemas/Timing"
+        404:
+          description: Timing non trouvé
+        500:
+          description: Erreur serveur
+
+    delete:
+      tags: [timings]
+      summary: Supprimer un timing
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+          required: true
+          description: ID du timing à supprimer
+      responses:
+        200:
+          description: Supprimé avec succès
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: Timing supprimé
+        404:
+          description: Timing non trouvé
+
+  /timings/event/{event_id}:
+    get:
+      tags: [timings]
+      summary: Liste des temps d’un événement donné
+      parameters:
+        - in: path
+          name: event_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID de l’événement
+      responses:
+        200:
+          description: Liste des temps pour l’événement
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Timing"
+        404:
+          description: Événement non trouvé
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Timing:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        timing_point_id:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        manual_entry:
+          type: boolean
+        entered_by:
+          type: string
+        status:
+          type: string
+          enum: [pending, assigned, hidden]

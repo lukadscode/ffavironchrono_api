@@ -1,0 +1,362 @@
+openapi: 3.0.3
+info:
+  title: Aviron API
+  version: 1.0.0
+  description: API de gestion des utilisateurs (admin uniquement)
+
+paths:
+  /users:
+    get:
+      tags: [Users]
+      summary: Liste des utilisateurs
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: role
+          schema:
+            type: string
+            enum: [user, admin, superadmin]
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Utilisateurs récupérés
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserListResponse"
+
+    post:
+      tags: [Users]
+      summary: Créer un utilisateur (admin)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required: [name, email, num_license]
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                num_license:
+                  type: string
+                role:
+                  type: string
+                  enum: [user, admin, superadmin]
+      responses:
+        "201":
+          description: Utilisateur créé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserCreationResponse"
+
+  /users/{identifier}:
+    get:
+      tags: [Users]
+      summary: Détail d’un utilisateur
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: identifier
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Email ou numéro de licence
+      responses:
+        "200":
+          description: Détail utilisateur
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserDetailResponse"
+
+  /users/{id}:
+    patch:
+      tags: [Users]
+      summary: Modifier un utilisateur
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                num_license:
+                  type: string
+                avatar:
+                  type: string
+                status:
+                  type: string
+                  enum: [active, inactive]
+                role:
+                  type: string
+                  enum: [user, admin, superadmin]
+      responses:
+        "200":
+          description: Utilisateur mis à jour
+
+    delete:
+      tags: [Users]
+      summary: Désactiver un utilisateur
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Utilisateur désactivé
+
+  /users/{id}/session-summary:
+    get:
+      tags:
+        - users
+      summary: Obtenir un résumé des sessions de l'utilisateur
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Résumé des sessions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      totalSessions:
+                        type: integer
+                      noShowSessions:
+                        type: integer
+                      points:
+                        type: integer
+
+  /users/{userId}/sessions:
+    get:
+      tags:
+        - users
+      summary: Lister les séances auxquelles un utilisateur est inscrit
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          description: ID de l'utilisateur
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Liste des séances inscrites
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UserSession"
+        "401":
+          description: Non autorisé
+        "500":
+          description: Erreur serveur
+
+  /users/me/session-summary:
+    get:
+      tags:
+        - users
+      summary: Obtenir un résumé des sessions pour l'utilisateur connecté
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Résumé des sessions de l'utilisateur connecté
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      totalSessions:
+                        type: integer
+                        example: 12
+                      noShowSessions:
+                        type: integer
+                        example: 3
+                      points:
+                        type: integer
+                        example: -6
+
+  /users/assign-club:
+    post:
+      tags: [Users]
+      summary: Associer un utilisateur à un club
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              required: [user_id, club_id]
+              properties:
+                user_id:
+                  type: string
+                club_id:
+                  type: string
+                role:
+                  type: string
+                  enum: [member, coach, admin]
+      responses:
+        "200":
+          description: Utilisateur associé au club
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ClubInfo:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        city:
+          type: string
+        role:
+          type: string
+
+    GroupInfo:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        club_id:
+          type: string
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        num_license:
+          type: string
+        avatar:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive]
+        role:
+          type: string
+          enum: [user, admin, superadmin]
+        slug:
+          type: string
+
+    UserDetailResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        data:
+          allOf:
+            - $ref: "#/components/schemas/User"
+            - type: object
+              properties:
+                clubs:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/ClubInfo"
+                groups:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/GroupInfo"
+
+    UserListResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+        pagination:
+          type: object
+          properties:
+            total:
+              type: integer
+            page:
+              type: integer
+            limit:
+              type: integer
+
+    UserCreationResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+            email:
+              type: string

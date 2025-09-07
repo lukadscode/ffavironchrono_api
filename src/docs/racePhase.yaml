@@ -1,0 +1,88 @@
+tags:
+  - name: racephases
+    description: Gestion des phases d’une compétition (Séries, Demi-finales, Finales, etc.)
+
+paths:
+  /race-phases:
+    post:
+      tags: [racephases]
+      summary: Créer une phase de course
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [event_id, name, order_index]
+              properties:
+                event_id:
+                  type: string
+                name:
+                  type: string
+                order_index:
+                  type: integer
+      responses:
+        201:
+          description: Phase créée
+
+  /race-phases/{event_id}:
+    get:
+      tags: [racephases]
+      summary: Récupérer les phases d’un événement
+      parameters:
+        - in: path
+          name: event_id
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Liste des phases triée par ordre
+
+  /race-phases/{id}:
+    put:
+      tags: [racephases]
+      summary: Modifier une phase
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                order_index:
+                  type: integer
+      responses:
+        200:
+          description: Phase mise à jour
+
+    delete:
+      tags: [racephases]
+      summary: Supprimer une phase
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Phase supprimée
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

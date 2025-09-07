@@ -1,0 +1,69 @@
+tags:
+  - name: racecrews
+    description: Affectation des équipages à une course, ligne d'eau et statut (DNS, DSQ…)
+
+paths:
+  /race-crews:
+    post:
+      tags: [racecrews]
+      summary: Affecter un équipage à une course
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [race_id, crew_id]
+              properties:
+                race_id:
+                  type: string
+                crew_id:
+                  type: string
+                lane:
+                  type: integer
+                  minimum: 1
+                status:
+                  type: string
+                  description: DNS, DNF, DSQ ou vide
+      responses:
+        201:
+          description: Équipage affecté
+        400:
+          description: Déjà présent
+
+  /race-crews/{race_id}:
+    get:
+      tags: [racecrews]
+      summary: Récupérer les équipages affectés à une course
+      parameters:
+        - in: path
+          name: race_id
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Liste des équipages
+
+  /race-crews/{id}:
+    delete:
+      tags: [racecrews]
+      summary: Retirer un équipage d’une course
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Supprimé
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

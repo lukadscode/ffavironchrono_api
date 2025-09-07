@@ -1,0 +1,63 @@
+tags:
+  - name: eventcategories
+    description: Liaison entre événements et catégories
+
+paths:
+  /event-categories:
+    post:
+      tags: [eventcategories]
+      summary: Lier une catégorie à un événement
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [event_id, category_id]
+              properties:
+                event_id:
+                  type: string
+                category_id:
+                  type: string
+      responses:
+        201:
+          description: Liaison créée
+        400:
+          description: Déjà lié
+
+  /event-categories/{event_id}:
+    get:
+      tags: [eventcategories]
+      summary: Récupérer les catégories liées à un événement
+      parameters:
+        - in: path
+          name: event_id
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Liste des catégories liées
+
+  /event-categories/unlink/{id}:
+    delete:
+      tags: [eventcategories]
+      summary: Supprimer une liaison événement ↔ catégorie
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Lien supprimé
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

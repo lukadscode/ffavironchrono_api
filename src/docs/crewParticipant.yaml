@@ -1,0 +1,69 @@
+tags:
+  - name: crewparticipants
+    description: Affectation des participants à un équipage
+
+paths:
+  /crew-participants:
+    post:
+      tags: [crewparticipants]
+      summary: Ajouter un participant à un équipage
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [crew_id, participant_id]
+              properties:
+                crew_id:
+                  type: string
+                participant_id:
+                  type: string
+                is_coxswain:
+                  type: boolean
+                coxswain_weight:
+                  type: number
+                seat_position:
+                  type: integer
+      responses:
+        201:
+          description: Participant affecté
+        400:
+          description: Déjà affecté
+
+  /crew-participants/{crew_id}:
+    get:
+      tags: [crewparticipants]
+      summary: Récupérer les participants d’un équipage
+      parameters:
+        - in: path
+          name: crew_id
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Liste des membres de l’équipage
+
+  /crew-participants/{id}:
+    delete:
+      tags: [crewparticipants]
+      summary: Retirer un participant d’un équipage
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Participant retiré
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

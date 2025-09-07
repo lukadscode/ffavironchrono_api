@@ -1,0 +1,118 @@
+tags:
+  - name: Events
+    description: Gestion des événements (courses, compétitions)
+
+paths:
+  /events:
+    get:
+      tags: [Events]
+      summary: Liste des événements
+      responses:
+        200:
+          description: Liste des événements renvoyée
+
+    post:
+      tags: [Events]
+      summary: Créer un événement
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, location, start_date, end_date]
+              properties:
+                name: { type: string }
+                location: { type: string }
+                start_date: { type: string, format: date-time }
+                end_date: { type: string, format: date-time }
+                race_type: { type: string }
+                website_url: { type: string, format: uri }
+                image_url: { type: string, format: uri }
+                organiser_name: { type: string }
+                organiser_code: { type: string }
+                is_visible: { type: boolean }
+                is_finished: { type: boolean }
+                progression_template_id: { type: string }
+      responses:
+        201:
+          description: Événement créé
+        400:
+          description: Données invalides
+
+  /events/{id}:
+    get:
+      tags: [Events]
+      summary: Obtenir un événement par ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Détail de l’événement
+        404:
+          description: Événement non trouvé
+
+    put:
+      tags: [Events]
+      summary: Modifier un événement
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                location: { type: string }
+                start_date: { type: string, format: date-time }
+                end_date: { type: string, format: date-time }
+                race_type: { type: string }
+                website_url: { type: string, format: uri }
+                image_url: { type: string, format: uri }
+                organiser_name: { type: string }
+                organiser_code: { type: string }
+                is_visible: { type: boolean }
+                is_finished: { type: boolean }
+                progression_template_id: { type: string }
+      responses:
+        200:
+          description: Événement mis à jour
+        400:
+          description: Données invalides
+        404:
+          description: Événement non trouvé
+
+    delete:
+      tags: [Events]
+      summary: Supprimer un événement
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Événement supprimé
+        404:
+          description: Événement non trouvé
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
