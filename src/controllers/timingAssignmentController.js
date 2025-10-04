@@ -80,6 +80,7 @@ exports.getAssignmentsByEvent = async (req, res) => {
           include: [
             {
               model: RaceCrew,
+              as: "race_crews",
               include: [
                 {
                   model: Race,
@@ -93,10 +94,19 @@ exports.getAssignmentsByEvent = async (req, res) => {
                 },
               ],
             },
-            Category,
+            {
+              model: Category,
+              as: "category",
+            },
             {
               model: CrewParticipant,
-              include: [Participant],
+              as: "crew_participants",
+              include: [
+                {
+                  model: Participant,
+                  as: "participant",
+                },
+              ],
             },
           ],
         },
@@ -133,6 +143,7 @@ exports.getAssignmentsByRace = async (req, res) => {
           include: [
             {
               model: RaceCrew,
+              as: "race_crews",
               required: true,
               where: { race_id },
               include: [
@@ -147,10 +158,19 @@ exports.getAssignmentsByRace = async (req, res) => {
                 },
               ],
             },
-            Category,
+            {
+              model: Category,
+              as: "category",
+            },
             {
               model: CrewParticipant,
-              include: [Participant],
+              as: "crew_participants",
+              include: [
+                {
+                  model: Participant,
+                  as: "participant",
+                },
+              ],
             },
           ],
         },
