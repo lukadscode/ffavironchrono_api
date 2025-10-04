@@ -40,10 +40,17 @@ exports.getRacesByEvent = async (req, res) => {
         },
         {
           model: require("../models/RaceCrew"),
+          as: "race_crews",
           include: [
             {
               model: require("../models/Crew"),
-              include: [require("../models/Category")],
+              as: "crew",
+              include: [
+                {
+                  model: require("../models/Category"),
+                  as: "category",
+                },
+              ],
             },
           ],
         },
