@@ -33,7 +33,13 @@ exports.getRaceCrews = async (req, res) => {
       include: [
         {
           model: Crew,
-          include: [Category],
+          as: "crew",
+          include: [
+            {
+              model: Category,
+              as: "category",
+            },
+          ],
         },
       ],
       order: [["lane", "ASC"]],
