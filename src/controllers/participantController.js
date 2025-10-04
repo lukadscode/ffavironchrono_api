@@ -41,6 +41,7 @@ exports.getParticipant = async (req, res) => {
               include: [
                 {
                   model: Category,
+                  as: "category",
                   attributes: ["id", "code", "label", "age_group", "gender"],
                 },
               ],
@@ -84,6 +85,7 @@ exports.getParticipantsByEvent = async (req, res) => {
               include: [
                 {
                   model: Category,
+                  as: "category",
                   attributes: ["id", "code", "label", "age_group", "gender"],
                 },
               ],
