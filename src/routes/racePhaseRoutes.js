@@ -12,6 +12,7 @@ router.post(
   controller.createRacePhase
 );
 router.get("/:event_id", controller.getRacePhasesByEvent);
+router.get("/:id/results", controller.getPhaseResults);
 router.put(
   "/:id",
   auth,

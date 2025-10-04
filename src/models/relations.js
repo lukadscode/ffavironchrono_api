@@ -21,7 +21,7 @@ UserSession.belongsTo(User, { foreignKey: "user_id" });
 
 // Relations Category / Crew / Event
 Category.hasMany(Crew, { foreignKey: "category_id" });
-Crew.belongsTo(Category, { foreignKey: "category_id" });
+Crew.belongsTo(Category, { foreignKey: "category_id", as: "category" });
 
 Category.belongsToMany(Event, {
   through: EventCategory,
@@ -53,18 +53,18 @@ RacePhase.belongsTo(Event, { foreignKey: "event_id" });
 Event.hasMany(RacePhase, { foreignKey: "event_id" });
 
 // Relations Race / RaceCrew / Crew
-Race.hasMany(RaceCrew, { foreignKey: "race_id" });
+Race.hasMany(RaceCrew, { foreignKey: "race_id", as: "race_crews" });
 RaceCrew.belongsTo(Race, { foreignKey: "race_id" });
 
 Crew.hasMany(RaceCrew, { foreignKey: "crew_id" });
-RaceCrew.belongsTo(Crew, { foreignKey: "crew_id" });
+RaceCrew.belongsTo(Crew, { foreignKey: "crew_id", as: "crew" });
 
 TimingPoint.hasMany(Timing, { foreignKey: "timing_point_id" });
 Timing.belongsTo(TimingPoint, { foreignKey: "timing_point_id" });
 
 // Relations TimingAssignment
 Timing.hasOne(TimingAssignment, { foreignKey: "timing_id" });
-TimingAssignment.belongsTo(Timing, { foreignKey: "timing_id" });
+TimingAssignment.belongsTo(Timing, { foreignKey: "timing_id", as: "timing" });
 
 Crew.hasMany(TimingAssignment, { foreignKey: "crew_id" });
 TimingAssignment.belongsTo(Crew, { foreignKey: "crew_id" });
@@ -97,11 +97,11 @@ CrewParticipant.belongsTo(Participant, { foreignKey: "participant_id" });
 Event.hasMany(Distance, { foreignKey: "event_id" });
 Distance.belongsTo(Event, { foreignKey: "event_id" });
 
-Event.hasMany(TimingPoint, { foreignKey: "event_id" });
+Event.hasMany(TimingPoint, { foreignKey: "event_id", as: "timing_points" });
 TimingPoint.belongsTo(Event, { foreignKey: "event_id" });
 
 Category.hasMany(Crew, { foreignKey: "category_id" });
-Crew.belongsTo(Category, { foreignKey: "category_id" });
+Crew.belongsTo(Category, { foreignKey: "category_id", as: "category" });
 
 Category.belongsToMany(Event, {
   through: EventCategory,
@@ -125,7 +125,8 @@ RaceCrew.belongsTo(Crew, { foreignKey: "crew_id" });
 Race.hasMany(RaceCrew, { foreignKey: "race_id" });
 RaceCrew.belongsTo(Race, { foreignKey: "race_id" });
 
-Race.belongsTo(RacePhase, { foreignKey: "phase_id" });
+Race.belongsTo(RacePhase, { foreignKey: "phase_id", as: "race_phase" });
 RacePhase.hasMany(Race, { foreignKey: "phase_id" });
 
-RacePhase.belongsTo(Event, { foreignKey: "event_id" });
+RacePhase.belongsTo(Event, { foreignKey: "event_id", as: "event" });
+Event.hasMany(RacePhase, { foreignKey: "event_id" });
