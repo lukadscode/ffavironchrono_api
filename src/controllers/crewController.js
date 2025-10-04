@@ -18,7 +18,7 @@ exports.createCrew = async (req, res) => {
 exports.getCrews = async (req, res) => {
   try {
     const list = await Crew.findAll({
-      include: [Event, Category],
+      include: [Event, { model: Category, as: "category" }],
       order: [["club_name", "ASC"]],
     });
     res.json({ status: "success", data: list });
@@ -32,7 +32,7 @@ exports.getCrew = async (req, res) => {
     const crew = await Crew.findByPk(req.params.id, {
       include: [
         Event,
-        Category,
+        { model: Category, as: "category" },
         {
           model: CrewParticipant,
           include: [
@@ -91,7 +91,7 @@ exports.getCrewsByEvent = async (req, res) => {
 
     const crews = await Crew.findAll({
       where: { event_id },
-      include: [Event, Category],
+      include: [Event, { model: Category, as: "category" }],
       order: [["club_name", "ASC"]],
     });
 
