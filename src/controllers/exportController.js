@@ -51,7 +51,19 @@ async function getPhaseData(phase_id) {
       Distance,
       {
         model: RaceCrew,
-        include: [{ model: Crew, include: [Category] }],
+        as: "race_crews",
+        include: [
+          {
+            model: Crew,
+            as: "crew",
+            include: [
+              {
+                model: Category,
+                as: "category",
+              },
+            ],
+          },
+        ],
       },
     ],
     order: [["race_number", "ASC"]],
@@ -144,12 +156,12 @@ exports.startListPdf = async (req, res) => {
 
       // lignes
       for (let lane = 1; lane <= laneCount; lane++) {
-        const entry = (race.RaceCrews || race.crews || []).find(
+        const entry = (race.race_crews || race.RaceCrews || race.crews || []).find(
           (c) => c.lane === lane
         );
-        const club = entry?.Crew?.club_name || "";
+        const club = entry?.crew?.club_name || entry?.Crew?.club_name || "";
         const cat =
-          entry?.Crew?.Category?.label || entry?.Crew?.category_label || "";
+          entry?.crew?.category?.label || entry?.Crew?.Category?.label || entry?.Crew?.category_label || "";
         const status = entry?.status || "";
 
         doc.fontSize(10);
@@ -206,7 +218,7 @@ exports.weighInPdf = async (req, res) => {
     // Flatten: une ligne par RaceCrew (avec race info)
     const rows = [];
     for (const r of races) {
-      const entries = (r.RaceCrews || r.crews || []).sort(
+      const entries = (r.race_crews || r.RaceCrews || r.crews || []).sort(
         (a, b) => (a.lane ?? 0) - (b.lane ?? 0)
       );
       for (const e of entries) {
@@ -220,9 +232,9 @@ exports.weighInPdf = async (req, res) => {
               })
             : "",
           lane: e.lane,
-          club: e.Crew?.club_name || "",
-          category: e.Crew?.Category?.label || e.Crew?.category_label || "",
-          crew_id: e.Crew?.id,
+          club: e.crew?.club_name || e.Crew?.club_name || "",
+          category: e.crew?.category?.label || e.Crew?.Category?.label || e.Crew?.category_label || "",
+          crew_id: e.crew?.id || e.Crew?.id,
         });
       }
     }
