@@ -101,7 +101,6 @@ Event.hasMany(TimingPoint, { foreignKey: "event_id", as: "timing_points" });
 TimingPoint.belongsTo(Event, { foreignKey: "event_id" });
 
 Category.hasMany(Crew, { foreignKey: "category_id" });
-Crew.belongsTo(Category, { foreignKey: "category_id", as: "category" });
 
 Category.belongsToMany(Event, {
   through: EventCategory,
