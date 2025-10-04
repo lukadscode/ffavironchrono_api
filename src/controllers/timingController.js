@@ -47,13 +47,14 @@ exports.getTimingsByEvent = async (req, res) => {
         },
         {
           model: TimingAssignment,
-          required: false, // on veut les timings même sans assignation
+          required: false,
           include: [
             {
               model: Crew,
               include: [
                 {
                   model: RaceCrew,
+                  as: "race_crews",
                   include: [
                     {
                       model: Race,
@@ -61,7 +62,10 @@ exports.getTimingsByEvent = async (req, res) => {
                     },
                   ],
                 },
-                Category,
+                {
+                  model: Category,
+                  as: "category",
+                },
               ],
             },
           ],
