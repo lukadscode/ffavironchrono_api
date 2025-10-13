@@ -80,7 +80,7 @@ exports.getAssignmentsByEvent = async (req, res) => {
           include: [
             {
               model: RaceCrew,
-              as: "race_crews",
+              as: "RaceCrews",
               include: [
                 {
                   model: Race,
@@ -143,7 +143,7 @@ exports.getAssignmentsByRace = async (req, res) => {
           include: [
             {
               model: RaceCrew,
-              as: "race_crews",
+              as: "RaceCrews",
               required: true,
               where: { race_id },
               include: [

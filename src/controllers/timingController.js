@@ -54,7 +54,7 @@ exports.getTimingsByEvent = async (req, res) => {
               include: [
                 {
                   model: RaceCrew,
-                  as: "race_crews",
+                  as: "RaceCrews",
                   include: [
                     {
                       model: Race,
