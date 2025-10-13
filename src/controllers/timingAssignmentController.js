@@ -135,16 +135,28 @@ exports.getAssignmentsByRace = async (req, res) => {
   try {
     const { race_id } = req.params;
 
+    const raceCrews = await RaceCrew.findAll({
+      where: { race_id },
+      attributes: ["crew_id"],
+    });
+
+    const crewIds = raceCrews.map((rc) => rc.crew_id);
+
+    if (crewIds.length === 0) {
+      return res.json({ status: "success", data: [] });
+    }
+
     const list = await TimingAssignment.findAll({
+      where: {
+        crew_id: crewIds,
+      },
       include: [
         {
           model: Crew,
-          required: true,
           include: [
             {
               model: RaceCrew,
               as: "RaceCrews",
-              required: true,
               where: { race_id },
               include: [
                 {
