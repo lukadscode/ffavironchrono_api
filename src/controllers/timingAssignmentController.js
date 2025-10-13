@@ -176,6 +176,7 @@ exports.getAssignmentsByRace = async (req, res) => {
         },
         {
           model: Timing,
+          as: "timing",
           include: [TimingPoint],
         },
       ],
