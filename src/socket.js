@@ -12,10 +12,20 @@ module.exports = (io) => {
       if (event_id) socket.join(`event_${event_id}`);
     });
 
+    socket.on("joinPublicEvent", ({ event_id }) => {
+      console.log(`Client ${socket.id} rejoint l'événement public ${event_id}`);
+      socket.join(`event:${event_id}`);
+    });
+
     // Leave race/event rooms
     socket.on("leaveRoom", ({ race_id, event_id }) => {
       if (race_id) socket.leave(`race_${race_id}`);
       if (event_id) socket.leave(`event_${event_id}`);
+    });
+
+    socket.on("leavePublicEvent", ({ event_id }) => {
+      console.log(`Client ${socket.id} quitte l'événement public ${event_id}`);
+      socket.leave(`event:${event_id}`);
     });
 
     // Join timing point room

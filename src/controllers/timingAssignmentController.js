@@ -21,6 +21,59 @@ exports.assignTiming = async (req, res) => {
       crew_id,
     });
 
+    const timing = await Timing.findByPk(timing_id, {
+      include: [TimingPoint],
+    });
+
+    const raceCrew = await RaceCrew.findOne({
+      where: { crew_id },
+      include: [
+        {
+          model: Race,
+          include: [{ model: RacePhase, include: [Event] }],
+        },
+      ],
+    });
+
+    if (timing && raceCrew && raceCrew.Race) {
+      const race = raceCrew.Race;
+      const timingPoint = timing.TimingPoint;
+      const event_id = race.RacePhase?.event_id;
+
+      const startTime = new Date(race.start_time).getTime();
+      const timingTime = new Date(timing.timestamp).getTime();
+      const time_ms = timingTime - startTime;
+
+      const io = req.app.get("io");
+
+      const allTimingPoints = await TimingPoint.findAll({
+        where: { event_id },
+        order: [["order_index", "ASC"]],
+      });
+
+      const maxOrderIndex = Math.max(
+        ...allTimingPoints.map((tp) => tp.order_index)
+      );
+
+      if (timingPoint.order_index === maxOrderIndex) {
+        io.to(`event:${event_id}`).emit("raceFinalUpdate", {
+          race_id: race.id,
+          crew_id,
+          final_time: time_ms.toString(),
+        });
+      } else {
+        io.to(`event:${event_id}`).emit("raceIntermediateUpdate", {
+          race_id: race.id,
+          crew_id,
+          timing_point_id: timingPoint.id,
+          timing_point_label: timingPoint.label,
+          distance_m: timingPoint.distance_m,
+          time_ms: time_ms.toString(),
+          order_index: timingPoint.order_index,
+        });
+      }
+    }
+
     res.status(201).json({ status: "success", data: assignment });
   } catch (err) {
     res.status(500).json({ status: "error", message: err.message });

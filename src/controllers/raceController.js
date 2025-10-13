@@ -79,10 +79,25 @@ exports.getRace = async (req, res) => {
 
 exports.updateRace = async (req, res) => {
   try {
-    const race = await Race.findByPk(req.params.id);
+    const race = await Race.findByPk(req.params.id, {
+      include: [{ model: RacePhase, include: [require("../models/Event")] }],
+    });
     if (!race)
       return res.status(404).json({ status: "error", message: "Non trouvé" });
+
+    const oldStatus = race.status;
     await race.update(req.body);
+
+    if (req.body.status && req.body.status !== oldStatus && race.RacePhase) {
+      const io = req.app.get("io");
+      const event_id = race.RacePhase.event_id;
+
+      io.to(`event:${event_id}`).emit("raceStatusUpdate", {
+        race_id: race.id,
+        status: req.body.status,
+      });
+    }
+
     res.json({ status: "success", data: race });
   } catch (err) {
     res.status(500).json({ status: "error", message: err.message });
