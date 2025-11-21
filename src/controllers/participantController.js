@@ -71,10 +71,12 @@ exports.getParticipantsByEvent = async (req, res) => {
       include: [
         {
           model: CrewParticipant,
+          required: true, // ← IMPORTANT : Ne retourner que les participants qui ont un équipage
           include: [
             {
               model: Crew,
-              where: { event_id },
+              where: { event_id }, // Filtrer par event_id
+              required: true, // ← IMPORTANT : Ne retourner que les équipages de cet événement
               attributes: [
                 "id",
                 "club_name",
@@ -94,6 +96,7 @@ exports.getParticipantsByEvent = async (req, res) => {
         },
       ],
       order: [["last_name", "ASC"]],
+      distinct: true, // Éviter les doublons si un participant a plusieurs équipages
     });
 
     res.json({ status: "success", data: participants });

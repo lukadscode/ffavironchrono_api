@@ -13,7 +13,7 @@ router.post(
   validate(schema.createSchema),
   controller.createParticipant
 );
-router.get("/event/:event_id", auth, controller.getParticipantsByEvent);
+router.get("/event/:event_id", controller.getParticipantsByEvent);
 router.put(
   "/:id",
   auth,

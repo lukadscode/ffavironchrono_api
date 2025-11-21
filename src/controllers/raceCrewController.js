@@ -2,6 +2,8 @@ const { v4: uuidv4 } = require("uuid");
 const RaceCrew = require("../models/RaceCrew");
 const Crew = require("../models/Crew");
 const Category = require("../models/Category");
+const CrewParticipant = require("../models/CrewParticipant");
+const Participant = require("../models/Participant");
 
 exports.assignCrewToRace = async (req, res) => {
   try {
@@ -38,6 +40,16 @@ exports.getRaceCrews = async (req, res) => {
             {
               model: Category,
               as: "category",
+            },
+            {
+              model: CrewParticipant,
+              as: "crew_participants",
+              include: [
+                {
+                  model: Participant,
+                  as: "participant",
+                },
+              ],
             },
           ],
         },

@@ -115,3 +115,218 @@ exports.deleteRace = async (req, res) => {
     res.status(500).json({ status: "error", message: err.message });
   }
 };
+
+// GET races with non_official status (for arbitres page)
+exports.getNonOfficialRaces = async (req, res) => {
+  try {
+    const Event = require("../models/Event");
+    
+    const races = await Race.findAll({
+      where: { status: "non_official" },
+      include: [
+        {
+          model: RacePhase,
+          as: "race_phase",
+          include: [
+            {
+              model: Event,
+              as: "event",
+            },
+          ],
+        },
+        {
+          model: Distance,
+        },
+        {
+          model: require("../models/RaceCrew"),
+          as: "race_crews",
+          include: [
+            {
+              model: require("../models/Crew"),
+              as: "crew",
+              include: [
+                {
+                  model: require("../models/Category"),
+                  as: "category",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      order: [
+        [{ model: RacePhase, as: "race_phase" }, { model: Event, as: "event" }, "name", "ASC"],
+        ["race_number", "ASC"],
+      ],
+    });
+
+    res.json({ status: "success", data: races });
+  } catch (err) {
+    console.error("Error fetching non-official races:", err);
+    res.status(500).json({ status: "error", message: err.message });
+  }
+};
+
+// GET race results by race ID
+exports.getRaceResults = async (req, res) => {
+  try {
+    const { race_id } = req.params;
+    const RaceCrew = require("../models/RaceCrew");
+    const Crew = require("../models/Crew");
+    const Category = require("../models/Category");
+    const TimingAssignment = require("../models/TimingAssignment");
+    const Timing = require("../models/Timing");
+    const TimingPoint = require("../models/TimingPoint");
+    const Event = require("../models/Event");
+
+    const race = await Race.findByPk(race_id, {
+      include: [
+        {
+          model: RacePhase,
+          as: "race_phase",
+          include: [
+            {
+              model: require("../models/Event"),
+              as: "event",
+              include: [
+                {
+                  model: require("../models/TimingPoint"),
+                  as: "timing_points",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    if (!race) {
+      return res
+        .status(404)
+        .json({ status: "error", message: "Course non trouvée" });
+    }
+
+    // Accéder à l'événement via la relation
+    const event = race.race_phase?.event;
+    if (!event || !event.timing_points) {
+      return res.json({ status: "success", data: [] });
+    }
+
+    const timingPoints = event.timing_points.sort(
+      (a, b) => a.order_index - b.order_index
+    );
+    const startPoint = timingPoints[0];
+    const finishPoint =
+      timingPoints.find(
+        (tp) =>
+          tp.label === "Finish" ||
+          tp.label === "finish" ||
+          tp.label === "Arrivée" ||
+          tp.label === "arrivée"
+      ) || timingPoints[timingPoints.length - 1];
+
+    if (!startPoint || !finishPoint) {
+      return res.json({ status: "success", data: [] });
+    }
+
+    // Récupérer tous les équipages de la course
+    const raceCrews = await RaceCrew.findAll({
+      where: { race_id },
+      include: [
+        {
+          model: Crew,
+          as: "crew",
+          include: [
+            {
+              model: Category,
+              as: "category",
+            },
+          ],
+        },
+      ],
+      order: [["lane", "ASC"]],
+    });
+
+    const results = [];
+
+    for (const raceCrew of raceCrews) {
+      const timingAssignments = await TimingAssignment.findAll({
+        where: { crew_id: raceCrew.crew_id },
+        include: [
+          {
+            model: Timing,
+            as: "timing",
+            where: {
+              timing_point_id: [startPoint.id, finishPoint.id],
+            },
+            required: false,
+          },
+        ],
+      });
+
+      const startTiming = timingAssignments.find(
+        (ta) => ta.timing && ta.timing.timing_point_id === startPoint.id
+      );
+      const finishTiming = timingAssignments.find(
+        (ta) => ta.timing && ta.timing.timing_point_id === finishPoint.id
+      );
+
+      let duration_ms = null;
+      let finish_time = null;
+
+      if (finishTiming?.timing?.timestamp) {
+        finish_time = finishTiming.timing.timestamp;
+
+        if (startTiming?.timing?.timestamp) {
+          const start = new Date(startTiming.timing.timestamp);
+          const finish = new Date(finishTiming.timing.timestamp);
+          duration_ms = finish - start;
+        }
+      }
+
+      results.push({
+        crew_id: raceCrew.crew_id,
+        lane: raceCrew.lane,
+        club_name: raceCrew.crew?.club_name || null,
+        club_code: raceCrew.crew?.club_code || null,
+        category: raceCrew.crew?.category
+          ? {
+              id: raceCrew.crew.category.id,
+              code: raceCrew.crew.category.code,
+              label: raceCrew.crew.category.label,
+              age_group: raceCrew.crew.category.age_group,
+              gender: raceCrew.crew.category.gender,
+            }
+          : null,
+        finish_time,
+        final_time: duration_ms !== null ? duration_ms.toString() : null,
+        has_timing: finish_time !== null,
+      });
+    }
+
+    // Trier par temps et calculer les positions
+    const sortedResults = results
+      .filter((r) => r.has_timing)
+      .sort((a, b) => {
+        const timeA = parseInt(a.final_time || "999999999", 10);
+        const timeB = parseInt(b.final_time || "999999999", 10);
+        return timeA - timeB;
+      });
+
+    sortedResults.forEach((r, index) => {
+      r.position = index + 1;
+    });
+
+    // Ajouter les résultats sans timing à la fin
+    const resultsWithoutTiming = results
+      .filter((r) => !r.has_timing)
+      .map((r) => ({ ...r, position: null }));
+
+    const allResults = [...sortedResults, ...resultsWithoutTiming];
+
+    res.json({ status: "success", data: allResults });
+  } catch (err) {
+    console.error("Error fetching race results:", err);
+    res.status(500).json({ status: "error", message: err.message });
+  }
+};

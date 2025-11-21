@@ -10,18 +10,9 @@ const { Op } = require("sequelize");
 exports.importManifestation = async (req, res) => {
   try {
     const { id } = req.params;
+    console.log(`🚀 Début de l'import de la manifestation ${id}...`);
     const result = await importManifestation(id, req);
-    res.status(201).json({ status: "success", data: result });
-  } catch (err) {
-    console.error("❌ Import error:", err);
-    res.status(500).json({ status: "error", message: err.message });
-  }
-};
-
-exports.importManifestation = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const result = await importManifestation(id, req);
+    console.log(`✅ Import terminé avec succès`);
     res.status(201).json({ status: "success", data: result });
   } catch (err) {
     console.error("❌ Import error:", err);

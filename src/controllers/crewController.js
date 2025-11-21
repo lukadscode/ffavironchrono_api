@@ -35,9 +35,11 @@ exports.getCrew = async (req, res) => {
         { model: Category, as: "category" },
         {
           model: CrewParticipant,
+          as: "crew_participants",
           include: [
             {
               model: Participant,
+              as: "participant",
               attributes: [
                 "id",
                 "first_name",

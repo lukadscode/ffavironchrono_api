@@ -10,6 +10,10 @@ const Event = require("../models/Event");
 const Category = require("../models/Category");
 const CrewParticipant = require("../models/CrewParticipant");
 const Participant = require("../models/Participant");
+const {
+  enrichAssignmentsWithRelativeTime,
+  calculateRelativeTime,
+} = require("../utils/relativeTimeCalculator");
 
 exports.assignTiming = async (req, res) => {
   try {
@@ -40,9 +44,12 @@ exports.assignTiming = async (req, res) => {
       const timingPoint = timing.TimingPoint;
       const event_id = race.RacePhase?.event_id;
 
-      const startTime = new Date(race.start_time).getTime();
-      const timingTime = new Date(timing.timestamp).getTime();
-      const time_ms = timingTime - startTime;
+      // Calculer le temps relatif avec la nouvelle logique (basé sur le timing de départ réel)
+      const relativeTimeMs = await calculateRelativeTime(
+        timing,
+        crew_id,
+        event_id
+      );
 
       const io = req.app.get("io");
 
@@ -59,7 +66,9 @@ exports.assignTiming = async (req, res) => {
         io.to(`event:${event_id}`).emit("raceFinalUpdate", {
           race_id: race.id,
           crew_id,
-          final_time: time_ms.toString(),
+          final_time:
+            relativeTimeMs !== null ? relativeTimeMs.toString() : null,
+          relative_time_ms: relativeTimeMs, // ← NOUVEAU
         });
       } else {
         io.to(`event:${event_id}`).emit("raceIntermediateUpdate", {
@@ -68,7 +77,8 @@ exports.assignTiming = async (req, res) => {
           timing_point_id: timingPoint.id,
           timing_point_label: timingPoint.label,
           distance_m: timingPoint.distance_m,
-          time_ms: time_ms.toString(),
+          time_ms: relativeTimeMs !== null ? relativeTimeMs.toString() : null, // ← Modifié pour utiliser relativeTimeMs
+          relative_time_ms: relativeTimeMs, // ← NOUVEAU
           order_index: timingPoint.order_index,
         });
       }
@@ -100,9 +110,34 @@ exports.getAssignmentsByCrew = async (req, res) => {
   try {
     const list = await TimingAssignment.findAll({
       where: { crew_id: req.params.crew_id },
+      include: [
+        {
+          model: Crew,
+          include: [
+            {
+              model: RaceCrew,
+              as: "RaceCrews",
+              include: [
+                {
+                  model: Race,
+                  include: [RacePhase],
+                },
+              ],
+            },
+          ],
+        },
+        {
+          model: Timing,
+          as: "timing",
+          include: [TimingPoint],
+        },
+      ],
     });
 
-    res.json({ status: "success", data: list });
+    // Enrichir avec relative_time_ms
+    const enrichedList = await enrichAssignmentsWithRelativeTime(list);
+
+    res.json({ status: "success", data: enrichedList });
   } catch (err) {
     res.status(500).json({ status: "error", message: err.message });
   }
@@ -165,6 +200,7 @@ exports.getAssignmentsByEvent = async (req, res) => {
         },
         {
           model: Timing,
+          as: "timing",
           include: [
             {
               model: TimingPoint,
@@ -177,7 +213,10 @@ exports.getAssignmentsByEvent = async (req, res) => {
       ],
     });
 
-    res.json({ status: "success", data: list });
+    // Enrichir avec relative_time_ms
+    const enrichedList = await enrichAssignmentsWithRelativeTime(list);
+
+    res.json({ status: "success", data: enrichedList });
   } catch (err) {
     console.error("getAssignmentsByEvent error:", err);
     res.status(500).json({ status: "error", message: err.message });
@@ -247,7 +286,10 @@ exports.getAssignmentsByRace = async (req, res) => {
       ],
     });
 
-    res.json({ status: "success", data: list });
+    // Enrichir avec relative_time_ms
+    const enrichedList = await enrichAssignmentsWithRelativeTime(list);
+
+    res.json({ status: "success", data: enrichedList });
   } catch (err) {
     console.error("getAssignmentsByRace error:", err);
     res.status(500).json({ status: "error", message: err.message });

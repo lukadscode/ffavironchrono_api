@@ -28,7 +28,17 @@ module.exports = (io) => ({
     io.to(`event:${event_id}`).emit("raceStatusUpdate", { race_id, status });
   },
 
-  emitRaceIntermediateUpdate: ({ event_id, race_id, crew_id, timing_point_id, timing_point_label, distance_m, time_ms, order_index }) => {
+  emitRaceIntermediateUpdate: ({
+    event_id,
+    race_id,
+    crew_id,
+    timing_point_id,
+    timing_point_label,
+    distance_m,
+    time_ms,
+    relative_time_ms,
+    order_index,
+  }) => {
     io.to(`event:${event_id}`).emit("raceIntermediateUpdate", {
       race_id,
       crew_id,
@@ -36,15 +46,23 @@ module.exports = (io) => ({
       timing_point_label,
       distance_m,
       time_ms,
+      relative_time_ms, // ← NOUVEAU
       order_index,
     });
   },
 
-  emitRaceFinalUpdate: ({ event_id, race_id, crew_id, final_time }) => {
+  emitRaceFinalUpdate: ({
+    event_id,
+    race_id,
+    crew_id,
+    final_time,
+    relative_time_ms,
+  }) => {
     io.to(`event:${event_id}`).emit("raceFinalUpdate", {
       race_id,
       crew_id,
       final_time,
+      relative_time_ms, // ← NOUVEAU
     });
   },
 });

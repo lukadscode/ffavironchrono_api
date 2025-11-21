@@ -7,10 +7,14 @@ const validate = require("../middlewares/validateSchema");
 const schema = require("../Schemas/raceSchema");
 
 router.get("/", controller.getRaces);
-router.get("/:id", controller.getRace);
 router.post("/", auth, validate(schema.createSchema), controller.createRace);
-router.get("/event/:event_id", auth, controller.getRacesByEvent);
+// Routes spécifiques avant les routes génériques
+router.get("/non-official", auth, controller.getNonOfficialRaces);
+router.get("/event/:event_id", controller.getRacesByEvent);
+router.get("/results/:race_id", controller.getRaceResults);
 router.post("/generate", importController.generateInitialRaces);
+// Routes génériques après les routes spécifiques
+router.get("/:id", controller.getRace);
 router.put("/:id", auth, validate(schema.updateSchema), controller.updateRace);
 router.delete("/:id", auth, controller.deleteRace);
 
