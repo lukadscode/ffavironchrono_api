@@ -120,7 +120,7 @@ exports.deleteRace = async (req, res) => {
 exports.getNonOfficialRaces = async (req, res) => {
   try {
     const Event = require("../models/Event");
-    
+
     const races = await Race.findAll({
       where: { status: "non_official" },
       include: [
@@ -155,7 +155,12 @@ exports.getNonOfficialRaces = async (req, res) => {
         },
       ],
       order: [
-        [{ model: RacePhase, as: "race_phase" }, { model: Event, as: "event" }, "name", "ASC"],
+        [
+          { model: RacePhase, as: "race_phase" },
+          { model: Event, as: "event" },
+          "name",
+          "ASC",
+        ],
         ["race_number", "ASC"],
       ],
     });

@@ -6,6 +6,7 @@ const validate = require("../middlewares/validateSchema");
 const schema = require("../Schemas/participantSchema");
 
 router.get("/", controller.getParticipants);
+router.get("/licencie/:numeroLicence", controller.searchLicencie);
 router.get("/:id", controller.getParticipant);
 router.post(
   "/",

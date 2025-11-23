@@ -3,6 +3,7 @@ const Participant = require("../models/Participant");
 const CrewParticipant = require("../models/CrewParticipant");
 const Crew = require("../models/Crew");
 const Category = require("../models/Category");
+const fetchExternalData = require("../utils/fetchExternalData");
 
 // CREATE
 exports.createParticipant = async (req, res) => {
@@ -128,5 +129,63 @@ exports.deleteParticipant = async (req, res) => {
     res.json({ status: "success", message: "Participant supprimé" });
   } catch (err) {
     res.status(500).json({ status: "error", message: err.message });
+  }
+};
+
+// SEARCH LICENCIÉ BY LICENSE NUMBER
+exports.searchLicencie = async (req, res) => {
+  try {
+    const { numeroLicence } = req.params;
+
+    if (!numeroLicence) {
+      return res
+        .status(400)
+        .json({ status: "error", message: "Numéro de licence requis" });
+    }
+
+    // Appel à l'API externe
+    const externalData = await fetchExternalData(
+      `/licences/verification/adherent/${numeroLicence}`
+    );
+
+    if (!externalData || !externalData.data) {
+      return res
+        .status(404)
+        .json({ status: "error", message: "Licencié non trouvé" });
+    }
+
+    const data = externalData.data;
+
+    // Récupérer la première licence (la plus récente généralement)
+    const firstLicence =
+      data.licences && data.licences.length > 0 ? data.licences[0] : null;
+
+    // Formater la réponse avec seulement les champs demandés
+    const response = {
+      numero_licence: data.numero_licence,
+      prenom: data.prenom,
+      nom: data.nom,
+      ddn: data.ddn,
+      genre: data.genre,
+      mail: data.adresse?.mail || null,
+      saison: firstLicence?.saison || null,
+      type_libelle: firstLicence?.type_libelle || null,
+      club_code: firstLicence?.club?.code || null,
+      club_nom_court: firstLicence?.club?.nom_court || null,
+    };
+
+    res.json({ status: "success", data: response });
+  } catch (err) {
+    // Gérer les erreurs spécifiques de l'API externe
+    if (err.response && err.response.status === 404) {
+      return res
+        .status(404)
+        .json({ status: "error", message: "Licencié non trouvé" });
+    }
+
+    res.status(500).json({
+      status: "error",
+      message: err.message || "Erreur lors de la recherche du licencié",
+    });
   }
 };
