@@ -1,0 +1,108 @@
+tags:
+  - name: clubs
+    description: Gestion des clubs (récupération depuis l'API FFA)
+
+paths:
+  /clubs:
+    get:
+      tags: [clubs]
+      summary: Récupérer la liste des clubs
+      description: |
+        Récupère la liste des clubs depuis l'API FFA (Fédération Française d'Aviron).
+        Filtre uniquement les structures de type "CLU" (clubs).
+      security: [{ bearerAuth: [] }]
+      responses:
+        200:
+          description: Liste des clubs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "success"
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Club"
+                  count:
+                    type: integer
+                    description: Nombre de clubs retournés
+                    example: 150
+        500:
+          description: Erreur lors de la récupération
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "error"
+                  message:
+                    type: string
+
+components:
+  schemas:
+    Club:
+      type: object
+      description: Informations d'un club
+      properties:
+        nom:
+          type: string
+          description: Nom complet du club
+          example: "CLUB AVIRON MARSEILLE"
+        nom_court:
+          type: string
+          description: Nom court du club
+          example: "CAM"
+        code:
+          type: string
+          description: Code unique du club
+          example: "C130001"
+        etat:
+          type: string
+          description: État du club (A = Actif, I = Inactif)
+          example: "A"
+        type:
+          type: string
+          description: Type de structure (toujours "CLU" pour les clubs)
+          example: "CLU"
+        logo:
+          type: string
+          nullable: true
+          description: Chemin relatif du logo
+          example: "a7/bc/a7bc4c71-2711-402c-848f-b773d353d187.png"
+        logo_url:
+          type: string
+          nullable: true
+          description: URL complète du logo
+          example: "https://intranet.ffaviron.fr/storage/logos_structures/a7/bc/a7bc4c71-2711-402c-848f-b773d353d187.png"
+        code_region:
+          type: string
+          nullable: true
+          description: Code de la région
+          example: "LR13"
+        nom_region:
+          type: string
+          nullable: true
+          description: Nom de la région
+          example: "LIGUE AVIRON SUD PROVENCE-ALPES-COTE D'AZUR"
+        code_departement:
+          type: string
+          nullable: true
+          description: Code du département
+          example: "CD013"
+        nom_departement:
+          type: string
+          nullable: true
+          description: Nom du département
+          example: "COMITÉ DÉPARTEMENTAL DES BOUCHES DU RHÔNE"
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+

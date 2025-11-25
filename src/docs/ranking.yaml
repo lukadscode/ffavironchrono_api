@@ -1,0 +1,209 @@
+tags:
+  - name: rankings
+    description: Gestion des classements des clubs
+
+paths:
+  /rankings/event/{event_id}/ranking:
+    get:
+      tags: [rankings]
+      summary: Récupère le classement des clubs pour un événement
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: event_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: ranking_type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [indoor_points, defis_capitaux, custom]
+            default: indoor_points
+      responses:
+        200:
+          description: Classement récupéré
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        event_id:
+                          type: string
+                        club_name:
+                          type: string
+                        club_code:
+                          type: string
+                        total_points:
+                          type: number
+                        rank:
+                          type: integer
+                        ranking_type:
+                          type: string
+
+  /rankings/event/{event_id}/club/{club_name}/points:
+    get:
+      tags: [rankings]
+      summary: Récupère les points détaillés d'un club
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: event_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: club_name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: ranking_type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [indoor_points, defis_capitaux, custom]
+            default: indoor_points
+      responses:
+        200:
+          description: Points détaillés récupérés
+        404:
+          description: Classement non trouvé
+
+  /rankings/event/{event_id}/recalculate:
+    post:
+      tags: [rankings]
+      summary: Recalcule les rangs des clubs pour un événement
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: event_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ranking_type:
+                  type: string
+                  enum: [indoor_points, defis_capitaux, custom]
+                  default: indoor_points
+      responses:
+        200:
+          description: Rangs recalculés
+
+  /rankings/race/{race_id}/calculate-points:
+    post:
+      tags: [rankings]
+      summary: Calcule et enregistre les points pour une course
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: race_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: ranking_type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [indoor_points, defis_capitaux, custom]
+            default: indoor_points
+      responses:
+        200:
+          description: Points calculés et enregistrés
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                      points:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            club_name:
+                              type: string
+                            place:
+                              type: integer
+                            points:
+                              type: number
+                            points_type:
+                              type: string
+                              enum: [individuel, relais]
+
+  /rankings/templates:
+    get:
+      tags: [rankings]
+      summary: Liste des templates de points
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [indoor_points, defis_capitaux, custom]
+      responses:
+        200:
+          description: Liste des templates
+
+    post:
+      tags: [rankings]
+      summary: Crée un template de points
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, type, config]
+              properties:
+                name:
+                  type: string
+                type:
+                  type: string
+                  enum: [indoor_points, defis_capitaux, custom]
+                config:
+                  type: object
+                  description: Configuration JSON des points
+                is_default:
+                  type: boolean
+                  default: false
+      responses:
+        201:
+          description: Template créé
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+

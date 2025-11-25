@@ -25,10 +25,22 @@ paths:
               properties:
                 event_id:
                   type: string
-                  example: "2000m"
+                  example: "7c38e42f-198a-4bd6-9c59-9854094a1ea0"
                 meters:
                   type: integer
+                  description: Distance en mètres pour un relais (ex: 250 pour 8x250m) ou distance totale pour une course normale
                   example: 2000
+                is_relay:
+                  type: boolean
+                  description: Indique si c'est une course en relais
+                  default: false
+                  example: false
+                relay_count:
+                  type: integer
+                  description: Nombre de relais (requis si is_relay = true). Ex: 8 pour 8x250m, 4 pour 4x500m
+                  minimum: 2
+                  maximum: 20
+                  example: 8
       responses:
         201:
           description: Distance créée

@@ -14,15 +14,20 @@ paths:
           application/json:
             schema:
               type: object
-              required: [user_id, event_id, role]
+              required: [email, event_id, role]
               properties:
-                user_id:
+                email:
                   type: string
+                  format: email
+                  description: Adresse email de l'utilisateur (sera créé si n'existe pas)
                 event_id:
                   type: string
                 role:
                   type: string
                   enum: [viewer, editor, referee, organiser]
+                name:
+                  type: string
+                  description: Nom de l'utilisateur (optionnel, extrait de l'email si non fourni)
       responses:
         200:
           description: Lien utilisateur-événement enregistré
@@ -34,6 +39,36 @@ paths:
                   status:
                     type: string
                     example: success
+                  data:
+                    type: object
+                    properties:
+                      user_event:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          user_id:
+                            type: string
+                          event_id:
+                            type: string
+                          role:
+                            type: string
+                      user:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          email:
+                            type: string
+                          name:
+                            type: string
+                      user_created:
+                        type: boolean
+                        description: Indique si l'utilisateur a été créé
+                      temporary_password:
+                        type: string
+                        nullable: true
+                        description: Mot de passe provisoire (uniquement si user_created = true)
 
   /user-events/{id}:
     delete:

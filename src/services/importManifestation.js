@@ -51,12 +51,34 @@ function hasCoxswain(bateauCode) {
 
 /**
  * Extrait la distance depuis le libellé de l'épreuve
- * Ex: "500 m" => 500, "2000 m" => 2000
+ * Ex: "500 m" => { meters: 500, isRelay: false, relayCount: null }
+ * Ex: "8x250m" => { meters: 250, isRelay: true, relayCount: 8 }
+ * Ex: "4x500 m" => { meters: 500, isRelay: true, relayCount: 4 }
  */
 function extractDistance(libelle) {
   if (!libelle) return null;
-  const match = libelle.match(/(\d+)\s*m/);
-  return match ? parseInt(match[1], 10) : null;
+  
+  // Détecter les relais (format: "8x250m", "4x500 m", "8 x 250 m", etc.)
+  const relayMatch = libelle.match(/(\d+)\s*x\s*(\d+)\s*m/i);
+  if (relayMatch) {
+    return {
+      meters: parseInt(relayMatch[2], 10),
+      isRelay: true,
+      relayCount: parseInt(relayMatch[1], 10),
+    };
+  }
+  
+  // Distance normale (format: "500 m", "2000m", etc.)
+  const normalMatch = libelle.match(/(\d+)\s*m/i);
+  if (normalMatch) {
+    return {
+      meters: parseInt(normalMatch[1], 10),
+      isRelay: false,
+      relayCount: null,
+    };
+  }
+  
+  return null;
 }
 
 /**
@@ -90,33 +112,36 @@ async function findOrCreateParticipant({
 
   // 2. Si pas de numéro de licence, chercher par nom + prénom
   // dans les participants déjà créés pour cet événement
-  // On cherche d'abord dans les participants qui sont liés à des équipages de l'événement
+  // Optimisation: chercher d'abord simplement par nom/prénom, puis vérifier s'il est dans l'événement
   const CrewParticipantModel = require("../models/CrewParticipant");
   const CrewModel = require("../models/Crew");
 
-  const existingParticipant = await Participant.findOne({
+  // Chercher d'abord les participants avec ce nom/prénom
+  const candidates = await Participant.findAll({
     where: {
       first_name: prenom,
       last_name: nom,
     },
-    include: [
-      {
-        model: CrewParticipantModel,
-        include: [
-          {
-            model: CrewModel,
-            where: { event_id },
-            required: true,
-          },
-        ],
-        required: true,
-      },
-    ],
+    limit: 10, // Limiter pour éviter trop de résultats
   });
 
-  if (existingParticipant) {
-    // Participant trouvé dans l'événement, le réutiliser
-    return existingParticipant;
+  // Pour chaque candidat, vérifier s'il est lié à un équipage de cet événement
+  for (const candidate of candidates) {
+    const crewParticipant = await CrewParticipant.findOne({
+      where: { participant_id: candidate.id },
+      include: [
+        {
+          model: CrewModel,
+          where: { event_id },
+          required: true,
+        },
+      ],
+    });
+
+    if (crewParticipant) {
+      // Participant trouvé dans l'événement, le réutiliser
+      return candidate;
+    }
   }
 
   // 3. Créer un nouveau participant avec un numéro temporaire basé sur nom + prénom + club
@@ -148,7 +173,10 @@ module.exports = async (manifestationId, req) => {
     };
 
     console.log(`📥 Récupération de la manifestation ${manifestationId}...`);
-    const { data } = await axios.get(url, { headers });
+    const { data } = await axios.get(url, { 
+      headers,
+      timeout: 60000, // 60 secondes de timeout pour l'API externe
+    });
 
     const m = data.manifestation;
     const epreuves = data.epreuves || [];
@@ -196,25 +224,65 @@ module.exports = async (manifestationId, req) => {
     console.log(`✅ Événement créé: ${event.id}`);
 
     // 3. Création des distances (basées sur les épreuves)
-    const distanceMap = {}; // distance_m => distance_id
-    const uniqueDistances = new Set();
+    console.log("📏 Création des distances...");
+    const distanceMap = {}; // clé unique => distance_id
+    const uniqueDistances = new Map(); // Map pour stocker les distances avec leurs métadonnées
 
     epreuves.forEach((ep) => {
-      const distance = extractDistance(ep.libelle_epreuve);
-      if (distance) uniqueDistances.add(distance);
+      const distanceInfo = extractDistance(ep.libelle_epreuve);
+      if (distanceInfo) {
+        // Créer une clé unique pour chaque combinaison (meters, isRelay, relayCount)
+        const key = distanceInfo.isRelay
+          ? `${distanceInfo.meters}_relay_${distanceInfo.relayCount}`
+          : `${distanceInfo.meters}_normal`;
+        uniqueDistances.set(key, distanceInfo);
+      }
     });
 
-    for (const distanceValue of uniqueDistances) {
+    for (const [key, distanceInfo] of uniqueDistances) {
+      // Chercher une distance existante avec les mêmes caractéristiques
+      const whereClause = {
+        event_id,
+        meters: distanceInfo.meters,
+        is_relay: distanceInfo.isRelay,
+      };
+      
+      // Pour les relais, inclure relay_count dans la recherche
+      if (distanceInfo.isRelay) {
+        whereClause.relay_count = distanceInfo.relayCount;
+      } else {
+        whereClause.relay_count = null;
+      }
+
       const [distance] = await Distance.findOrCreate({
-        where: { event_id, meters: distanceValue },
+        where: whereClause,
         defaults: {
           id: uuidv4(),
           event_id,
-          meters: distanceValue,
+          meters: distanceInfo.meters,
+          is_relay: distanceInfo.isRelay,
+          relay_count: distanceInfo.relayCount,
         },
       });
-      distanceMap[distanceValue] = distance.id;
+      
+      // Log pour indiquer le type de distance créée
+      if (distanceInfo.isRelay) {
+        console.log(
+          `  ✅ Relais créé: ${distanceInfo.relayCount}x${distanceInfo.meters}m`
+        );
+      } else {
+        console.log(`  ✅ Distance créée: ${distanceInfo.meters}m`);
+      }
+      
+      // Utiliser la clé unique pour le mapping
+      distanceMap[key] = distance.id;
+      // Aussi mapper par meters pour compatibilité (si nécessaire)
+      if (!distanceMap[distanceInfo.meters]) {
+        distanceMap[distanceInfo.meters] = distance.id;
+      }
     }
+    
+    console.log(`✅ ${uniqueDistances.size} distance(s) unique(s) créée(s)`);
 
     // 4. Création des catégories à partir des épreuves
     console.log("🏷️  Création des catégories...");
@@ -236,8 +304,25 @@ module.exports = async (manifestationId, req) => {
       if (createdCategories.has(identifiant)) continue;
 
       // Extraire la distance pour créer un code unique
-      const distance = extractDistance(ep.libelle_epreuve);
-      const codeWithDistance = distance ? `${code}_${distance}m` : code;
+      const distanceInfo = extractDistance(ep.libelle_epreuve);
+      let codeWithDistance = code;
+      let distanceId = null;
+
+      if (distanceInfo) {
+        if (distanceInfo.isRelay) {
+          // Pour les relais: "CODE_8x250m"
+          codeWithDistance = `${code}_${distanceInfo.relayCount}x${distanceInfo.meters}m`;
+        } else {
+          // Pour les courses normales: "CODE_2000m"
+          codeWithDistance = `${code}_${distanceInfo.meters}m`;
+        }
+
+        // Trouver la distance correspondante dans l'événement
+        const key = distanceInfo.isRelay
+          ? `${distanceInfo.meters}_relay_${distanceInfo.relayCount}`
+          : `${distanceInfo.meters}_normal`;
+        distanceId = distanceMap[key] || null;
+      }
 
       // Chercher si une catégorie avec ce code+distance existe déjà
       let category = await Category.findOne({
@@ -257,9 +342,22 @@ module.exports = async (manifestationId, req) => {
           gender,
           boat_seats: boatSeats,
           has_coxswain: hasCox,
+          distance_id: distanceId, // Lier directement à la distance
         });
+        
+        const distanceLabel = distanceId
+          ? distanceInfo.isRelay
+            ? ` (${distanceInfo.relayCount}x${distanceInfo.meters}m)`
+            : ` (${distanceInfo.meters}m)`
+          : "";
         console.log(
-          `  ✅ Catégorie créée: ${codeWithDistance} - ${category.label}`
+          `  ✅ Catégorie créée: ${codeWithDistance} - ${category.label}${distanceLabel}`
+        );
+      } else if (!category.distance_id && distanceId) {
+        // Mettre à jour la catégorie existante si elle n'a pas de distance_id
+        await category.update({ distance_id: distanceId });
+        console.log(
+          `  ✅ Distance assignée à la catégorie existante: ${codeWithDistance}`
         );
       }
 
@@ -297,8 +395,18 @@ module.exports = async (manifestationId, req) => {
     let crewCount = 0;
     let newParticipantCount = 0;
     let totalParticipantCount = 0; // Tous les participants liés aux équipages
+    const totalInscriptions = inscriptions.length;
+    let processedInscriptions = 0;
 
     for (const ins of inscriptions) {
+      processedInscriptions++;
+      
+      // Log de progression tous les 50 équipages
+      if (processedInscriptions % 50 === 0 || processedInscriptions === totalInscriptions) {
+        console.log(
+          `  📊 Progression: ${processedInscriptions}/${totalInscriptions} inscriptions traitées (${crewCount} équipages créés)`
+        );
+      }
       const identifiantEpreuve = ins.identifiant_epreuve;
       const category_id = categoryMap[identifiantEpreuve];
 
@@ -324,16 +432,25 @@ module.exports = async (manifestationId, req) => {
         ins.num_club_rameur_1 || ins.club_abrege_rameur_1 || club_name || "";
 
       // Créer l'équipage
-      const crew = await Crew.create({
-        id: uuidv4(),
-        event_id,
-        category_id,
-        club_name: club_name || "Non spécifié",
-        club_code: club_code,
-        status: 8, // Statut par défaut
-      });
-
-      crewCount++;
+      let crew;
+      try {
+        crew = await Crew.create({
+          id: uuidv4(),
+          event_id,
+          category_id,
+          club_name: club_name || "Non spécifié",
+          club_code: club_code,
+          status: 8, // Statut par défaut
+        });
+        crewCount++;
+      } catch (crewError) {
+        console.error(
+          `❌ Erreur lors de la création de l'équipage pour ${club_name} (catégorie ${category_id}):`,
+          crewError.message
+        );
+        // Continuer avec l'inscription suivante
+        continue;
+      }
 
       // Créer les participants (rameurs 1 à 8)
       for (let i = 1; i <= 8; i++) {
@@ -352,70 +469,87 @@ module.exports = async (manifestationId, req) => {
           continue;
         }
 
-        // Trouver ou créer le participant (réutilise si déjà existant dans l'événement)
-        const participant = await findOrCreateParticipant({
-          nom,
-          prenom,
-          licenseNumber,
-          gender: mapGender(ins[`sexe_rameur_${i}`]),
-          club_name: ins[`club_abrege_rameur_${i}`] || club_name,
-          event_id,
-        });
-
-        if (participant.isNewRecord) newParticipantCount++;
-        totalParticipantCount++; // Compter tous les participants liés
-
-        // Vérifier si le participant n'est pas déjà lié à cet équipage
-        const existingLink = await CrewParticipant.findOne({
-          where: {
-            crew_id: crew.id,
-            participant_id: participant.id,
-          },
-        });
-
-        if (!existingLink) {
-          // Lier le participant à l'équipage
-          await CrewParticipant.create({
-            id: uuidv4(),
-            crew_id: crew.id,
-            participant_id: participant.id,
-            is_coxswain: false,
-            seat_position: i,
+        try {
+          // Trouver ou créer le participant (réutilise si déjà existant dans l'événement)
+          const participant = await findOrCreateParticipant({
+            nom,
+            prenom,
+            licenseNumber,
+            gender: mapGender(ins[`sexe_rameur_${i}`]),
+            club_name: ins[`club_abrege_rameur_${i}`] || club_name,
+            event_id,
           });
+
+          if (participant.isNewRecord) newParticipantCount++;
+          totalParticipantCount++; // Compter tous les participants liés
+
+          // Vérifier si le participant n'est pas déjà lié à cet équipage
+          const existingLink = await CrewParticipant.findOne({
+            where: {
+              crew_id: crew.id,
+              participant_id: participant.id,
+            },
+          });
+
+          if (!existingLink) {
+            // Lier le participant à l'équipage
+            await CrewParticipant.create({
+              id: uuidv4(),
+              crew_id: crew.id,
+              participant_id: participant.id,
+              is_coxswain: false,
+              seat_position: i,
+            });
+          }
+        } catch (participantError) {
+          console.error(
+            `❌ Erreur lors de la création du participant ${i} pour l'équipage ${crew.id}:`,
+            participantError.message
+          );
+          // Continuer avec les autres participants plutôt que de tout arrêter
+          continue;
         }
       }
 
       // Créer le barreur si présent
       if (ins.nom_bareur && ins.prenom_barreur) {
-        // Trouver ou créer le barreur (réutilise si déjà existant dans l'événement)
-        const barreur = await findOrCreateParticipant({
-          nom: ins.nom_bareur,
-          prenom: ins.prenom_barreur,
-          licenseNumber: ins.numero_licence_barreur,
-          gender: mapGender(ins.sexe_barreur),
-          club_name: ins.club_abrege_barreur || club_name,
-          event_id,
-        });
-
-        if (barreur.isNewRecord) newParticipantCount++;
-        totalParticipantCount++; // Compter tous les participants liés
-
-        // Vérifier si le barreur n'est pas déjà lié à cet équipage
-        const existingLink = await CrewParticipant.findOne({
-          where: {
-            crew_id: crew.id,
-            participant_id: barreur.id,
-          },
-        });
-
-        if (!existingLink) {
-          await CrewParticipant.create({
-            id: uuidv4(),
-            crew_id: crew.id,
-            participant_id: barreur.id,
-            is_coxswain: true,
-            coxswain_weight: null,
+        try {
+          // Trouver ou créer le barreur (réutilise si déjà existant dans l'événement)
+          const barreur = await findOrCreateParticipant({
+            nom: ins.nom_bareur,
+            prenom: ins.prenom_barreur,
+            licenseNumber: ins.numero_licence_barreur,
+            gender: mapGender(ins.sexe_barreur),
+            club_name: ins.club_abrege_barreur || club_name,
+            event_id,
           });
+
+          if (barreur.isNewRecord) newParticipantCount++;
+          totalParticipantCount++; // Compter tous les participants liés
+
+          // Vérifier si le barreur n'est pas déjà lié à cet équipage
+          const existingLink = await CrewParticipant.findOne({
+            where: {
+              crew_id: crew.id,
+              participant_id: barreur.id,
+            },
+          });
+
+          if (!existingLink) {
+            await CrewParticipant.create({
+              id: uuidv4(),
+              crew_id: crew.id,
+              participant_id: barreur.id,
+              is_coxswain: true,
+              coxswain_weight: null,
+            });
+          }
+        } catch (barreurError) {
+          console.error(
+            `❌ Erreur lors de la création du barreur pour l'équipage ${crew.id}:`,
+            barreurError.message
+          );
+          // Continuer avec les autres équipages
         }
       }
     }

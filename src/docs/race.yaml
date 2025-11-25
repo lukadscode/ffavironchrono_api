@@ -96,6 +96,16 @@ paths:
                   type: integer
                   minimum: 0
                   description: Minutes entre chaque course
+                category_order:
+                  type: array
+                  items:
+                    type: string
+                  description: |
+                    Ordre personnalisé des catégories (tableau de codes de catégories).
+                    Les catégories seront traitées dans cet ordre lors de la génération des courses.
+                    Les catégories non listées seront ajoutées à la fin (triées par code).
+                    Exemple: ["H4X", "H2X", "F4X", "F2X", "H1X", "F1X"]
+                  example: ["H4X", "H2X", "F4X", "F2X"]
       responses:
         200:
           description: Courses générées

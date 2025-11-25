@@ -65,4 +65,71 @@ module.exports = (io) => ({
       relative_time_ms, // ← NOUVEAU
     });
   },
+
+  // Diffuser une notification
+  broadcastNotification: (notification) => {
+    const payload = {
+      id: notification.id,
+      event_id: notification.event_id,
+      race_id: notification.race_id,
+      message: notification.message,
+      importance: notification.importance,
+      created_at: notification.created_at,
+    };
+
+    if (notification.race_id) {
+      // Notification pour une course spécifique
+      io.to(`race_${notification.race_id}`).emit("notification:new", payload);
+      // Aussi dans la room de l'événement
+      if (notification.event_id) {
+        io.to(`event:${notification.event_id}`).emit("notification:new", payload);
+      }
+    } else if (notification.event_id) {
+      // Notification pour tout l'événement
+      io.to(`event:${notification.event_id}`).emit("notification:new", payload);
+      io.to(`event_${notification.event_id}`).emit("notification:new", payload);
+    }
+  },
+
+  // Supprimer une notification
+  removeNotification: (notification) => {
+    const payload = {
+      id: notification.id,
+      event_id: notification.event_id,
+      race_id: notification.race_id,
+    };
+
+    if (notification.race_id) {
+      io.to(`race_${notification.race_id}`).emit("notification:removed", payload);
+      if (notification.event_id) {
+        io.to(`event:${notification.event_id}`).emit("notification:removed", payload);
+      }
+    } else if (notification.event_id) {
+      io.to(`event:${notification.event_id}`).emit("notification:removed", payload);
+      io.to(`event_${notification.event_id}`).emit("notification:removed", payload);
+    }
+  },
+
+  // Mettre à jour une notification
+  updateNotification: (notification) => {
+    const payload = {
+      id: notification.id,
+      event_id: notification.event_id,
+      race_id: notification.race_id,
+      message: notification.message,
+      importance: notification.importance,
+      is_active: notification.is_active,
+      updated_at: notification.updated_at,
+    };
+
+    if (notification.race_id) {
+      io.to(`race_${notification.race_id}`).emit("notification:updated", payload);
+      if (notification.event_id) {
+        io.to(`event:${notification.event_id}`).emit("notification:updated", payload);
+      }
+    } else if (notification.event_id) {
+      io.to(`event:${notification.event_id}`).emit("notification:updated", payload);
+      io.to(`event_${notification.event_id}`).emit("notification:updated", payload);
+    }
+  },
 });

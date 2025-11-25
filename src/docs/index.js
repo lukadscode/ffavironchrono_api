@@ -23,6 +23,9 @@ const userDoc = YAML.load(path.join(__dirname, "user.yaml"));
 const importDoc = YAML.load(path.join(__dirname, "import.yaml"));
 const userEventDoc = YAML.load(path.join(__dirname, "userEvent.yaml"));
 const miscDoc = YAML.load(path.join(__dirname, "misc.yaml"));
+const rankingDoc = YAML.load(path.join(__dirname, "ranking.yaml"));
+const notificationDoc = YAML.load(path.join(__dirname, "notification.yaml"));
+const clubDoc = YAML.load(path.join(__dirname, "club.yaml"));
 
 // Fusionner les chemins
 const swaggerDocument = {
@@ -50,6 +53,9 @@ const swaggerDocument = {
     ...importDoc.paths, // Ajouter les chemins d'importation
     ...userEventDoc.paths, // Ajouter les chemins pour les événements utilisateurs
     ...miscDoc.paths, // Ajouter les chemins pour les routes diverses
+    ...rankingDoc.paths, // Ajouter les chemins pour les classements
+    ...notificationDoc.paths, // Ajouter les chemins pour les notifications
+    ...clubDoc.paths, // Ajouter les chemins pour les clubs
   },
   components: {
     ...authDoc.components,
@@ -70,6 +76,9 @@ const swaggerDocument = {
     ...importDoc.components, // Ajouter les composants d'importation
     ...userEventDoc.components, // Ajouter les composants pour les événements utilisateurs
     ...miscDoc.components, // Ajouter les composants pour les routes diverses
+    ...rankingDoc.components, // Ajouter les composants pour les classements
+    ...notificationDoc.components, // Ajouter les composants pour les notifications
+    ...clubDoc.components, // Ajouter les composants pour les clubs
   },
   tags: [
     ...(authDoc.tags || []),
@@ -90,6 +99,9 @@ const swaggerDocument = {
     ...(importDoc.tags || []), // Ajouter les tags d'importation
     ...(userEventDoc.tags || []), // Ajouter les tags pour les événements utilisateurs
     ...(miscDoc.tags || []), // Ajouter les tags pour les routes diverses
+    ...(rankingDoc.tags || []), // Ajouter les tags pour les classements
+    ...(notificationDoc.tags || []), // Ajouter les tags pour les notifications
+    ...(clubDoc.tags || []), // Ajouter les tags pour les clubs
   ],
   security: authDoc.security || [],
 };

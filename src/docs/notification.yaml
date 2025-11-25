@@ -1,0 +1,271 @@
+tags:
+  - name: notifications
+    description: Gestion des notifications pour les événements et les courses
+
+paths:
+  /notifications:
+    get:
+      tags: [notifications]
+      summary: Liste toutes les notifications (backoffice)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: query
+          name: event_id
+          schema:
+            type: string
+          description: Filtrer par événement
+        - in: query
+          name: race_id
+          schema:
+            type: string
+          description: Filtrer par course
+        - in: query
+          name: is_active
+          schema:
+            type: boolean
+          description: Filtrer par statut actif
+      responses:
+        200:
+          description: Liste des notifications
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Notification"
+
+    post:
+      tags: [notifications]
+      summary: Créer une nouvelle notification
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                event_id:
+                  type: string
+                  description: ID de l'événement (requis si race_id n'est pas fourni)
+                race_id:
+                  type: string
+                  description: ID de la course (requis si event_id n'est pas fourni)
+                message:
+                  type: string
+                  minLength: 1
+                  maxLength: 1000
+                  description: Message de la notification
+                importance:
+                  type: string
+                  enum: [info, warning, error, success]
+                  default: info
+                  description: Niveau d'importance
+                is_active:
+                  type: boolean
+                  default: true
+                  description: Si la notification est active
+                start_date:
+                  type: string
+                  format: date-time
+                  nullable: true
+                  description: Date de début d'affichage (null = immédiat)
+                end_date:
+                  type: string
+                  format: date-time
+                  nullable: true
+                  description: Date de fin d'affichage (null = pas d'expiration)
+      responses:
+        201:
+          description: Notification créée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  data:
+                    $ref: "#/components/schemas/Notification"
+
+  /notifications/event/{event_id}:
+    get:
+      tags: [notifications]
+      summary: Récupérer les notifications actives d'un événement
+      parameters:
+        - in: path
+          name: event_id
+          required: true
+          schema:
+            type: string
+          description: ID de l'événement
+      responses:
+        200:
+          description: Liste des notifications actives
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Notification"
+
+  /notifications/race/{race_id}:
+    get:
+      tags: [notifications]
+      summary: Récupérer les notifications actives d'une course
+      description: |
+        Retourne les notifications spécifiques à la course ET les notifications de l'événement parent
+      parameters:
+        - in: path
+          name: race_id
+          required: true
+          schema:
+            type: string
+          description: ID de la course
+      responses:
+        200:
+          description: Liste des notifications actives
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Notification"
+
+  /notifications/{id}:
+    put:
+      tags: [notifications]
+      summary: Mettre à jour une notification
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID de la notification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  minLength: 1
+                  maxLength: 1000
+                importance:
+                  type: string
+                  enum: [info, warning, error, success]
+                is_active:
+                  type: boolean
+                start_date:
+                  type: string
+                  format: date-time
+                  nullable: true
+                end_date:
+                  type: string
+                  format: date-time
+                  nullable: true
+      responses:
+        200:
+          description: Notification mise à jour
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  data:
+                    $ref: "#/components/schemas/Notification"
+
+    delete:
+      tags: [notifications]
+      summary: Supprimer une notification
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID de la notification
+      responses:
+        200:
+          description: Notification supprimée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  message:
+                    type: string
+
+components:
+  schemas:
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        event_id:
+          type: string
+          format: uuid
+          nullable: true
+        race_id:
+          type: string
+          format: uuid
+          nullable: true
+        message:
+          type: string
+        importance:
+          type: string
+          enum: [info, warning, error, success]
+        is_active:
+          type: boolean
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+        created_by:
+          type: string
+          format: uuid
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+

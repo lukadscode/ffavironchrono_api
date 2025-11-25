@@ -38,6 +38,10 @@ paths:
                   maximum: 8
                 has_coxswain:
                   type: boolean
+                distance_id:
+                  type: string
+                  nullable: true
+                  description: ID de la distance associée (peut être null)
       responses:
         201:
           description: Catégorie créée
@@ -139,6 +143,10 @@ paths:
                   maximum: 8
                 has_coxswain:
                   type: boolean
+                distance_id:
+                  type: string
+                  nullable: true
+                  description: ID de la distance associée (peut être null)
       responses:
         200:
           description: Mise à jour réussie

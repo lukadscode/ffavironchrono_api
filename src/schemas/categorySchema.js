@@ -7,6 +7,7 @@ exports.createSchema = Joi.object({
   gender: Joi.string().valid("Homme", "Femme", "Mixte").optional(),
   boat_seats: Joi.number().integer().min(1).max(8).optional(),
   has_coxswain: Joi.boolean().optional(),
+  distance_id: Joi.string().allow(null).optional(),
 });
 
 exports.updateSchema = Joi.object({
@@ -16,4 +17,5 @@ exports.updateSchema = Joi.object({
   gender: Joi.string().valid("Homme", "Femme", "Mixte").optional(),
   boat_seats: Joi.number().integer().min(1).max(8).optional(),
   has_coxswain: Joi.boolean().optional(),
+  distance_id: Joi.string().allow(null).optional(),
 });

@@ -4,7 +4,7 @@ const controller = require("../controllers/raceController");
 const importController = require("../controllers/importController");
 const auth = require("../middlewares/authMiddleware");
 const validate = require("../middlewares/validateSchema");
-const schema = require("../Schemas/raceSchema");
+const schema = require("../schemas/raceSchema");
 
 router.get("/", controller.getRaces);
 router.post("/", auth, validate(schema.createSchema), controller.createRace);
@@ -12,7 +12,12 @@ router.post("/", auth, validate(schema.createSchema), controller.createRace);
 router.get("/non-official", auth, controller.getNonOfficialRaces);
 router.get("/event/:event_id", controller.getRacesByEvent);
 router.get("/results/:race_id", controller.getRaceResults);
-router.post("/generate", importController.generateInitialRaces);
+router.post(
+  "/generate",
+  auth,
+  validate(require("../schemas/generateRacesSchema").generateInitialRacesSchema),
+  importController.generateInitialRaces
+);
 // Routes génériques après les routes spécifiques
 router.get("/:id", controller.getRace);
 router.put("/:id", auth, validate(schema.updateSchema), controller.updateRace);

@@ -32,6 +32,10 @@ const Category = sequelize.define(
       type: DataTypes.BOOLEAN,
       allowNull: true,
     },
+    distance_id: {
+      type: DataTypes.CHAR(36),
+      allowNull: true,
+    },
   },
   {
     tableName: "categories",

@@ -48,6 +48,10 @@ RacePhase.hasMany(Race, { foreignKey: "phase_id" });
 Race.belongsTo(Distance, { foreignKey: "distance_id" });
 Distance.hasMany(Race, { foreignKey: "distance_id" });
 
+// Relation Category / Distance
+Category.belongsTo(Distance, { foreignKey: "distance_id", as: "distance" });
+Distance.hasMany(Category, { foreignKey: "distance_id" });
+
 // Relation RacePhase / Event
 RacePhase.belongsTo(Event, { foreignKey: "event_id" });
 Event.hasMany(RacePhase, { foreignKey: "event_id" });
@@ -121,3 +125,29 @@ RacePhase.hasMany(Race, { foreignKey: "phase_id" });
 
 RacePhase.belongsTo(Event, { foreignKey: "event_id", as: "event" });
 Event.hasMany(RacePhase, { foreignKey: "event_id" });
+
+// Relations pour le système de classement
+const ScoringTemplate = require("./ScoringTemplate");
+const ClubRanking = require("./ClubRanking");
+const RankingPoint = require("./RankingPoint");
+
+Event.hasMany(ClubRanking, { foreignKey: "event_id" });
+ClubRanking.belongsTo(Event, { foreignKey: "event_id" });
+
+ClubRanking.hasMany(RankingPoint, { foreignKey: "club_ranking_id", as: "ranking_points" });
+RankingPoint.belongsTo(ClubRanking, { foreignKey: "club_ranking_id" });
+
+RankingPoint.belongsTo(Race, { foreignKey: "race_id" });
+RankingPoint.belongsTo(Crew, { foreignKey: "crew_id" });
+
+// Relations pour le système de notifications
+const Notification = require("./Notification");
+
+Event.hasMany(Notification, { foreignKey: "event_id", as: "notifications" });
+Notification.belongsTo(Event, { foreignKey: "event_id", as: "event" });
+
+Race.hasMany(Notification, { foreignKey: "race_id", as: "notifications" });
+Notification.belongsTo(Race, { foreignKey: "race_id", as: "race" });
+
+Notification.belongsTo(User, { foreignKey: "created_by", as: "creator" });
+User.hasMany(Notification, { foreignKey: "created_by" });
