@@ -3,7 +3,7 @@ const router = express.Router();
 const controller = require("../controllers/timingAssignmentController");
 const auth = require("../middlewares/authMiddleware");
 const validate = require("../middlewares/validateSchema");
-const schema = require("../Schemas/timingAssignmentSchema");
+const schema = require("../schemas/timingAssignmentSchema");
 
 router.post("/", auth, validate(schema.assignSchema), controller.assignTiming);
 router.put(

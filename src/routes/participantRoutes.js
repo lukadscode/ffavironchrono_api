@@ -3,7 +3,7 @@ const router = express.Router();
 const controller = require("../controllers/participantController");
 const auth = require("../middlewares/authMiddleware");
 const validate = require("../middlewares/validateSchema");
-const schema = require("../Schemas/participantSchema");
+const schema = require("../schemas/participantSchema");
 
 router.get("/", controller.getParticipants);
 router.get("/licencie/:numeroLicence", controller.searchLicencie);

@@ -3,7 +3,7 @@ const router = express.Router();
 const controller = require("../controllers/raceCrewController");
 const auth = require("../middlewares/authMiddleware");
 const validate = require("../middlewares/validateSchema");
-const schema = require("../Schemas/raceCrewSchema");
+const schema = require("../schemas/raceCrewSchema");
 
 router.post(
   "/",

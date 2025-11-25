@@ -3,7 +3,7 @@ const router = express.Router();
 const controller = require("../controllers/categoryController");
 const auth = require("../middlewares/authMiddleware");
 const validate = require("../middlewares/validateSchema");
-const schema = require("../Schemas/categorySchema");
+const schema = require("../schemas/categorySchema");
 
 router.get("/", controller.getCategories);
 router.get("/:id", controller.getCategory);

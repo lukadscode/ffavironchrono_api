@@ -3,7 +3,7 @@ const router = express.Router();
 const controller = require("../controllers/timingPointController");
 const auth = require("../middlewares/authMiddleware");
 const validate = require("../middlewares/validateSchema");
-const schema = require("../Schemas/timingPointSchema");
+const schema = require("../schemas/timingPointSchema");
 
 router.post(
   "/",

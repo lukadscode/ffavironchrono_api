@@ -3,7 +3,7 @@ const router = express.Router();
 const controller = require("../controllers/crewParticipantController");
 const auth = require("../middlewares/authMiddleware");
 const validate = require("../middlewares/validateSchema");
-const schema = require("../Schemas/crewParticipantSchema");
+const schema = require("../schemas/crewParticipantSchema");
 
 router.post(
   "/",

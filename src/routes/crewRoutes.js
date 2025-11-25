@@ -3,7 +3,7 @@ const router = express.Router();
 const controller = require("../controllers/crewController");
 const auth = require("../middlewares/authMiddleware");
 const validate = require("../middlewares/validateSchema");
-const schema = require("../Schemas/crewSchema");
+const schema = require("../schemas/crewSchema");
 
 router.get("/", controller.getCrews);
 router.get("/:id", controller.getCrew);

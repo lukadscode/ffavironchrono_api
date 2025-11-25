@@ -3,7 +3,7 @@ const router = express.Router();
 const controller = require("../controllers/distanceController");
 const auth = require("../middlewares/authMiddleware");
 const validate = require("../middlewares/validateSchema");
-const schema = require("../Schemas/distanceSchema");
+const schema = require("../schemas/distanceSchema");
 
 router.get("/", controller.getDistances);
 router.post(

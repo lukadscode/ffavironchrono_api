@@ -3,7 +3,7 @@ const router = express.Router();
 const eventController = require("../controllers/eventController");
 const auth = require("../middlewares/authMiddleware");
 const validate = require("../middlewares/validateSchema");
-const schema = require("../Schemas/eventSchema");
+const schema = require("../schemas/eventSchema");
 
 router.get("/", eventController.getEvents);
 router.get("/:id", eventController.getEvent);
