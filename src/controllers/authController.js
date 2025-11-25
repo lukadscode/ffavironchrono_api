@@ -345,18 +345,101 @@ exports.getProfile = async (req, res) => {
 
 // VERIFY EMAIL
 exports.verifyEmail = async (req, res) => {
-  const { token } = req.query;
-  const user = await User.findOne({
-    where: { email_verification_token: token },
-  });
-  if (!user)
-    return res.status(400).json({ status: "error", message: "Token invalide" });
+  try {
+    const { token } = req.query;
+    
+    if (!token) {
+      return res.status(400).json({ 
+        status: "error", 
+        message: "Token manquant" 
+      });
+    }
 
-  user.email_verification_token = null;
-  user.status = "active";
-  await user.save();
+    // Nettoyer le token (supprimer les espaces et caractères invisibles)
+    const cleanToken = token.trim().replace(/\s+/g, '');
 
-  res.json({ status: "success", message: "Email vérifié avec succès" });
+    // Chercher l'utilisateur avec le token (comparaison exacte)
+    let user = await User.findOne({
+      where: { email_verification_token: cleanToken },
+    });
+
+    // Si pas trouvé, faire des logs de débogage détaillés
+    if (!user) {
+      console.log("🔍 Token recherché:", cleanToken);
+      console.log("📏 Longueur du token recherché:", cleanToken.length);
+      console.log("🔤 Token (hex):", Buffer.from(cleanToken).toString('hex'));
+      
+      // Chercher tous les utilisateurs avec un token non null pour comparaison
+      const usersWithTokens = await User.findAll({
+        where: {
+          email_verification_token: { [Op.ne]: null }
+        },
+        attributes: ["id", "email", "email_verification_token"],
+        limit: 10
+      });
+      
+      console.log("📋 Tokens existants en base (échantillon):");
+      let foundMatch = false;
+      usersWithTokens.forEach(u => {
+        const dbToken = u.email_verification_token;
+        if (dbToken) {
+          const dbTokenClean = dbToken.trim().replace(/\s+/g, '');
+          console.log(`  - ${u.email}:`);
+          console.log(`    Token (premiers 30 chars): ${dbToken.substring(0, 30)}...`);
+          console.log(`    Longueur: ${dbToken.length}`);
+          console.log(`    Longueur nettoyée: ${dbTokenClean.length}`);
+          
+          // Comparaison exacte
+          if (dbToken === cleanToken || dbTokenClean === cleanToken) {
+            console.log(`    ✅ MATCH TROUVÉ !`);
+            foundMatch = true;
+            // Réessayer avec le token exact de la base
+            user = u;
+          }
+        }
+      });
+
+      if (!user && !foundMatch) {
+        return res.status(400).json({ 
+          status: "error", 
+          message: "Token invalide ou déjà utilisé",
+          debug: process.env.NODE_ENV === "development" ? {
+            tokenLength: cleanToken.length,
+            tokenPreview: cleanToken.substring(0, 20) + "...",
+            tokensInDb: usersWithTokens.length
+          } : undefined
+        });
+      }
+    }
+
+    // Vérifier si le compte est déjà actif
+    if (user.status === "active") {
+      return res.status(400).json({ 
+        status: "error", 
+        message: "Ce compte est déjà activé" 
+      });
+    }
+
+    // Activer le compte
+    user.email_verification_token = null;
+    user.status = "active";
+    await user.save();
+
+    res.json({ 
+      status: "success", 
+      message: "Email vérifié avec succès",
+      data: {
+        email: user.email,
+        name: user.name
+      }
+    });
+  } catch (err) {
+    console.error("Erreur lors de la vérification d'email:", err);
+    res.status(500).json({ 
+      status: "error", 
+      message: "Erreur serveur lors de la vérification" 
+    });
+  }
 };
 
 // REQUEST PASSWORD RESET
