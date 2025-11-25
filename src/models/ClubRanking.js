@@ -46,3 +46,4 @@ const ClubRanking = sequelize.define(
 module.exports = ClubRanking;
 
 
+

@@ -146,3 +146,4 @@ Si vous avez déjà des catégories existantes sans `distance_id`, vous pouvez :
 - L'import assigne automatiquement `distance_id` lors de la création des catégories
 
 
+

@@ -57,3 +57,4 @@ const RankingPoint = sequelize.define(
 module.exports = RankingPoint;
 
 
+

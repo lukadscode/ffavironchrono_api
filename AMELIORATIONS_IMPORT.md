@@ -122,3 +122,4 @@ Pour vérifier que l'import fonctionne :
 3. Vérifier dans la base de données si des données partielles ont été créées
 4. Relancer l'import si nécessaire (les doublons sont évités)
 
+

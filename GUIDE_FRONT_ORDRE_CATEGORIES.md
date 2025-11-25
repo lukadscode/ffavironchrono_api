@@ -162,3 +162,4 @@ const CategoryOrderSelector = ({ categories, onOrderChange }) => {
 - L'ordre est respecté strictement : les courses sont numérotées selon cet ordre
 - Si `category_order` est vide ou non fourni, le comportement par défaut (tri par code) est utilisé
 
+

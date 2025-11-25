@@ -35,3 +35,4 @@ router.delete("/:id", auth, controller.deleteNotification);
 
 module.exports = router;
 
+

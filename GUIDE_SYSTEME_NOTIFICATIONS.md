@@ -332,3 +332,4 @@ Ou via votre outil de gestion de base de données.
 4. **WebSocket** : Les notifications sont diffusées automatiquement lors de la création/mise à jour/suppression
 5. **Permissions** : Seuls les utilisateurs authentifiés peuvent créer/modifier/supprimer des notifications
 
+

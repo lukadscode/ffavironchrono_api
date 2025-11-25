@@ -52,3 +52,4 @@ exports.getClubs = async (req, res) => {
   }
 };
 
+

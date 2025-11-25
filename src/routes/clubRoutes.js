@@ -8,3 +8,4 @@ router.get("/", auth, controller.getClubs);
 
 module.exports = router;
 
+

@@ -9,3 +9,4 @@ exports.addUserToEventSchema = Joi.object({
   name: Joi.string().optional(),
 });
 
+

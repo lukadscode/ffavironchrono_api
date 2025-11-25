@@ -37,3 +37,4 @@ const ScoringTemplate = sequelize.define(
 module.exports = ScoringTemplate;
 
 
+
