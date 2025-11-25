@@ -4,6 +4,7 @@ const User = require("../models/User");
 const UserSession = require("../models/UserSession");
 const { hashPassword } = require("../utils/hash");
 const sendEmail = require("../utils/sendEmail");
+const emailTemplates = require("../utils/emailTemplates");
 const crypto = require("crypto");
 
 // GET /users - Liste des utilisateurs avec pagination et filtres
@@ -105,25 +106,15 @@ exports.createUser = async (req, res) => {
     });
 
     // Envoyer un email avec le mot de passe temporaire
-    const emailSubject = "Création de votre compte";
-    const emailText = `Bonjour ${name},
-
-Votre compte a été créé par un administrateur.
-
-Vos identifiants de connexion :
-- Email : ${email}
-- Mot de passe temporaire : ${temporaryPassword}
-
-⚠️ IMPORTANT : Veuillez changer ce mot de passe lors de votre première connexion.
-
-Pour activer votre compte, veuillez cliquer sur le lien suivant :
-https://aviron-app.com/verify-email?token=${email_verification_token}
-
-Cordialement,
-L'équipe AvironApp`;
+    const emailData = emailTemplates.accountCreationEmail(
+      name,
+      email,
+      temporaryPassword,
+      email_verification_token
+    );
 
     try {
-      await sendEmail(email, emailSubject, emailText);
+      await sendEmail(email, emailData.subject, emailData.text, emailData.html);
     } catch (emailError) {
       console.error("Erreur lors de l'envoi de l'email:", emailError);
       // On continue même si l'email n'a pas pu être envoyé

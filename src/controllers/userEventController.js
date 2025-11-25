@@ -3,8 +3,10 @@ const crypto = require("crypto");
 const { Op } = require("sequelize");
 const UserEvent = require("../models/UserEvent");
 const User = require("../models/User");
+const Event = require("../models/Event");
 const { hashPassword } = require("../utils/hash");
 const sendEmail = require("../utils/sendEmail");
+const emailTemplates = require("../utils/emailTemplates");
 
 /**
  * Génère un mot de passe provisoire aléatoire
@@ -69,31 +71,30 @@ exports.addUserToEvent = async (req, res) => {
 
       userCreated = true;
 
+      // Récupérer le nom de l'événement pour l'email
+      const event = await Event.findByPk(event_id);
+      const eventName = event ? event.name : "l'événement";
+
       // Envoyer un email avec le mot de passe provisoire
-      const emailSubject = "Création de votre compte - Mot de passe provisoire";
-      const emailText = `Bonjour ${userName},
-
-Votre compte a été créé pour accéder à l'événement.
-
-Vos identifiants de connexion :
-- Email : ${email}
-- Mot de passe provisoire : ${temporaryPassword}
-
-⚠️ IMPORTANT : Veuillez changer ce mot de passe lors de votre première connexion.
-
-Pour activer votre compte, veuillez cliquer sur le lien suivant :
-https://aviron-app.com/verify-email?token=${email_verification_token}
-
-Cordialement,
-L'équipe AvironApp`;
+      const emailData = emailTemplates.eventInvitationEmail(
+        userName,
+        email,
+        temporaryPassword,
+        eventName,
+        email_verification_token
+      );
 
       try {
-        await sendEmail(email, emailSubject, emailText);
+        await sendEmail(email, emailData.subject, emailData.text, emailData.html);
       } catch (emailError) {
         console.error("Erreur lors de l'envoi de l'email:", emailError);
         // On continue même si l'email n'a pas pu être envoyé
       }
     }
+
+    // Récupérer le nom de l'événement (pour l'email)
+    const event = await Event.findByPk(event_id);
+    const eventName = event ? event.name : "l'événement";
 
     // Créer ou mettre à jour le lien UserEvent
     const [record, created] = await UserEvent.findOrCreate({
@@ -104,9 +105,25 @@ L'équipe AvironApp`;
       },
     });
 
+    const roleChanged = !created && record.role !== role;
     if (!created) {
       record.role = role;
       await record.save();
+    }
+
+    // Si l'utilisateur existe déjà, envoyer un email de notification
+    if (!userCreated) {
+      try {
+        const emailData = emailTemplates.eventAddedEmail(
+          user.name,
+          eventName,
+          role
+        );
+        await sendEmail(user.email, emailData.subject, emailData.text, emailData.html);
+      } catch (emailError) {
+        console.error("Erreur lors de l'envoi de l'email:", emailError);
+        // On continue même si l'email n'a pas pu être envoyé
+      }
     }
 
     res.json({

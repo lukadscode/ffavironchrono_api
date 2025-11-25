@@ -19,7 +19,7 @@ module.exports = async (to, subject, text, html = null) => {
       const { Resend } = require("resend");
       const resend = new Resend(RESEND_API_KEY);
 
-      const from = process.env.RESEND_FROM_EMAIL || process.env.SMTP_USER || "noreply@aviron-app.com";
+      const from = process.env.RESEND_FROM_EMAIL || process.env.SMTP_USER || "noreply@ffaviron.fr";
 
       const result = await resend.emails.send({
         from,

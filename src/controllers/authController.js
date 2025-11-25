@@ -12,6 +12,7 @@ const {
   generateRefreshToken,
 } = require("../services/tokenService");
 const sendEmail = require("../utils/sendEmail");
+const emailTemplates = require("../utils/emailTemplates");
 
 // REGISTER
 exports.register = async (req, res) => {
@@ -72,11 +73,8 @@ exports.register = async (req, res) => {
       }
 
       // Envoyer un nouvel email de vérification
-      await sendEmail(
-        email,
-        "Vérification de votre adresse",
-        `Cliquez pour vérifier : https://aviron-app.com/verify-email?token=${email_verification_token}`
-      );
+      const emailData = emailTemplates.verificationEmail(email_verification_token, name);
+      await sendEmail(email, emailData.subject, emailData.text, emailData.html);
 
       return res.status(200).json({
         status: "success",
@@ -123,11 +121,8 @@ exports.register = async (req, res) => {
         throw saveErr;
       }
 
-      await sendEmail(
-        email,
-        "Vérification de votre adresse",
-        `Cliquez pour vérifier : https://aviron-app.com/verify-email?token=${email_verification_token}`
-      );
+      const emailData = emailTemplates.verificationEmail(email_verification_token, name);
+      await sendEmail(email, emailData.subject, emailData.text, emailData.html);
 
       return res.status(200).json({
         status: "success",
@@ -165,11 +160,8 @@ exports.register = async (req, res) => {
         email_verification_token,
       });
 
-      await sendEmail(
-        email,
-        "Vérification de votre adresse",
-        `Cliquez pour vérifier : https://aviron-app.com/verify-email?token=${email_verification_token}`
-      );
+      const emailData = emailTemplates.verificationEmail(email_verification_token, name);
+      await sendEmail(email, emailData.subject, emailData.text, emailData.html);
 
       res.status(201).json({
         status: "success",
@@ -385,11 +377,8 @@ exports.requestPasswordReset = async (req, res) => {
   user.reset_password_expires = new Date(Date.now() + 3600 * 1000); // 1h
   await user.save();
 
-  await sendEmail(
-    user.email,
-    "Réinitialisation de mot de passe",
-    `Cliquez ici pour réinitialiser : https://aviron-app.com/reset-password?token=${token}`
-  );
+  const emailData = emailTemplates.passwordResetEmail(user.name, token);
+  await sendEmail(user.email, emailData.subject, emailData.text, emailData.html);
   res.json({ status: "success", message: "Email envoyé" });
 };
 
