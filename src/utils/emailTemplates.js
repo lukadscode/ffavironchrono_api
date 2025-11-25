@@ -67,18 +67,20 @@ const baseTemplate = (content, title) => `
     .button {
       display: inline-block;
       padding: 16px 40px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
       color: #ffffff !important;
       text-decoration: none;
       border-radius: 8px;
       font-weight: 600;
       font-size: 16px;
-      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+      box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4);
       transition: transform 0.2s, box-shadow 0.2s;
+      border: none;
     }
     .button:hover {
       transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+      box-shadow: 0 6px 20px rgba(37, 99, 235, 0.5);
+      background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
     }
     .info-box {
       background-color: #f8f9fa;
@@ -179,14 +181,14 @@ const baseTemplate = (content, title) => `
 <body>
   <div class="email-container">
     <div class="email-header">
-      <h1>🚣 AvironApp</h1>
+      <h1>🚣 FFAVIRON - TIMING</h1>
       <p>Gestion de chronométrage</p>
     </div>
     <div class="email-body">
       ${content}
     </div>
     <div class="email-footer">
-      <p><strong>AvironApp</strong></p>
+      <p><strong>FFAVIRON - TIMING</strong></p>
       <p>Plateforme de gestion de chronométrage</p>
       <p style="margin-top: 15px;">
         <a href="${BASE_URL}">Visiter le site</a> | 
@@ -210,7 +212,7 @@ exports.verificationEmail = (token, userName = "Utilisateur") => {
   const content = `
     <div class="email-content">
       <h2>Bienvenue ${userName} ! 👋</h2>
-      <p>Merci de vous être inscrit sur <strong>AvironApp</strong>.</p>
+      <p>Merci de vous être inscrit sur <strong>FFAVIRON - TIMING</strong>.</p>
       <p>Pour finaliser votre inscription et activer votre compte, veuillez vérifier votre adresse email en cliquant sur le bouton ci-dessous :</p>
       
       <div class="button-container">
@@ -232,7 +234,7 @@ exports.verificationEmail = (token, userName = "Utilisateur") => {
   `;
   
   return {
-    subject: "Vérification de votre adresse email - AvironApp",
+    subject: "Vérification de votre adresse email - FFAVIRON - TIMING",
     html: baseTemplate(content, "Vérification de votre email"),
     text: `Bienvenue ${userName} !\n\nPour activer votre compte, veuillez cliquer sur ce lien : ${verifyUrl}\n\nCe lien est valide pendant 24 heures.`
   };
@@ -248,7 +250,7 @@ exports.accountCreationEmail = (userName, email, temporaryPassword, token) => {
     <div class="email-content">
       <h2>Votre compte a été créé ! 🎉</h2>
       <p>Bonjour <strong>${userName}</strong>,</p>
-      <p>Votre compte AvironApp a été créé avec succès. Vous pouvez maintenant accéder à la plateforme de gestion de chronométrage.</p>
+      <p>Votre compte <strong>FFAVIRON - TIMING</strong> a été créé avec succès. Vous pouvez maintenant accéder à la plateforme de gestion de chronométrage.</p>
       
       <div class="credentials-box">
         <h3>🔑 Vos identifiants de connexion</h3>
@@ -298,7 +300,7 @@ exports.eventInvitationEmail = (userName, email, temporaryPassword, eventName, t
     <div class="email-content">
       <h2>Invitation à un événement 🏁</h2>
       <p>Bonjour <strong>${userName}</strong>,</p>
-      <p>Vous avez été ajouté à l'événement <strong>${eventName}</strong> sur AvironApp.</p>
+      <p>Vous avez été ajouté à l'événement <strong>${eventName}</strong> sur <strong>FFAVIRON - TIMING</strong>.</p>
       <p>Un compte a été créé pour vous permettre d'accéder à la plateforme.</p>
       
       <div class="credentials-box">
@@ -333,7 +335,7 @@ exports.eventInvitationEmail = (userName, email, temporaryPassword, eventName, t
   `;
   
   return {
-    subject: `Invitation à l'événement ${eventName} - AvironApp`,
+    subject: `Invitation à l'événement ${eventName} - FFAVIRON - TIMING`,
     html: baseTemplate(content, "Invitation à un événement"),
     text: `Bonjour ${userName},\n\nVous avez été ajouté à l'événement ${eventName}.\n\nEmail : ${email}\nMot de passe provisoire : ${temporaryPassword}\n\n⚠️ IMPORTANT : Veuillez changer ce mot de passe lors de votre première connexion.\n\nPour activer votre compte : ${verifyUrl}`
   };
@@ -356,7 +358,7 @@ exports.eventAddedEmail = (userName, eventName, role) => {
     <div class="email-content">
       <h2>Vous avez été ajouté à un événement ! 🏁</h2>
       <p>Bonjour <strong>${userName}</strong>,</p>
-      <p>Vous avez été ajouté à l'événement <strong>${eventName}</strong> sur AvironApp.</p>
+      <p>Vous avez été ajouté à l'événement <strong>${eventName}</strong> sur <strong>FFAVIRON - TIMING</strong>.</p>
       
       <div class="info-box">
         <strong>👤 Votre rôle</strong>
@@ -377,7 +379,7 @@ exports.eventAddedEmail = (userName, eventName, role) => {
   `;
   
   return {
-    subject: `Ajout à l'événement ${eventName} - AvironApp`,
+    subject: `Ajout à l'événement ${eventName} - FFAVIRON - TIMING`,
     html: baseTemplate(content, "Ajout à un événement"),
     text: `Bonjour ${userName},\n\nVous avez été ajouté à l'événement ${eventName} avec le rôle ${roleLabel}.\n\nVous pouvez accéder à l'événement en vous connectant : ${BASE_URL}/login`
   };
@@ -393,7 +395,7 @@ exports.passwordResetEmail = (userName, token) => {
     <div class="email-content">
       <h2>Réinitialisation de mot de passe 🔐</h2>
       <p>Bonjour <strong>${userName}</strong>,</p>
-      <p>Vous avez demandé à réinitialiser votre mot de passe sur AvironApp.</p>
+      <p>Vous avez demandé à réinitialiser votre mot de passe sur <strong>FFAVIRON - TIMING</strong>.</p>
       <p>Cliquez sur le bouton ci-dessous pour créer un nouveau mot de passe :</p>
       
       <div class="button-container">
@@ -415,7 +417,7 @@ exports.passwordResetEmail = (userName, token) => {
   `;
   
   return {
-    subject: "Réinitialisation de votre mot de passe - AvironApp",
+    subject: "Réinitialisation de votre mot de passe - FFAVIRON - TIMING",
     html: baseTemplate(content, "Réinitialisation de mot de passe"),
     text: `Bonjour ${userName},\n\nPour réinitialiser votre mot de passe, cliquez sur ce lien : ${resetUrl}\n\nCe lien est valide pendant 1 heure.`
   };
@@ -443,7 +445,7 @@ exports.passwordChangedEmail = (userName) => {
   `;
   
   return {
-    subject: "Mot de passe modifié - AvironApp",
+    subject: "Mot de passe modifié - FFAVIRON - TIMING",
     html: baseTemplate(content, "Mot de passe modifié"),
     text: `Bonjour ${userName},\n\nVotre mot de passe a été modifié avec succès.\n\nSi vous n'avez pas effectué cette modification, contactez immédiatement le support.`
   };
