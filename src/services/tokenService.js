@@ -3,7 +3,7 @@ const crypto = require("crypto");
 require("dotenv").config();
 
 exports.generateAccessToken = (userId) => {
-  return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: "15m" });
+  return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: "5h" });
 };
 
 exports.generateRefreshToken = () => {

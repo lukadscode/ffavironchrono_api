@@ -23,6 +23,7 @@ const exportRoutes = require("./routes/exportRoutes");
 const rankingRoutes = require("./routes/rankingRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const clubRoutes = require("./routes/clubRoutes");
+const userRoutes = require("./routes/userRoutes");
 
 const swaggerUi = require("swagger-ui-express");
 const openapiSpec = require("./docs");
@@ -62,6 +63,7 @@ app.use("/export", exportRoutes); // Export routes for PDF generation
 app.use("/rankings", rankingRoutes); // Ranking routes
 app.use("/notifications", notificationRoutes); // Notification routes
 app.use("/clubs", clubRoutes); // Club routes
+app.use("/users", userRoutes); // User routes (admin only)
 app.use("/", miscRoutes); // Assuming you have a miscRoutes file for miscellaneous routes
 
 app.get("/swagger.json", (req, res) => {

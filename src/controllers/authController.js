@@ -17,40 +17,184 @@ const sendEmail = require("../utils/sendEmail");
 exports.register = async (req, res) => {
   try {
     const { name, email, password, num_license } = req.body;
-    const existing = await User.findOne({
-      where: {
-        [Op.or]: [{ email }, { num_license: email }],
-      },
-    });
-    if (existing)
-      return res
-        .status(400)
-        .json({ status: "error", message: "Email ou numéro déjà utilisé" });
 
+    // Vérifier si l'email existe déjà
+    const existingByEmail = await User.findOne({
+      where: { email },
+    });
+
+    // Vérifier si le num_license existe déjà (si fourni)
+    let existingByLicense = null;
+    if (num_license) {
+      existingByLicense = await User.findOne({
+        where: { num_license },
+      });
+    }
+
+    // Si l'utilisateur existe par email et est inactif, on met à jour son compte
+    if (existingByEmail && existingByEmail.status === "inactive") {
+      // Vérifier que le num_license fourni n'est pas déjà utilisé par un autre utilisateur actif
+      if (
+        num_license &&
+        existingByLicense &&
+        existingByLicense.id !== existingByEmail.id &&
+        existingByLicense.status === "active"
+      ) {
+        return res.status(400).json({
+          status: "error",
+          message: "Ce numéro de licence est déjà utilisé par un autre compte",
+        });
+      }
+
+      const hashed = await hashPassword(password);
+      const email_verification_token = crypto.randomBytes(32).toString("hex");
+
+      // Mettre à jour le compte inactif
+      existingByEmail.password = hashed;
+      existingByEmail.email_verification_token = email_verification_token;
+      if (name) existingByEmail.name = name;
+      if (num_license) existingByEmail.num_license = num_license;
+
+      try {
+        await existingByEmail.save();
+      } catch (saveErr) {
+        // Gérer les erreurs de contrainte unique (num_license déjà utilisé)
+        if (
+          saveErr.name === "SequelizeUniqueConstraintError" ||
+          saveErr.name === "SequelizeValidationError"
+        ) {
+          return res.status(400).json({
+            status: "error",
+            message: "Ce numéro de licence est déjà utilisé",
+          });
+        }
+        throw saveErr;
+      }
+
+      // Envoyer un nouvel email de vérification
+      await sendEmail(
+        email,
+        "Vérification de votre adresse",
+        `Cliquez pour vérifier : https://aviron-app.com/verify-email?token=${email_verification_token}`
+      );
+
+      return res.status(200).json({
+        status: "success",
+        data: { id: existingByEmail.id, email: existingByEmail.email },
+        message: "Compte mis à jour, veuillez vérifier votre email",
+      });
+    }
+
+    // Si l'utilisateur existe par num_license et est inactif (mais email différent)
+    if (
+      existingByLicense &&
+      existingByLicense.status === "inactive" &&
+      existingByLicense.email !== email
+    ) {
+      // Si l'email fourni est déjà utilisé par un utilisateur actif, erreur
+      if (existingByEmail && existingByEmail.status === "active") {
+        return res.status(400).json({
+          status: "error",
+          message: "Cet email est déjà utilisé par un autre compte",
+        });
+      }
+
+      // Mettre à jour l'utilisateur inactif trouvé par num_license
+      const hashed = await hashPassword(password);
+      const email_verification_token = crypto.randomBytes(32).toString("hex");
+
+      existingByLicense.email = email; // Mettre à jour l'email
+      existingByLicense.password = hashed;
+      existingByLicense.email_verification_token = email_verification_token;
+      if (name) existingByLicense.name = name;
+
+      try {
+        await existingByLicense.save();
+      } catch (saveErr) {
+        if (
+          saveErr.name === "SequelizeUniqueConstraintError" ||
+          saveErr.name === "SequelizeValidationError"
+        ) {
+          return res.status(400).json({
+            status: "error",
+            message: "Cet email est déjà utilisé",
+          });
+        }
+        throw saveErr;
+      }
+
+      await sendEmail(
+        email,
+        "Vérification de votre adresse",
+        `Cliquez pour vérifier : https://aviron-app.com/verify-email?token=${email_verification_token}`
+      );
+
+      return res.status(200).json({
+        status: "success",
+        data: { id: existingByLicense.id, email: existingByLicense.email },
+        message: "Compte mis à jour, veuillez vérifier votre email",
+      });
+    }
+
+    // Si l'utilisateur existe et est actif, erreur
+    if (existingByEmail && existingByEmail.status === "active") {
+      return res.status(400).json({
+        status: "error",
+        message: "Cet email est déjà utilisé",
+      });
+    }
+
+    if (existingByLicense && existingByLicense.status === "active") {
+      return res.status(400).json({
+        status: "error",
+        message: "Ce numéro de licence est déjà utilisé",
+      });
+    }
+
+    // Sinon, création d'un nouvel utilisateur
     const hashed = await hashPassword(password);
     const email_verification_token = crypto.randomBytes(32).toString("hex");
 
-    const newUser = await User.create({
-      id: uuidv4(),
-      name,
-      email,
-      num_license,
-      password: hashed,
-      email_verification_token,
-    });
+    try {
+      const newUser = await User.create({
+        id: uuidv4(),
+        name,
+        email,
+        num_license,
+        password: hashed,
+        email_verification_token,
+      });
 
-    await sendEmail(
-      email,
-      "Vérification de votre adresse",
-      `Cliquez pour vérifier : https://aviron-app.com/verify-email?token=${email_verification_token}`
-    );
+      await sendEmail(
+        email,
+        "Vérification de votre adresse",
+        `Cliquez pour vérifier : https://aviron-app.com/verify-email?token=${email_verification_token}`
+      );
 
-    res.status(201).json({
-      status: "success",
-      data: { id: newUser.id, email: newUser.email },
-    });
+      res.status(201).json({
+        status: "success",
+        data: { id: newUser.id, email: newUser.email },
+      });
+    } catch (createErr) {
+      // Gérer les erreurs de contrainte unique
+      if (
+        createErr.name === "SequelizeUniqueConstraintError" ||
+        createErr.name === "SequelizeValidationError"
+      ) {
+        const field = createErr.errors?.[0]?.path || "champ";
+        return res.status(400).json({
+          status: "error",
+          message: `Ce ${field === "email" ? "email" : "numéro de licence"} est déjà utilisé`,
+        });
+      }
+      throw createErr;
+    }
   } catch (err) {
-    res.status(500).json({ status: "error", message: err.message });
+    console.error("Error in register:", err);
+    res.status(500).json({
+      status: "error",
+      message: err.message || "Une erreur est survenue lors de l'inscription",
+    });
   }
 };
 
