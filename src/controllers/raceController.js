@@ -2,6 +2,8 @@ const { v4: uuidv4 } = require("uuid");
 const Race = require("../models/Race");
 const RacePhase = require("../models/RacePhase");
 const Distance = require("../models/Distance");
+const RaceCrew = require("../models/RaceCrew");
+const RankingPoint = require("../models/RankingPoint");
 
 exports.createRace = async (req, res) => {
   try {
@@ -106,11 +108,25 @@ exports.updateRace = async (req, res) => {
 
 exports.deleteRace = async (req, res) => {
   try {
-    const race = await Race.findByPk(req.params.id);
+    const { id } = req.params;
+    const race = await Race.findByPk(id);
     if (!race)
       return res.status(404).json({ status: "error", message: "Non trouvé" });
+
+    // 🔄 Suppression automatique de tout ce qui dépend de la course
+    // 1) Supprimer les RaceCrew liés à cette course
+    await RaceCrew.destroy({ where: { race_id: id } });
+
+    // 2) Supprimer les RankingPoint liés à cette course (classements)
+    await RankingPoint.destroy({ where: { race_id: id } });
+
+    // 3) Supprimer enfin la course
     await race.destroy();
-    res.json({ status: "success", message: "Course supprimée" });
+
+    res.json({
+      status: "success",
+      message: "Course et données associées supprimées automatiquement",
+    });
   } catch (err) {
     res.status(500).json({ status: "error", message: err.message });
   }

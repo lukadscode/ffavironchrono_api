@@ -56,8 +56,30 @@ exports.deleteRacePhase = async (req, res) => {
     const phase = await RacePhase.findByPk(id);
     if (!phase)
       return res.status(404).json({ status: "error", message: "Non trouvée" });
+
+    // 🔄 Suppression automatique de tout ce qui dépend de la phase
+    // 1) Récupérer toutes les courses de cette phase
+    const races = await Race.findAll({ where: { phase_id: id } });
+    const raceIds = races.map((r) => r.id);
+
+    // 2) Supprimer les RaceCrew liés à ces courses
+    if (raceIds.length > 0) {
+      await RaceCrew.destroy({ where: { race_id: raceIds } });
+    }
+
+    // 3) Supprimer les courses de cette phase
+    await Race.destroy({ where: { phase_id: id } });
+
+    // 4) Supprimer enfin la phase
     await phase.destroy();
-    res.json({ status: "success", message: "Phase supprimée" });
+
+    res.json({
+      status: "success",
+      message: "Phase et courses associées supprimées automatiquement",
+      data: {
+        deleted_races: raceIds.length,
+      },
+    });
   } catch (err) {
     res.status(500).json({ status: "error", message: err.message });
   }
