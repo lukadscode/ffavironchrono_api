@@ -4,6 +4,7 @@ const RacePhase = require("../models/RacePhase");
 const Distance = require("../models/Distance");
 const RaceCrew = require("../models/RaceCrew");
 const RankingPoint = require("../models/RankingPoint");
+const Notification = require("../models/Notification");
 
 exports.createRace = async (req, res) => {
   try {
@@ -120,7 +121,10 @@ exports.deleteRace = async (req, res) => {
     // 2) Supprimer les RankingPoint liés à cette course (classements)
     await RankingPoint.destroy({ where: { race_id: id } });
 
-    // 3) Supprimer enfin la course
+    // 3) Supprimer les Notifications liées à cette course
+    await Notification.destroy({ where: { race_id: id } });
+
+    // 4) Supprimer enfin la course
     await race.destroy();
 
     res.json({
