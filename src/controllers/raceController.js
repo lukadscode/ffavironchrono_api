@@ -119,7 +119,18 @@ exports.deleteRace = async (req, res) => {
     await RaceCrew.destroy({ where: { race_id: id } });
 
     // 2) Supprimer les RankingPoint liés à cette course (classements)
-    await RankingPoint.destroy({ where: { race_id: id } });
+    //    (ignorer silencieusement si la table n'existe pas encore en BDD)
+    try {
+      await RankingPoint.destroy({ where: { race_id: id } });
+    } catch (rpErr) {
+      // MySQL : table manquante (par ex. si le module de classement n'a pas encore été déployé)
+      const msg = rpErr?.original?.sqlMessage || rpErr?.message || "";
+      if (!/rankingpoints/i.test(msg) || !/doesn't exist|does not exist/i.test(msg)) {
+        // Si ce n'est pas une erreur \"table inexistante\", on la relaie
+        throw rpErr;
+      }
+      console.warn(\"RankingPoint table missing, skipping delete for race_id=\", id);
+    }
 
     // 3) Supprimer les Notifications liées à cette course
     await Notification.destroy({ where: { race_id: id } });
