@@ -123,10 +123,14 @@ exports.deleteRace = async (req, res) => {
     try {
       await RankingPoint.destroy({ where: { race_id: id } });
     } catch (rpErr) {
-      const msg = (rpErr && rpErr.original && rpErr.original.sqlMessage) || rpErr.message || "";
-      // Si le message d'erreur ne parle PAS de table rankingpoints inexistante, on relaie l'erreur
+      const msg =
+        (rpErr && rpErr.original && rpErr.original.sqlMessage) ||
+        rpErr.message ||
+        "";
+      // Si le message d'erreur NE concerne PAS une table ranking_points inexistante, on relaie l'erreur
       const isMissingTableError =
-        /rankingpoints/i.test(msg) && /(doesn't exist|does not exist)/i.test(msg);
+        /ranking[_ ]?points/i.test(msg) &&
+        /(doesn't exist|does not exist|n'existe pas|doesn t exist)/i.test(msg);
       if (!isMissingTableError) {
         throw rpErr;
       }
