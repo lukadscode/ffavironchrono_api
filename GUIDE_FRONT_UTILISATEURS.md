@@ -357,6 +357,7 @@ Authorization: Bearer <token>
 - `viewer` : Visualiseur
 - `editor` : Éditeur
 - `referee` : Arbitre
+- `timing` : Chronométreur
 - `organiser` : Organisateur
 
 ### GET `/user-events/event/{event_id}` - Liste des utilisateurs d'un événement
@@ -476,7 +477,7 @@ Content-Type: application/json
 **Champs requis** :
 - `email` (string, format email) : Adresse email de l'utilisateur
 - `event_id` (string) : ID de l'événement
-- `role` (enum) : Rôle dans l'événement (`viewer`, `editor`, `referee`, `organiser`)
+- `role` (enum) : Rôle dans l'événement (`viewer`, `editor`, `referee`, `timing`, `organiser`)
 - `name` (string, optionnel) : Nom de l'utilisateur (extrait de l'email si non fourni)
 
 **Exemple de requête** :
@@ -663,7 +664,7 @@ Un utilisateur ajouté à un événement peut maintenant :
 
 1. **Rôle principal vs Rôle dans l'événement** :
    - Le **rôle principal** (`role` dans la table `users`) : `user`, `admin`, `superadmin` - définit les permissions globales
-   - Le **rôle dans l'événement** (`role` dans la table `user_events`) : `viewer`, `editor`, `referee`, `organiser` - définit les permissions pour un événement spécifique
+   - Le **rôle dans l'événement** (`role` dans la table `user_events`) : `viewer`, `editor`, `referee`, `timing`, `organiser` - définit les permissions pour un événement spécifique
 
 2. **Statut utilisateur** :
    - `inactive` : Compte créé mais email non vérifié

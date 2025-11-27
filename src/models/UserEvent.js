@@ -17,7 +17,7 @@ const UserEvent = sequelize.define(
       allowNull: false,
     },
     role: {
-      type: DataTypes.ENUM("viewer", "editor", "referee", "organiser"),
+      type: DataTypes.ENUM("viewer", "editor", "referee", "timing", "organiser"),
       defaultValue: "viewer",
     },
   },

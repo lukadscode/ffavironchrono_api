@@ -24,7 +24,7 @@ paths:
                   type: string
                 role:
                   type: string
-                  enum: [viewer, editor, referee, organiser]
+                  enum: [viewer, editor, referee, timing, organiser]
                 name:
                   type: string
                   description: Nom de l'utilisateur (optionnel, extrait de l'email si non fourni)
