@@ -4,6 +4,7 @@ const Event = require("../models/Event");
 const Category = require("../models/Category");
 const CrewParticipant = require("../models/CrewParticipant");
 const Participant = require("../models/Participant");
+const RaceCrew = require("../models/RaceCrew");
 
 exports.createCrew = async (req, res) => {
   try {
@@ -77,11 +78,24 @@ exports.updateCrew = async (req, res) => {
 
 exports.deleteCrew = async (req, res) => {
   try {
-    const crew = await Crew.findByPk(req.params.id);
+    const { id } = req.params;
+    const crew = await Crew.findByPk(id);
     if (!crew)
       return res.status(404).json({ status: "error", message: "Non trouvé" });
+
+    // 1) Supprimer les CrewParticipant liés à cet équipage
+    await CrewParticipant.destroy({ where: { crew_id: id } });
+
+    // 2) Supprimer les RaceCrew liés à cet équipage
+    await RaceCrew.destroy({ where: { crew_id: id } });
+
+    // 3) Supprimer enfin l'équipage
     await crew.destroy();
-    res.json({ status: "success", message: "Équipage supprimé" });
+
+    res.json({
+      status: "success",
+      message: "Équipage et données associées supprimées automatiquement",
+    });
   } catch (err) {
     res.status(500).json({ status: "error", message: err.message });
   }
