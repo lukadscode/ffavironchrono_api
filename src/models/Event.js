@@ -48,6 +48,11 @@ const Event = sequelize.define(
       type: DataTypes.STRING(50),
       allowNull: true,
     },
+    manifestation_id: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      description: "ID de la manifestation dans l'API FFAviron",
+    },
     is_visible: {
       type: DataTypes.BOOLEAN,
       defaultValue: true,

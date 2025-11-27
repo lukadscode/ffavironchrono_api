@@ -6,6 +6,7 @@ const RaceCrew = require("../models/RaceCrew");
 const Crew = require("../models/Crew");
 const Category = require("../models/Category");
 const Distance = require("../models/Distance");
+const Event = require("../models/Event");
 const { Op } = require("sequelize");
 
 exports.importManifestation = async (req, res) => {
@@ -421,5 +422,70 @@ exports.generateRacesFromSeries = async (req, res) => {
   } catch (err) {
     console.error("Error in generateRacesFromSeries:", err);
     res.status(500).json({ status: "error", message: err.message });
+  }
+};
+
+exports.updateEventFromManifestation = async (req, res) => {
+  const startTime = Date.now();
+  let event_id = null;
+  
+  try {
+    const { id } = req.params; // manifestation_id
+    const { event_id: providedEventId } = req.body;
+
+    if (!providedEventId) {
+      return res.status(400).json({
+        status: "error",
+        message: "event_id est requis dans le body de la requête",
+      });
+    }
+
+    event_id = providedEventId;
+
+    console.log(`🔄 Début de la mise à jour de l'événement ${event_id} depuis la manifestation ${id}...`);
+    
+    const result = await importManifestation.updateEventFromManifestation(id, event_id, req);
+    
+    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+    console.log(`✅ Mise à jour terminée avec succès en ${duration}s`);
+    console.log(`📊 Résumé: ${result.new_crews_count} nouveaux équipages, ${result.new_participants_count} nouveaux participants, ${result.new_categories_count} nouvelles catégories`);
+    
+    res.status(200).json({ 
+      status: "success", 
+      message: "Événement mis à jour avec succès",
+      data: result 
+    });
+  } catch (err) {
+    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+    console.error(`❌ Erreur de mise à jour après ${duration}s:`, err);
+    console.error("Stack trace:", err.stack);
+    
+    const errorMessage = err.message || "Erreur inconnue lors de la mise à jour";
+    const errorDetails = process.env.NODE_ENV === "development" 
+      ? { 
+          message: errorMessage,
+          stack: err.stack,
+          duration: `${duration}s`,
+          event_id: event_id || null
+        }
+      : { 
+          message: errorMessage,
+          duration: `${duration}s`
+        };
+    
+    // Vérifier si c'est une erreur 404 (événement introuvable)
+    if (errorMessage.includes("introuvable")) {
+      return res.status(404).json({ 
+        status: "error", 
+        message: errorMessage,
+        details: errorDetails
+      });
+    }
+    
+    res.status(500).json({ 
+      status: "error", 
+      message: errorMessage,
+      details: errorDetails
+    });
   }
 };

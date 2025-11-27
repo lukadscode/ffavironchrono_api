@@ -217,6 +217,7 @@ module.exports = async (manifestationId, req) => {
       race_type: m.type?.disciplines?.[0]?.discipline_libelle || "Aviron",
       organiser_name: m.structure?.nom || null,
       organiser_code: m.structure?.code || null,
+      manifestation_id: manifestationId.toString(), // Enregistrer l'ID de la manifestation
       created_by: req.user?.userId || null,
     });
 
@@ -572,6 +573,435 @@ module.exports = async (manifestationId, req) => {
     };
   } catch (error) {
     console.error("❌ Erreur lors de l'import:", error);
+    if (error.response) {
+      console.error("Réponse API:", error.response.status, error.response.data);
+      throw new Error(
+        `Erreur API: ${error.response.status} - ${JSON.stringify(
+          error.response.data
+        )}`
+      );
+    }
+    throw error;
+  }
+};
+
+/**
+ * Met à jour un événement existant en ajoutant uniquement les nouveaux éléments
+ * (catégories, participants, équipages) sans toucher à l'existant
+ */
+module.exports.updateEventFromManifestation = async (manifestationId, event_id, req) => {
+  try {
+    // 1. Vérifier que l'événement existe
+    const event = await Event.findByPk(event_id);
+    if (!event) {
+      throw new Error(`Événement ${event_id} introuvable`);
+    }
+
+    // 2. Récupérer les données depuis l'API externe
+    const url = `https://intranet.ffaviron.fr/api/v1/manifestation/${manifestationId}`;
+    const headers = {
+      Authorization: `Bearer ${process.env.EXTERNAL_API_TOKEN}`,
+    };
+
+    console.log(`📥 Mise à jour de l'événement ${event_id} depuis la manifestation ${manifestationId}...`);
+    const { data } = await axios.get(url, { 
+      headers,
+      timeout: 60000,
+    });
+
+    const m = data.manifestation;
+    const epreuves = data.epreuves || [];
+    const inscriptions = data.inscriptions || [];
+
+    console.log(`✅ Manifestation récupérée: ${m.libelle}`);
+    console.log(`📊 ${epreuves.length} épreuves, ${inscriptions.length} inscriptions`);
+
+    // 3. Récupérer les catégories existantes pour cet événement
+    const existingEventCategories = await EventCategory.findAll({
+      where: { event_id },
+      include: [{ model: Category }],
+    });
+    const existingCategoryCodes = new Set(
+      existingEventCategories.map((ec) => ec.Category?.code).filter(Boolean)
+    );
+
+    // 4. Récupérer les équipages existants pour cet événement (pour éviter les doublons)
+    const existingCrews = await Crew.findAll({
+      where: { event_id },
+      attributes: ['id', 'category_id', 'club_name', 'club_code'],
+    });
+    
+    // Créer un Set pour vérifier rapidement si un équipage existe déjà
+    // Clé: "category_id|club_name|club_code"
+    const existingCrewKeys = new Set();
+    existingCrews.forEach((crew) => {
+      const key = `${crew.category_id}|${crew.club_name || ''}|${crew.club_code || ''}`;
+      existingCrewKeys.add(key);
+    });
+
+    // 5. Création des distances (uniquement les nouvelles)
+    console.log("📏 Vérification des distances...");
+    const distanceMap = {};
+    const uniqueDistances = new Map();
+    const newDistances = []; // Pour stocker les détails des nouvelles distances
+
+    epreuves.forEach((ep) => {
+      const distanceInfo = extractDistance(ep.libelle_epreuve);
+      if (distanceInfo) {
+        const key = distanceInfo.isRelay
+          ? `${distanceInfo.meters}_relay_${distanceInfo.relayCount}`
+          : `${distanceInfo.meters}_normal`;
+        uniqueDistances.set(key, distanceInfo);
+      }
+    });
+
+    let newDistancesCount = 0;
+    for (const [key, distanceInfo] of uniqueDistances) {
+      const whereClause = {
+        event_id,
+        meters: distanceInfo.meters,
+        is_relay: distanceInfo.isRelay,
+      };
+      
+      if (distanceInfo.isRelay) {
+        whereClause.relay_count = distanceInfo.relayCount;
+      } else {
+        whereClause.relay_count = null;
+      }
+
+      const [distance, created] = await Distance.findOrCreate({
+        where: whereClause,
+        defaults: {
+          id: uuidv4(),
+          event_id,
+          meters: distanceInfo.meters,
+          is_relay: distanceInfo.isRelay,
+          relay_count: distanceInfo.relayCount,
+        },
+      });
+      
+      if (created) {
+        newDistancesCount++;
+        newDistances.push({
+          id: distance.id,
+          meters: distance.meters,
+          is_relay: distance.is_relay,
+          relay_count: distance.relay_count,
+          label: distanceInfo.isRelay
+            ? `${distanceInfo.relayCount}x${distanceInfo.meters}m`
+            : `${distanceInfo.meters}m`,
+        });
+        if (distanceInfo.isRelay) {
+          console.log(`  ✅ Nouvelle distance créée: ${distanceInfo.relayCount}x${distanceInfo.meters}m`);
+        } else {
+          console.log(`  ✅ Nouvelle distance créée: ${distanceInfo.meters}m`);
+        }
+      }
+      
+      distanceMap[key] = distance.id;
+      if (!distanceMap[distanceInfo.meters]) {
+        distanceMap[distanceInfo.meters] = distance.id;
+      }
+    }
+
+    // 6. Création des catégories (uniquement les nouvelles)
+    console.log("🏷️  Vérification des catégories...");
+    const categoryMap = {};
+    let newCategoriesCount = 0;
+    const newCategories = []; // Pour stocker les détails des nouvelles catégories
+
+    for (const ep of epreuves) {
+      const identifiant = ep.identifiant_epreuve;
+      const code = ep.code_epreuve;
+
+      if (!identifiant || !code) {
+        console.warn(`⚠️  Épreuve sans identifiant ou code:`, ep);
+        continue;
+      }
+
+      const distanceInfo = extractDistance(ep.libelle_epreuve);
+      let codeWithDistance = code;
+      let distanceId = null;
+
+      if (distanceInfo) {
+        if (distanceInfo.isRelay) {
+          codeWithDistance = `${code}_${distanceInfo.relayCount}x${distanceInfo.meters}m`;
+        } else {
+          codeWithDistance = `${code}_${distanceInfo.meters}m`;
+        }
+
+        const key = distanceInfo.isRelay
+          ? `${distanceInfo.meters}_relay_${distanceInfo.relayCount}`
+          : `${distanceInfo.meters}_normal`;
+        distanceId = distanceMap[key] || null;
+      }
+
+      // Chercher si la catégorie existe déjà
+      let category = await Category.findOne({
+        where: { code: codeWithDistance },
+      });
+
+      if (!category) {
+        const boatSeats = extractBoatSeats(ep.bateau?.code);
+        const hasCox = hasCoxswain(ep.bateau?.code);
+        const gender = mapGender(ep.sexe);
+
+        category = await Category.create({
+          id: uuidv4(),
+          code: codeWithDistance,
+          label: ep.libelle_epreuve || ep.code_epreuve,
+          age_group: ep.categorie?.code || null,
+          gender,
+          boat_seats: boatSeats,
+          has_coxswain: hasCox,
+          distance_id: distanceId,
+        });
+        
+        newCategoriesCount++;
+        newCategories.push({
+          id: category.id,
+          code: category.code,
+          label: category.label,
+          age_group: category.age_group,
+          gender: category.gender,
+          boat_seats: category.boat_seats,
+          has_coxswain: category.has_coxswain,
+          distance_id: category.distance_id,
+        });
+        const distanceLabel = distanceId
+          ? distanceInfo.isRelay
+            ? ` (${distanceInfo.relayCount}x${distanceInfo.meters}m)`
+            : ` (${distanceInfo.meters}m)`
+          : "";
+        console.log(`  ✅ Nouvelle catégorie créée: ${codeWithDistance} - ${category.label}${distanceLabel}`);
+      } else if (!category.distance_id && distanceId) {
+        // Mettre à jour la catégorie existante si elle n'a pas de distance_id
+        await category.update({ distance_id: distanceId });
+        console.log(`  ✅ Distance assignée à la catégorie existante: ${codeWithDistance}`);
+      }
+
+      categoryMap[identifiant] = category.id;
+
+      // Lier la catégorie à l'événement (findOrCreate pour éviter les doublons)
+      await EventCategory.findOrCreate({
+        where: { event_id, category_id: category.id },
+        defaults: { id: uuidv4() },
+      });
+    }
+
+    console.log(`✅ ${newCategoriesCount} nouvelle(s) catégorie(s) créée(s)`);
+
+    // 7. Création des équipages et participants (uniquement les nouveaux)
+    console.log("👥 Vérification des équipages et participants...");
+    let newCrewCount = 0;
+    let newParticipantCount = 0;
+    let totalParticipantCount = 0;
+    const totalInscriptions = inscriptions.length;
+    let processedInscriptions = 0;
+    const newCrews = []; // Pour stocker les détails des nouveaux équipages
+    const newParticipants = []; // Pour stocker les détails des nouveaux participants
+
+    for (const ins of inscriptions) {
+      processedInscriptions++;
+      
+      if (processedInscriptions % 50 === 0 || processedInscriptions === totalInscriptions) {
+        console.log(
+          `  📊 Progression: ${processedInscriptions}/${totalInscriptions} inscriptions traitées (${newCrewCount} nouveaux équipages)`
+        );
+      }
+
+      const identifiantEpreuve = ins.identifiant_epreuve;
+      const category_id = categoryMap[identifiantEpreuve];
+
+      if (!category_id) {
+        console.warn(
+          `⚠️  Catégorie non trouvée pour identifiant_epreuve ${identifiantEpreuve} (code: ${ins.code_epreuve})`
+        );
+        continue;
+      }
+
+      // Extraire le nom du club
+      const clubInfo = ins.nom_abrege_club_numero_equipage || "";
+      const clubParts = clubInfo.trim().split(/\s+/);
+      const lastPart = clubParts[clubParts.length - 1];
+      const isNumber = /^\d+$/.test(lastPart);
+      const club_name = isNumber ? clubParts.slice(0, -1).join(" ") : clubInfo;
+      const club_code = ins.num_club_rameur_1 || ins.club_abrege_rameur_1 || club_name || "";
+
+      // Vérifier si l'équipage existe déjà
+      const crewKey = `${category_id}|${club_name || ''}|${club_code || ''}`;
+      if (existingCrewKeys.has(crewKey)) {
+        // Équipage déjà existant, on passe
+        continue;
+      }
+
+      // Créer le nouvel équipage
+      let crew;
+      try {
+        crew = await Crew.create({
+          id: uuidv4(),
+          event_id,
+          category_id,
+          club_name: club_name || "Non spécifié",
+          club_code: club_code,
+          status: 8,
+        });
+        newCrewCount++;
+        existingCrewKeys.add(crewKey); // Ajouter à la liste pour éviter les doublons dans cette session
+        
+        // Récupérer la catégorie pour les détails
+        const category = await Category.findByPk(category_id);
+        newCrews.push({
+          id: crew.id,
+          category_id: crew.category_id,
+          category_code: category?.code || null,
+          category_label: category?.label || null,
+          club_name: crew.club_name,
+          club_code: crew.club_code,
+          status: crew.status,
+        });
+      } catch (crewError) {
+        console.error(
+          `❌ Erreur lors de la création de l'équipage pour ${club_name}:`,
+          crewError.message
+        );
+        continue;
+      }
+
+      // Créer les participants (rameurs 1 à 8)
+      for (let i = 1; i <= 8; i++) {
+        const nom = ins[`nom_rameur_${i}`];
+        const prenom = ins[`prenom_rameur_${i}`];
+        const licenseNumber = ins[`numero_licence_rameur_${i}`];
+
+        if (!nom || !prenom) continue;
+
+        try {
+          const participant = await findOrCreateParticipant({
+            nom,
+            prenom,
+            licenseNumber,
+            gender: mapGender(ins[`sexe_rameur_${i}`]),
+            club_name: ins[`club_abrege_rameur_${i}`] || club_name,
+            event_id,
+          });
+
+          if (participant.isNewRecord) {
+            newParticipantCount++;
+            newParticipants.push({
+              id: participant.id,
+              first_name: participant.first_name,
+              last_name: participant.last_name,
+              license_number: participant.license_number,
+              gender: participant.gender,
+              club_name: participant.club_name,
+              crew_id: crew.id,
+              crew_club: club_name,
+              is_coxswain: false,
+              seat_position: i,
+            });
+          }
+          totalParticipantCount++;
+
+          const existingLink = await CrewParticipant.findOne({
+            where: {
+              crew_id: crew.id,
+              participant_id: participant.id,
+            },
+          });
+
+          if (!existingLink) {
+            await CrewParticipant.create({
+              id: uuidv4(),
+              crew_id: crew.id,
+              participant_id: participant.id,
+              is_coxswain: false,
+              seat_position: i,
+            });
+          }
+        } catch (participantError) {
+          console.error(
+            `❌ Erreur lors de la création du participant ${i} pour l'équipage ${crew.id}:`,
+            participantError.message
+          );
+          continue;
+        }
+      }
+
+      // Créer le barreur si présent
+      if (ins.nom_bareur && ins.prenom_barreur) {
+        try {
+          const barreur = await findOrCreateParticipant({
+            nom: ins.nom_bareur,
+            prenom: ins.prenom_barreur,
+            licenseNumber: ins.numero_licence_barreur,
+            gender: mapGender(ins.sexe_barreur),
+            club_name: ins.club_abrege_barreur || club_name,
+            event_id,
+          });
+
+          if (barreur.isNewRecord) {
+            newParticipantCount++;
+            newParticipants.push({
+              id: barreur.id,
+              first_name: barreur.first_name,
+              last_name: barreur.last_name,
+              license_number: barreur.license_number,
+              gender: barreur.gender,
+              club_name: barreur.club_name,
+              crew_id: crew.id,
+              crew_club: club_name,
+              is_coxswain: true,
+              seat_position: null,
+            });
+          }
+          totalParticipantCount++;
+
+          const existingLink = await CrewParticipant.findOne({
+            where: {
+              crew_id: crew.id,
+              participant_id: barreur.id,
+            },
+          });
+
+          if (!existingLink) {
+            await CrewParticipant.create({
+              id: uuidv4(),
+              crew_id: crew.id,
+              participant_id: barreur.id,
+              is_coxswain: true,
+              coxswain_weight: null,
+            });
+          }
+        } catch (barreurError) {
+          console.error(
+            `❌ Erreur lors de la création du barreur pour l'équipage ${crew.id}:`,
+            barreurError.message
+          );
+        }
+      }
+    }
+
+    console.log(`✅ ${newCrewCount} nouveaux équipages créés`);
+    console.log(`✅ ${newParticipantCount} nouveaux participants créés`);
+    console.log(`✅ ${totalParticipantCount} participants totaux liés aux nouveaux équipages`);
+
+    return {
+      event_id,
+      name: event.name,
+      new_categories_count: newCategoriesCount,
+      new_crews_count: newCrewCount,
+      new_participants_count: newParticipantCount,
+      total_participants_count: totalParticipantCount,
+      new_distances_count: newDistancesCount,
+      // Détails complets
+      new_categories: newCategories,
+      new_distances: newDistances,
+      new_crews: newCrews,
+      new_participants: newParticipants,
+    };
+  } catch (error) {
+    console.error("❌ Erreur lors de la mise à jour:", error);
     if (error.response) {
       console.error("Réponse API:", error.response.status, error.response.data);
       throw new Error(
