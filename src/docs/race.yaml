@@ -110,6 +110,129 @@ paths:
         200:
           description: Courses générées
 
+  /races/generate-from-series:
+    post:
+      tags: [races]
+      summary: Génère les courses à partir de séries prédéfinies
+      description: |
+        Génère les courses en respectant la structure des séries fournie par le frontend.
+        Chaque série devient une course avec les équipages assignés selon le nombre spécifié par catégorie.
+        Les équipages sont sélectionnés aléatoirement parmi ceux disponibles pour chaque catégorie.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phase_id, lane_count, series]
+              properties:
+                phase_id:
+                  type: string
+                  format: uuid
+                lane_count:
+                  type: integer
+                  minimum: 1
+                start_time:
+                  type: string
+                  format: date-time
+                  description: Heure de départ de la première course (optionnel)
+                interval_minutes:
+                  type: integer
+                  minimum: 0
+                  default: 5
+                  description: Minutes entre chaque course (optionnel)
+                series:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required: [id, categories]
+                    properties:
+                      id:
+                        type: string
+                        description: Identifiant unique de la série
+                      categories:
+                        type: object
+                        additionalProperties:
+                          type: integer
+                          minimum: 1
+                        description: |
+                          Objet avec les codes de catégories comme clés et le nombre d'équipages comme valeurs.
+                          Exemple: { "SF": 5, "SH": 1 } signifie 5 équipages "Senior Femme" et 1 "Senior Homme"
+                  example:
+                    - id: "series-1234567890"
+                      categories:
+                        SF: 5
+                        SH: 1
+                    - id: "series-1234567891"
+                      categories:
+                        SF: 5
+                        SH: 1
+                    - id: "series-1234567892"
+                      categories:
+                        JF: 6
+      responses:
+        200:
+          description: Courses générées avec succès
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: "5 courses générées avec succès"
+                  data:
+                    type: object
+                    properties:
+                      races_created:
+                        type: integer
+                        description: Nombre de courses créées
+                      crews_assigned:
+                        type: integer
+                        description: Nombre total d'équipages assignés
+                      races:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            race_number:
+                              type: integer
+                            start_time:
+                              type: string
+                              format: date-time
+                            distance_id:
+                              type: string
+                              nullable: true
+                            crews_count:
+                              type: integer
+        400:
+          description: Erreurs de validation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: error
+                  message:
+                    type: string
+                    example: "Erreurs de validation"
+                  errors:
+                    type: array
+                    items:
+                      type: string
+                    example:
+                      - "Série 1: Le nombre total de participants (7) dépasse le nombre de lignes d'eau (6)"
+                      - "Série 2: Les catégories ont des distances différentes"
+
   /races/{id}:
     get:
       tags: [races]

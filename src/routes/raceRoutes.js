@@ -18,6 +18,12 @@ router.post(
   validate(require("../schemas/generateRacesSchema").generateInitialRacesSchema),
   importController.generateInitialRaces
 );
+router.post(
+  "/generate-from-series",
+  auth,
+  validate(require("../schemas/generateRacesSchema").generateRacesFromSeriesSchema),
+  importController.generateRacesFromSeries
+);
 // Routes génériques après les routes spécifiques
 router.get("/:id", controller.getRace);
 router.put("/:id", auth, validate(schema.updateSchema), controller.updateRace);

@@ -188,3 +188,238 @@ exports.generateInitialRaces = async (req, res) => {
     res.status(500).json({ status: "error", message: err.message });
   }
 };
+
+exports.generateRacesFromSeries = async (req, res) => {
+  try {
+    const { phase_id, lane_count, start_time, interval_minutes, series } = req.body;
+
+    if (!phase_id || !lane_count || lane_count < 1)
+      return res
+        .status(400)
+        .json({ status: "error", message: "phase_id et lane_count requis" });
+
+    if (!series || !Array.isArray(series) || series.length === 0)
+      return res
+        .status(400)
+        .json({ status: "error", message: "series est requis et doit être un tableau non vide" });
+
+    const phase = await RacePhase.findByPk(phase_id);
+    if (!phase)
+      return res
+        .status(404)
+        .json({ status: "error", message: "Phase introuvable" });
+
+    const event_id = phase.event_id;
+
+    // Récupérer les équipages déjà assignés à des courses de cette phase
+    const existingRaces = await Race.findAll({
+      where: { phase_id },
+      include: [
+        {
+          model: RaceCrew,
+          attributes: ["crew_id"],
+        },
+      ],
+    });
+
+    const alreadyAssignedCrewIds = new Set();
+    existingRaces.forEach((race) => {
+      race.RaceCrews?.forEach((rc) => {
+        alreadyAssignedCrewIds.add(rc.crew_id);
+      });
+    });
+
+    // Récupérer toutes les catégories avec leurs équipages pour cet événement
+    const allCategories = await Category.findAll({
+      include: [
+        { model: Crew, where: { event_id }, required: false },
+        { model: Distance, as: "distance", required: false },
+      ],
+    });
+
+    // Créer un map pour accéder rapidement aux catégories par code
+    const categoryMap = new Map();
+    allCategories.forEach((cat) => {
+      categoryMap.set(cat.code, cat);
+    });
+
+    // Validation des séries
+    const validationErrors = [];
+    const categoryUsageCount = new Map(); // Pour tracker combien d'équipages sont utilisés par catégorie
+
+    for (let i = 0; i < series.length; i++) {
+      const serie = series[i];
+      const categoryCodes = Object.keys(serie.categories);
+      let totalParticipants = 0;
+      const distances = new Set();
+
+      // Vérifier que chaque catégorie existe
+      for (const code of categoryCodes) {
+        if (!categoryMap.has(code)) {
+          validationErrors.push(
+            `Série ${i + 1}: La catégorie "${code}" n'existe pas`
+          );
+          continue;
+        }
+
+        const category = categoryMap.get(code);
+        const requestedCount = serie.categories[code];
+        // Filtrer les équipages non déjà assignés à une course de cette phase
+        const availableCrews = (category.Crews || []).filter(
+          (crew) => !alreadyAssignedCrewIds.has(crew.id)
+        );
+        const availableCount = availableCrews.length;
+
+        // Vérifier que le nombre demandé ne dépasse pas le disponible
+        const currentUsage = categoryUsageCount.get(code) || 0;
+        if (currentUsage + requestedCount > availableCount) {
+          validationErrors.push(
+            `Série ${i + 1}: La catégorie "${code}" n'a que ${availableCount} équipages disponibles (${category.Crews?.length || 0} au total, ${alreadyAssignedCrewIds.size} déjà assignés), mais ${currentUsage + requestedCount} sont demandés au total`
+          );
+        }
+
+        // Vérifier la distance
+        if (category.distance_id) {
+          distances.add(category.distance_id);
+        } else {
+          distances.add(null); // null pour les catégories sans distance
+        }
+
+        totalParticipants += requestedCount;
+        categoryUsageCount.set(code, currentUsage + requestedCount);
+      }
+
+      // Vérifier que le total ne dépasse pas lane_count
+      if (totalParticipants > lane_count) {
+        validationErrors.push(
+          `Série ${i + 1}: Le nombre total de participants (${totalParticipants}) dépasse le nombre de lignes d'eau (${lane_count})`
+        );
+      }
+
+      // Vérifier que toutes les catégories ont la même distance (ou aucune)
+      if (distances.size > 1) {
+        validationErrors.push(
+          `Série ${i + 1}: Les catégories ont des distances différentes. Toutes les catégories d'une série doivent avoir la même distance.`
+        );
+      }
+    }
+
+    if (validationErrors.length > 0) {
+      return res.status(400).json({
+        status: "error",
+        message: "Erreurs de validation",
+        errors: validationErrors,
+      });
+    }
+
+    // Génération des courses
+    let raceNumber = 1;
+    const createdRaces = [];
+    let currentStartTime = start_time ? new Date(start_time) : null;
+    const intervalMs = (interval_minutes || 5) * 60 * 1000;
+    let totalCrewsAssigned = 0;
+
+    // Map pour tracker les équipages déjà assignés par catégorie
+    const assignedCrewsByCategory = new Map();
+    allCategories.forEach((cat) => {
+      assignedCrewsByCategory.set(cat.code, new Set());
+    });
+
+    for (const serie of series) {
+      const categoryCodes = Object.keys(serie.categories);
+      let totalParticipants = 0;
+      let commonDistanceId = null;
+
+      // Déterminer la distance commune (toutes les catégories ont la même distance)
+      for (const code of categoryCodes) {
+        const category = categoryMap.get(code);
+        if (category.distance_id) {
+          commonDistanceId = category.distance_id;
+          break;
+        }
+      }
+
+      // Calculer le total de participants pour cette série
+      for (const code of categoryCodes) {
+        totalParticipants += serie.categories[code];
+      }
+
+      // Créer la course pour cette série
+      const raceStartTime =
+        currentStartTime instanceof Date ? new Date(currentStartTime) : null;
+
+      const race = await Race.create({
+        id: uuidv4(),
+        name: `Série ${raceNumber}`,
+        race_number: raceNumber,
+        phase_id,
+        lane_count,
+        start_time: raceStartTime,
+        distance_id: commonDistanceId,
+      });
+
+      if (currentStartTime) {
+        currentStartTime = new Date(currentStartTime.getTime() + intervalMs);
+      }
+
+      // Assigner les équipages à cette course
+      let laneNumber = 1;
+
+      for (const code of categoryCodes) {
+        const category = categoryMap.get(code);
+        const requestedCount = serie.categories[code];
+        const availableCrews = category.Crews || [];
+        const alreadyAssigned = assignedCrewsByCategory.get(code);
+
+        // Filtrer les équipages non encore assignés (ni dans cette génération, ni dans des courses existantes)
+        const unassignedCrews = availableCrews.filter(
+          (crew) =>
+            !alreadyAssigned.has(crew.id) &&
+            !alreadyAssignedCrewIds.has(crew.id)
+        );
+
+        // Sélectionner aléatoirement le nombre demandé
+        const shuffled = unassignedCrews.sort(() => 0.5 - Math.random());
+        const selectedCrews = shuffled.slice(0, requestedCount);
+
+        // Créer les RaceCrew pour chaque équipage sélectionné
+        for (const crew of selectedCrews) {
+          await RaceCrew.create({
+            id: uuidv4(),
+            race_id: race.id,
+            crew_id: crew.id,
+            lane: laneNumber,
+          });
+
+          // Marquer cet équipage comme assigné
+          alreadyAssigned.add(crew.id);
+          laneNumber++;
+          totalCrewsAssigned++;
+        }
+      }
+
+      createdRaces.push({
+        id: race.id,
+        race_number: race.race_number,
+        start_time: race.start_time,
+        distance_id: race.distance_id,
+        crews_count: totalParticipants,
+      });
+
+      raceNumber++;
+    }
+
+    res.json({
+      status: "success",
+      message: `${createdRaces.length} courses générées avec succès`,
+      data: {
+        races_created: createdRaces.length,
+        crews_assigned: totalCrewsAssigned,
+        races: createdRaces,
+      },
+    });
+  } catch (err) {
+    console.error("Error in generateRacesFromSeries:", err);
+    res.status(500).json({ status: "error", message: err.message });
+  }
+};
