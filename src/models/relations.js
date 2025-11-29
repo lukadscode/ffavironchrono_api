@@ -155,9 +155,6 @@ Notification.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 User.hasMany(Notification, { foreignKey: "created_by" });
 
 // Relations Indoor Results
-const IndoorRaceResult = require("./IndoorRaceResult");
-const IndoorParticipantResult = require("./IndoorParticipantResult");
-
 IndoorRaceResult.belongsTo(Race, { foreignKey: "race_id", as: "race" });
 Race.hasMany(IndoorRaceResult, { foreignKey: "race_id", as: "indoor_results" });
 

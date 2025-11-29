@@ -59,8 +59,8 @@ exports.updateGenerationSchemaSchema = Joi.object({
       )
       .min(1)
       .required(),
-    generated_at: Joi.string().iso().optional(),
-    updated_at: Joi.string().iso().optional(),
+    generated_at: Joi.string().isoDate().optional(),
+    updated_at: Joi.string().isoDate().optional(),
   })
     .unknown(true) // Permettre d'autres champs comme generated_at, updated_at
     .required(),
