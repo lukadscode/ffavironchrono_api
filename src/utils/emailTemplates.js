@@ -28,7 +28,8 @@ const baseTemplate = (content, title) => `
       background-color: #ffffff;
     }
     .email-header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background-color: #2563eb;
+      background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
       padding: 40px 30px;
       text-align: center;
       color: #ffffff;
@@ -38,10 +39,12 @@ const baseTemplate = (content, title) => `
       font-weight: 700;
       margin-bottom: 10px;
       letter-spacing: -0.5px;
+      color: #ffffff !important;
     }
     .email-header p {
       font-size: 16px;
-      opacity: 0.95;
+      color: #ffffff !important;
+      opacity: 1;
     }
     .email-body {
       padding: 40px 30px;
@@ -198,8 +201,8 @@ const baseTemplate = (content, title) => `
 <body>
   <div class="email-container">
     <div class="email-header">
-      <h1>🚣 FFAVIRON - TIMING</h1>
-      <p>Gestion de chronométrage</p>
+      <h1 style="color: #ffffff !important; font-weight: 700;">FFAVIRON - TIMING</h1>
+      <p style="color: #ffffff !important;">Gestion de chronométrage</p>
     </div>
     <div class="email-body">
       ${content}
