@@ -118,6 +118,9 @@ paths:
         Génère les courses en respectant la structure des séries fournie par le frontend.
         Chaque série devient une course avec les équipages assignés selon le nombre spécifié par catégorie.
         Les équipages sont sélectionnés aléatoirement parmi ceux disponibles pour chaque catégorie.
+        
+        **Mode brouillon** : Utilisez `save_only: true` pour enregistrer uniquement le schéma sans générer les courses.
+        Vous pourrez ensuite générer les courses via `POST /race-phases/:id/generate-from-schema`.
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
@@ -172,6 +175,12 @@ paths:
                     - id: "series-1234567892"
                       categories:
                         JF: 6
+                save_only:
+                  type: boolean
+                  default: false
+                  description: |
+                    Si true, enregistre uniquement le schéma sans générer les courses (mode brouillon).
+                    Vous pourrez ensuite générer les courses via POST /race-phases/:id/generate-from-schema.
       responses:
         200:
           description: Courses générées avec succès

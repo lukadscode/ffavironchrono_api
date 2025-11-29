@@ -85,6 +85,131 @@ exports.deleteRacePhase = async (req, res) => {
   }
 };
 
+exports.getGenerationSchema = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const phase = await RacePhase.findByPk(id, {
+      attributes: ["id", "name", "generation_schema"],
+    });
+    
+    if (!phase) {
+      return res.status(404).json({ 
+        status: "error", 
+        message: "Phase introuvable" 
+      });
+    }
+
+    res.json({
+      status: "success",
+      data: {
+        phase_id: phase.id,
+        phase_name: phase.name,
+        generation_schema: phase.generation_schema || null,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ status: "error", message: err.message });
+  }
+};
+
+exports.updateGenerationSchema = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { generation_schema } = req.body;
+
+    if (!generation_schema) {
+      return res.status(400).json({
+        status: "error",
+        message: "generation_schema est requis dans le body",
+      });
+    }
+
+    // Valider la structure du schéma
+    if (typeof generation_schema !== "object") {
+      return res.status(400).json({
+        status: "error",
+        message: "generation_schema doit être un objet JSON",
+      });
+    }
+
+    const phase = await RacePhase.findByPk(id);
+    if (!phase) {
+      return res.status(404).json({ 
+        status: "error", 
+        message: "Phase introuvable" 
+      });
+    }
+
+    // Ajouter la date de mise à jour
+    const updatedSchema = {
+      ...generation_schema,
+      updated_at: new Date().toISOString(),
+    };
+
+    await phase.update({ generation_schema: updatedSchema });
+
+    res.json({
+      status: "success",
+      message: "Schéma de génération mis à jour avec succès",
+      data: {
+        phase_id: phase.id,
+        phase_name: phase.name,
+        generation_schema: updatedSchema,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ status: "error", message: err.message });
+  }
+};
+
+exports.generateFromSavedSchema = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const phase = await RacePhase.findByPk(id);
+    
+    if (!phase) {
+      return res.status(404).json({ 
+        status: "error", 
+        message: "Phase introuvable" 
+      });
+    }
+
+    if (!phase.generation_schema) {
+      return res.status(400).json({
+        status: "error",
+        message: "Aucun schéma de génération enregistré pour cette phase",
+      });
+    }
+
+    const schema = phase.generation_schema;
+    const { lane_count, start_time, interval_minutes, series } = schema;
+
+    if (!series || !Array.isArray(series) || series.length === 0) {
+      return res.status(400).json({
+        status: "error",
+        message: "Le schéma enregistré est invalide (series manquant ou vide)",
+      });
+    }
+
+    // Créer un mock req.body pour réutiliser la logique existante
+    req.body = {
+      phase_id: id,
+      lane_count,
+      start_time,
+      interval_minutes,
+      series,
+      save_only: false, // On génère vraiment cette fois
+    };
+
+    // Appeler directement la fonction de génération
+    const importController = require("./importController");
+    return await importController.generateRacesFromSeries(req, res);
+  } catch (err) {
+    console.error("Error in generateFromSavedSchema:", err);
+    res.status(500).json({ status: "error", message: err.message });
+  }
+};
+
 exports.getPhaseResults = async (req, res) => {
   try {
     const { id } = req.params;

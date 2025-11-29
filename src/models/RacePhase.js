@@ -20,6 +20,11 @@ const RacePhase = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: false,
     },
+    generation_schema: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      description: "Schéma JSON de génération des courses depuis les séries",
+    },
   },
   {
     tableName: "race_phases",

@@ -192,7 +192,7 @@ exports.generateInitialRaces = async (req, res) => {
 
 exports.generateRacesFromSeries = async (req, res) => {
   try {
-    const { phase_id, lane_count, start_time, interval_minutes, series } = req.body;
+    const { phase_id, lane_count, start_time, interval_minutes, series, save_only } = req.body;
 
     if (!phase_id || !lane_count || lane_count < 1)
       return res
@@ -313,6 +313,35 @@ exports.generateRacesFromSeries = async (req, res) => {
       });
     }
 
+    // Enregistrer le schéma de génération dans la phase
+    const generationSchema = {
+      lane_count,
+      start_time: start_time || null,
+      interval_minutes: interval_minutes || 5,
+      series: series.map((s) => ({
+        id: s.id,
+        categories: s.categories,
+      })),
+      saved_at: new Date().toISOString(),
+      is_draft: save_only === true,
+    };
+
+    await phase.update({ generation_schema: generationSchema });
+
+    // Si mode brouillon (save_only = true), on s'arrête ici
+    if (save_only === true) {
+      return res.json({
+        status: "success",
+        message: "Schéma de génération enregistré en mode brouillon",
+        data: {
+          phase_id,
+          phase_name: phase.name,
+          generation_schema: generationSchema,
+          is_draft: true,
+        },
+      });
+    }
+
     // Génération des courses
     let raceNumber = 1;
     const createdRaces = [];
@@ -410,6 +439,11 @@ exports.generateRacesFromSeries = async (req, res) => {
       raceNumber++;
     }
 
+    // Mettre à jour le schéma pour indiquer qu'il a été utilisé
+    generationSchema.is_draft = false;
+    generationSchema.generated_at = new Date().toISOString();
+    await phase.update({ generation_schema: generationSchema });
+
     res.json({
       status: "success",
       message: `${createdRaces.length} courses générées avec succès`,
@@ -417,6 +451,7 @@ exports.generateRacesFromSeries = async (req, res) => {
         races_created: createdRaces.length,
         crews_assigned: totalCrewsAssigned,
         races: createdRaces,
+        generation_schema: generationSchema,
       },
     });
   } catch (err) {

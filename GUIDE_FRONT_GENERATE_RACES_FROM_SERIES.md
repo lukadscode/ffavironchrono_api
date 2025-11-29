@@ -29,6 +29,7 @@ Cette route génère les courses en respectant la structure des séries fournie 
 | `start_time` | string (ISO 8601) | ❌ Non | Heure de départ de la première course (ex: `"2024-01-15T09:00:00.000Z"`) |
 | `interval_minutes` | integer (≥ 0) | ❌ Non | Minutes entre chaque course (défaut: `5`) |
 | `series` | array | ✅ Oui | Tableau des séries à générer (voir structure ci-dessous) |
+| `save_only` | boolean | ❌ Non | Si `true`, enregistre uniquement le schéma sans générer les courses (mode brouillon). Défaut: `false` |
 
 ### Structure d'une série
 
@@ -44,6 +45,8 @@ Chaque élément du tableau `series` doit avoir la structure suivante :
 ```
 
 ## Exemple de requête
+
+### Génération immédiate (par défaut)
 
 ```javascript
 const response = await axios.post('/races/generate-from-series', {
@@ -78,6 +81,51 @@ const response = await axios.post('/races/generate-from-series', {
     'Authorization': `Bearer ${token}`
   }
 });
+```
+
+### Mode brouillon (enregistrement sans génération)
+
+```javascript
+// Enregistrer le schéma sans générer les courses
+const response = await axios.post('/races/generate-from-series', {
+  phase_id: 'abc-123-def-456',
+  lane_count: 6,
+  start_time: '2024-01-15T09:00:00.000Z',
+  interval_minutes: 5,
+  series: [
+    {
+      id: 'series-1234567890',
+      categories: {
+        'SF': 5,
+        'SH': 1
+      }
+    }
+  ],
+  save_only: true  // ⭐ Mode brouillon : enregistre uniquement le schéma
+}, {
+  headers: {
+    'Authorization': `Bearer ${token}`
+  }
+});
+
+// Réponse en mode brouillon
+{
+  "status": "success",
+  "message": "Schéma de génération enregistré en mode brouillon",
+  "data": {
+    "phase_id": "abc-123-def-456",
+    "phase_name": "Phase 1",
+    "generation_schema": {
+      "lane_count": 6,
+      "start_time": "2024-01-15T09:00:00.000Z",
+      "interval_minutes": 5,
+      "series": [...],
+      "saved_at": "2024-01-15T08:30:00.000Z",
+      "is_draft": true
+    },
+    "is_draft": true
+  }
+}
 ```
 
 ## Réponse en cas de succès
@@ -369,4 +417,146 @@ R : Le backend retournera une erreur de validation avec le détail du problème.
 
 **Q : Les équipages sont-ils sélectionnés dans un ordre spécifique ?**  
 R : Non, la sélection est aléatoire parmi les équipages disponibles pour chaque catégorie.
+
+## Mode brouillon et génération différée
+
+### Workflow recommandé
+
+1. **Enregistrer en brouillon** : Utilisez `save_only: true` pour préparer la configuration sans générer les courses
+2. **Vérifier/modifier** : Récupérez le schéma, vérifiez-le, modifiez-le si nécessaire
+3. **Générer les courses** : Utilisez `POST /race-phases/:id/generate-from-schema` pour lancer la génération
+
+### Générer depuis le schéma enregistré
+
+Une fois le schéma enregistré (en brouillon ou après une génération), vous pouvez générer les courses à partir du schéma enregistré :
+
+```javascript
+// POST /race-phases/{phase_id}/generate-from-schema
+const response = await axios.post(
+  `/race-phases/${phaseId}/generate-from-schema`,
+  {}, // Pas de body nécessaire, utilise le schéma enregistré
+  {
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
+  }
+);
+
+// Réponse identique à POST /races/generate-from-series
+{
+  "status": "success",
+  "message": "3 courses générées avec succès depuis le schéma enregistré",
+  "data": {
+    "races_created": 3,
+    "crews_assigned": 18,
+    "races": [...],
+    "generation_schema": {...}
+  }
+}
+```
+
+**Avantages** :
+- Permet de préparer la configuration à l'avance
+- Évite de régénérer accidentellement
+- Permet de modifier le schéma avant de générer
+
+## Sauvegarde et récupération du schéma
+
+Le schéma de génération est **automatiquement enregistré** dans la base de données lors de l'appel à `POST /races/generate-from-series` (avec ou sans `save_only`). Cela permet de :
+
+- **Récupérer le schéma** pour pré-remplir le formulaire de génération
+- **Modifier le schéma** sans avoir à régénérer les courses
+- **Conserver l'historique** de la configuration utilisée
+
+### Récupérer le schéma
+
+```javascript
+// GET /race-phases/{phase_id}/generation-schema
+const response = await axios.get(`/race-phases/${phaseId}/generation-schema`, {
+  headers: {
+    'Authorization': `Bearer ${token}`
+  }
+});
+
+// Réponse
+{
+  "status": "success",
+  "data": {
+    "phase_id": "abc-123-def-456",
+    "phase_name": "Phase 1",
+    "generation_schema": {
+      "lane_count": 6,
+      "start_time": "2024-01-15T09:00:00.000Z",
+      "interval_minutes": 5,
+      "series": [
+        {
+          "id": "series-1234567890",
+          "categories": {
+            "SF": 5,
+            "SH": 1
+          }
+        }
+      ],
+      "generated_at": "2024-01-15T08:30:00.000Z"
+    }
+  }
+}
+```
+
+**Note** : Si aucune génération n'a encore été effectuée, `generation_schema` sera `null`.
+
+### Mettre à jour le schéma
+
+```javascript
+// PUT /race-phases/{phase_id}/generation-schema
+const response = await axios.put(
+  `/race-phases/${phaseId}/generation-schema`,
+  {
+    generation_schema: {
+      lane_count: 6,
+      start_time: "2024-01-15T09:00:00.000Z",
+      interval_minutes: 5,
+      series: [
+        {
+          id: "series-1234567890",
+          categories: {
+            SF: 5,
+            SH: 1
+          }
+        }
+      ]
+    }
+  },
+  {
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
+  }
+);
+
+// Réponse
+{
+  "status": "success",
+  "message": "Schéma de génération mis à jour avec succès",
+  "data": {
+    "phase_id": "abc-123-def-456",
+    "phase_name": "Phase 1",
+    "generation_schema": {
+      "lane_count": 6,
+      "start_time": "2024-01-15T09:00:00.000Z",
+      "interval_minutes": 5,
+      "series": [...],
+      "updated_at": "2024-01-15T10:00:00.000Z"
+    }
+  }
+}
+```
+
+**Important** : La mise à jour du schéma ne régénère **pas automatiquement** les courses. Il faut appeler `POST /races/generate-from-series` avec le schéma mis à jour pour créer de nouvelles courses.
+
+### Cas d'usage
+
+1. **Pré-remplir le formulaire** : Récupérer le schéma existant pour afficher la configuration précédente
+2. **Modifier la configuration** : Mettre à jour le schéma avant de régénérer les courses
+3. **Conserver l'historique** : Garder une trace de la configuration utilisée pour chaque phase
 
