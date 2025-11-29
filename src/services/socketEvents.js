@@ -132,4 +132,78 @@ module.exports = (io) => ({
       io.to(`event_${notification.event_id}`).emit("notification:updated", payload);
     }
   },
+
+  // ===== Événements pour les résultats Indoor (ErgRace) =====
+
+  /**
+   * Émet un événement quand des résultats indoor sont importés
+   */
+  emitIndoorResultsImported: ({ race_id, event_id, participants_count, linked_crews_count, race_status }) => {
+    const payload = {
+      race_id,
+      event_id,
+      participants_count,
+      linked_crews_count,
+      race_status: race_status || "non_official",
+    };
+
+    // Émettre dans les rooms de l'événement (tous les formats pour compatibilité)
+    if (event_id) {
+      io.to(`event:${event_id}`).emit("indoorResultsImported", payload);
+      io.to(`publicEvent:${event_id}`).emit("indoorResultsImported", payload);
+    }
+
+    // Émettre dans les rooms de la course (tous les formats pour compatibilité)
+    if (race_id) {
+      io.to(`race_${race_id}`).emit("indoorResultsImported", payload);
+      io.to(`race:${race_id}`).emit("indoorResultsImported", payload);
+    }
+  },
+
+  /**
+   * Émet un événement quand un participant indoor termine sa course
+   */
+  emitIndoorParticipantUpdate: ({ race_id, event_id, participant }) => {
+    const payload = {
+      race_id,
+      event_id,
+      participant,
+    };
+
+    // Émettre dans les rooms de l'événement (tous les formats pour compatibilité)
+    if (event_id) {
+      io.to(`event:${event_id}`).emit("indoorParticipantUpdate", payload);
+      io.to(`publicEvent:${event_id}`).emit("indoorParticipantUpdate", payload);
+    }
+
+    // Émettre dans les rooms de la course (tous les formats pour compatibilité)
+    if (race_id) {
+      io.to(`race_${race_id}`).emit("indoorParticipantUpdate", payload);
+      io.to(`race:${race_id}`).emit("indoorParticipantUpdate", payload);
+    }
+  },
+
+  /**
+   * Émet un événement quand tous les résultats d'une course indoor sont disponibles
+   */
+  emitIndoorRaceResultsComplete: ({ race_id, event_id, total_participants, race_status }) => {
+    const payload = {
+      race_id,
+      event_id,
+      total_participants,
+      race_status: race_status || "official",
+    };
+
+    // Émettre dans les rooms de l'événement (tous les formats pour compatibilité)
+    if (event_id) {
+      io.to(`event:${event_id}`).emit("indoorRaceResultsComplete", payload);
+      io.to(`publicEvent:${event_id}`).emit("indoorRaceResultsComplete", payload);
+    }
+
+    // Émettre dans les rooms de la course (tous les formats pour compatibilité)
+    if (race_id) {
+      io.to(`race_${race_id}`).emit("indoorRaceResultsComplete", payload);
+      io.to(`race:${race_id}`).emit("indoorRaceResultsComplete", payload);
+    }
+  },
 });

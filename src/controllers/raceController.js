@@ -99,6 +99,30 @@ exports.updateRace = async (req, res) => {
         race_id: race.id,
         status: req.body.status,
       });
+
+      // Si la course passe en statut "official" et qu'elle a des résultats indoor
+      if (req.body.status === "official" && oldStatus !== "official") {
+        const IndoorRaceResult = require("../models/IndoorRaceResult");
+        const IndoorParticipantResult = require("../models/IndoorParticipantResult");
+        
+        const indoorResult = await IndoorRaceResult.findOne({
+          where: { race_id: race.id },
+        });
+
+        if (indoorResult) {
+          const participantCount = await IndoorParticipantResult.count({
+            where: { indoor_race_result_id: indoorResult.id },
+          });
+
+          const socketEvents = require("../services/socketEvents")(io);
+          socketEvents.emitIndoorRaceResultsComplete({
+            race_id: race.id,
+            event_id: event_id,
+            total_participants: participantCount,
+            race_status: "official",
+          });
+        }
+      }
     }
 
     res.json({ status: "success", data: race });

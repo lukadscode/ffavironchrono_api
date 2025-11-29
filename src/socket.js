@@ -8,13 +8,20 @@ module.exports = (io) => {
 
     // Join race/event rooms
     socket.on("joinRoom", ({ race_id, event_id }) => {
-      if (race_id) socket.join(`race_${race_id}`);
-      if (event_id) socket.join(`event_${event_id}`);
+      if (race_id) {
+        socket.join(`race_${race_id}`);
+        socket.join(`race:${race_id}`); // Alias pour compatibilité
+      }
+      if (event_id) {
+        socket.join(`event_${event_id}`);
+        socket.join(`event:${event_id}`); // Alias pour compatibilité
+      }
     });
 
     socket.on("joinPublicEvent", ({ event_id }) => {
       console.log(`Client ${socket.id} rejoint l'événement public ${event_id}`);
       socket.join(`event:${event_id}`);
+      socket.join(`publicEvent:${event_id}`); // Alias pour compatibilité
     });
 
     // Leave race/event rooms

@@ -420,10 +420,36 @@ Les participants avec `id = "Lane X"` ne sont pas liés à un équipage. Le cham
 
 ---
 
+## 📡 WebSocket - Notifications en temps réel
+
+Le système émet des événements WebSocket pour mettre à jour les résultats en temps réel sur la page Live.
+
+### Événements disponibles
+
+1. **`indoorResultsImported`** : Émis après l'import des résultats
+2. **`indoorParticipantUpdate`** : Émis quand un participant termine sa course (si ErgRace envoie des mises à jour en temps réel)
+3. **`indoorRaceResultsComplete`** : Émis quand la course passe en statut "official"
+
+### Documentation complète
+
+📖 **Voir le guide détaillé** : `GUIDE_FRONT_WEBSOCKET_INDOOR_RESULTS.md`
+
+**Exemple rapide** :
+```typescript
+socket.on("indoorResultsImported", async ({ race_id, participants_count }) => {
+  // Recharger les résultats de la course
+  const results = await getRaceResults(race_id);
+  setRaceResults(results);
+});
+```
+
+---
+
 ## 📞 Support
 
 En cas de question ou problème :
 - Consulter la documentation Swagger : `/docs`
+- Guide WebSocket : `GUIDE_FRONT_WEBSOCKET_INDOOR_RESULTS.md`
 - Vérifier les logs serveur pour les erreurs détaillées
 - Les erreurs retournent toujours un format cohérent avec `status: "error"` et `message`
 
@@ -431,5 +457,6 @@ En cas de question ou problème :
 
 **Date de création** : 2024-01-XX  
 **Version API** : 1.0.0  
-**Statut** : ✅ Prêt pour production
+**Statut** : ✅ Prêt pour production  
+**WebSocket** : ✅ Implémenté et documenté
 

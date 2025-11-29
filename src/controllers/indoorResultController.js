@@ -2,7 +2,9 @@ const { v4: uuidv4 } = require("uuid");
 const IndoorRaceResult = require("../models/IndoorRaceResult");
 const IndoorParticipantResult = require("../models/IndoorParticipantResult");
 const Race = require("../models/Race");
+const RacePhase = require("../models/RacePhase");
 const Crew = require("../models/Crew");
+const Category = require("../models/Category");
 
 /**
  * Importe les résultats d'une course depuis ErgRace
@@ -131,14 +133,104 @@ exports.importResults = async (req, res) => {
 
       const created = await IndoorParticipantResult.create(participantData);
       createdParticipants.push(created);
+
+      // Émettre une mise à jour pour chaque participant (optionnel, pour mises à jour en temps réel)
+      // Décommenter si ErgRace envoie des mises à jour participant par participant
+      /*
+      if (io && (raceId || eventId)) {
+        const socketEvents = require("../services/socketEvents")(io);
+        
+        // Préparer les données du participant avec les infos du crew si lié
+        let participantPayload = {
+          id: created.id,
+          place: created.place,
+          time_display: created.time_display,
+          time_ms: created.time_ms,
+          distance: created.distance,
+          avg_pace: created.avg_pace,
+          spm: created.spm,
+          calories: created.calories,
+          crew_id: created.crew_id,
+          crew: null,
+        };
+
+        // Si le crew est lié, récupérer ses infos
+        if (created.crew_id) {
+          const crew = await Crew.findByPk(created.crew_id, {
+            include: [
+              {
+                model: Category,
+                as: "category",
+              },
+            ],
+          });
+
+          if (crew) {
+            participantPayload.crew = {
+              id: crew.id,
+              club_name: crew.club_name,
+              club_code: crew.club_code,
+              category: crew.category
+                ? {
+                    id: crew.category.id,
+                    code: crew.category.code,
+                    label: crew.category.label,
+                  }
+                : null,
+            };
+          }
+        }
+
+        socketEvents.emitIndoorParticipantUpdate({
+          race_id: raceId,
+          event_id: eventId,
+          participant: participantPayload,
+        });
+      }
+      */
     }
 
-    // Mettre à jour le statut de la course si elle existe
+    // Récupérer l'event_id depuis la course si elle existe
+    let eventId = null;
+    let raceStatus = "non_official";
+    
     if (raceId) {
-      await Race.update(
-        { status: "finished" },
-        { where: { id: raceId } }
-      );
+      const race = await Race.findByPk(raceId, {
+        include: [
+          {
+            model: RacePhase,
+            as: "race_phase",
+          },
+        ],
+      });
+
+      if (race) {
+        eventId = race.RacePhase?.event_id || null;
+        raceStatus = race.status || "non_official";
+
+        // Mettre à jour le statut de la course en "finished" si pas déjà
+        if (race.status !== "finished" && race.status !== "official") {
+          await Race.update(
+            { status: "finished" },
+            { where: { id: raceId } }
+          );
+          raceStatus = "finished";
+        }
+      }
+    }
+
+    // Émettre l'événement WebSocket pour l'import des résultats
+    const io = req.app.get("io");
+    if (io && (raceId || eventId)) {
+      const socketEvents = require("../services/socketEvents")(io);
+      
+      socketEvents.emitIndoorResultsImported({
+        race_id: raceId,
+        event_id: eventId,
+        participants_count: createdParticipants.length,
+        linked_crews_count: linkedCrewsCount,
+        race_status: raceStatus,
+      });
     }
 
     res.status(isUpdate ? 200 : 201).json({
