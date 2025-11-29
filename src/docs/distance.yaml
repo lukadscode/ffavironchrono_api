@@ -21,14 +21,18 @@ paths:
           application/json:
             schema:
               type: object
-              required: [event_id, meters]
+              required: [event_id]
               properties:
                 event_id:
                   type: string
                   example: "7c38e42f-198a-4bd6-9c59-9854094a1ea0"
                 meters:
                   type: integer
-                  description: Distance en mètres pour un relais (ex: 250 pour 8x250m) ou distance totale pour une course normale
+                  description: |
+                    Distance en mètres (requis si is_time_based = false).
+                    Pour un relais: distance par segment (ex: 250 pour 8x250m).
+                    Pour une course normale: distance totale (ex: 2000 pour 2000m).
+                  minimum: 100
                   example: 2000
                 is_relay:
                   type: boolean
@@ -41,6 +45,31 @@ paths:
                   minimum: 2
                   maximum: 20
                   example: 8
+                is_time_based:
+                  type: boolean
+                  description: Indique si la course est basée sur le temps plutôt que sur la distance
+                  default: false
+                  example: false
+                duration_seconds:
+                  type: integer
+                  description: |
+                    Durée en secondes (requis si is_time_based = true).
+                    Ex: 120 pour 2 minutes, 300 pour 5 minutes, 60 pour 1 minute.
+                  minimum: 1
+                  example: 120
+              allOf:
+                - if:
+                    properties:
+                      is_time_based:
+                        const: false
+                    then:
+                      required: [meters]
+                - if:
+                    properties:
+                      is_time_based:
+                        const: true
+                    then:
+                      required: [duration_seconds]
       responses:
         201:
           description: Distance créée

@@ -121,7 +121,8 @@ Authorization: Bearer <token>  // Optionnel si course publique
 **Note de sécurité** :
 - Si la course est `"non_official"` ou `"official"` → Accès public (pas besoin de token)
 - Si la course a un autre statut → Authentification requise
-- Les champs `raw_data` et `splits_data` ne sont retournés que si l'utilisateur est authentifié
+- Le champ `raw_data` n'est retourné que si l'utilisateur est authentifié
+- Le champ `splits_data` est toujours retourné (utile pour l'affichage des splits)
 
 **Réponse (200 OK)** :
 ```json

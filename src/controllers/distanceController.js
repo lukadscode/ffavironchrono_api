@@ -1,6 +1,7 @@
 const { v4: uuidv4 } = require("uuid");
 const Distance = require("../models/Distance");
 const Event = require("../models/Event");
+const sequelize = require("../models/index");
 
 exports.createDistance = async (req, res) => {
   try {
@@ -16,7 +17,15 @@ exports.createDistance = async (req, res) => {
 
 exports.getDistances = async (req, res) => {
   try {
-    const list = await Distance.findAll({ order: [["meters", "ASC"]] });
+    // Trier : d'abord les distances (par meters), puis les temps (par duration_seconds)
+    // MySQL ne supporte pas NULLS LAST, on utilise une approche avec CASE
+    const list = await Distance.findAll({
+      order: [
+        ["is_time_based", "ASC"], // Distances d'abord (false = 0), puis temps (true = 1)
+        [sequelize.literal("CASE WHEN meters IS NOT NULL THEN meters ELSE 999999 END"), "ASC"], // Pour les distances
+        [sequelize.literal("CASE WHEN duration_seconds IS NOT NULL THEN duration_seconds ELSE 999999 END"), "ASC"], // Pour les temps
+      ],
+    });
     res.json({ status: "success", data: list });
   } catch (err) {
     res.status(500).json({ status: "error", message: err.message });
@@ -36,7 +45,11 @@ exports.getDistancesByEvent = async (req, res) => {
         },
       ],
       group: ["Distance.id"],
-      order: [["meters", "ASC"]],
+      order: [
+        ["is_time_based", "ASC"], // Distances d'abord, puis temps
+        [sequelize.literal("CASE WHEN meters IS NOT NULL THEN meters ELSE 999999 END"), "ASC"],
+        [sequelize.literal("CASE WHEN duration_seconds IS NOT NULL THEN duration_seconds ELSE 999999 END"), "ASC"],
+      ],
     });
 
     res.json({ status: "success", data: distances });

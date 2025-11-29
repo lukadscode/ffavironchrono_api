@@ -159,8 +159,8 @@ paths:
         si la course a le statut "non_official" ou "official". Pour les autres statuts, 
         l'authentification est requise.
         
-        **Données sensibles** : Les champs `raw_data` et `splits_data` ne sont retournés 
-        que si l'utilisateur est authentifié.
+        **Données sensibles** : Le champ `raw_data` n'est retourné que si l'utilisateur est authentifié.
+        Le champ `splits_data` est toujours retourné (utile pour l'affichage des splits).
       security: []  # Authentification optionnelle
       parameters:
         - in: path

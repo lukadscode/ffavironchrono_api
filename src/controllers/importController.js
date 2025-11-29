@@ -119,9 +119,22 @@ exports.generateInitialRaces = async (req, res) => {
       const distanceId = category.distance_id;
 
       if (distanceId && category.distance) {
-        const distanceLabel = category.distance.is_relay
-          ? `${category.distance.relay_count}x${category.distance.meters}m`
-          : `${category.distance.meters}m`;
+        let distanceLabel;
+        if (category.distance.is_time_based && category.distance.duration_seconds) {
+          const minutes = Math.floor(category.distance.duration_seconds / 60);
+          const seconds = category.distance.duration_seconds % 60;
+          if (minutes > 0 && seconds > 0) {
+            distanceLabel = `${minutes}min ${seconds}s`;
+          } else if (minutes > 0) {
+            distanceLabel = `${minutes}min`;
+          } else {
+            distanceLabel = `${category.distance.duration_seconds}s`;
+          }
+        } else if (category.distance.is_relay) {
+          distanceLabel = `${category.distance.relay_count}x${category.distance.meters}m`;
+        } else {
+          distanceLabel = `${category.distance.meters}m`;
+        }
         console.log(
           `  ✅ Distance assignée pour ${category.code}: ${distanceLabel}`
         );

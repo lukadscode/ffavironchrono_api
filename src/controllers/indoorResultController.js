@@ -337,6 +337,7 @@ exports.getRaceResults = async (req, res) => {
     });
 
     // Ne pas exposer raw_data pour les requêtes publiques (sécurité)
+    // Mais splits_data est toujours disponible (données utiles pour l'affichage)
     const includeRawData = isAuthenticated;
 
     res.json({
@@ -379,7 +380,7 @@ exports.getRaceResults = async (req, res) => {
               }
             : null,
           ergrace_participant_id: pr.ergrace_participant_id,
-          ...(includeRawData && { splits_data: pr.splits_data }), // Seulement si authentifié
+          splits_data: pr.splits_data, // Toujours envoyé (utile pour l'affichage des splits)
         })),
       },
     });

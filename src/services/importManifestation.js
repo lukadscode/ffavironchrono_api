@@ -51,30 +51,63 @@ function hasCoxswain(bateauCode) {
 
 /**
  * Extrait la distance depuis le libellé de l'épreuve
- * Ex: "500 m" => { meters: 500, isRelay: false, relayCount: null }
- * Ex: "8x250m" => { meters: 250, isRelay: true, relayCount: 8 }
- * Ex: "4x500 m" => { meters: 500, isRelay: true, relayCount: 4 }
+ * Ex: "500 m" => { meters: 500, isRelay: false, relayCount: null, isTimeBased: false }
+ * Ex: "8x250m" => { meters: 250, isRelay: true, relayCount: 8, isTimeBased: false }
+ * Ex: "4x500 m" => { meters: 500, isRelay: true, relayCount: 4, isTimeBased: false }
+ * Ex: "2 min" => { durationSeconds: 120, isTimeBased: true, isRelay: false }
+ * Ex: "5 minutes" => { durationSeconds: 300, isTimeBased: true, isRelay: false }
+ * Ex: "120s" => { durationSeconds: 120, isTimeBased: true, isRelay: false }
  */
 function extractDistance(libelle) {
   if (!libelle) return null;
   
-  // Détecter les relais (format: "8x250m", "4x500 m", "8 x 250 m", etc.)
+  // 1. Détecter les relais (format: "8x250m", "4x500 m", "8 x 250 m", etc.)
   const relayMatch = libelle.match(/(\d+)\s*x\s*(\d+)\s*m/i);
   if (relayMatch) {
     return {
       meters: parseInt(relayMatch[2], 10),
       isRelay: true,
       relayCount: parseInt(relayMatch[1], 10),
+      isTimeBased: false,
+      durationSeconds: null,
     };
   }
-  
-  // Distance normale (format: "500 m", "2000m", etc.)
+
+  // 2. Vérifier si c'est une course basée sur le temps (format: "2 min", "5 minutes", "120s", etc.)
+  // Format avec "min" ou "minutes"
+  const timeMatchMinutes = libelle.match(/(\d+)\s*(?:min|minutes?)/i);
+  if (timeMatchMinutes) {
+    const minutes = parseInt(timeMatchMinutes[1], 10);
+    return {
+      meters: null,
+      isRelay: false,
+      relayCount: null,
+      isTimeBased: true,
+      durationSeconds: minutes * 60,
+    };
+  }
+
+  // Format avec "s" ou "secondes"
+  const timeMatchSeconds = libelle.match(/(\d+)\s*(?:s|secondes?)/i);
+  if (timeMatchSeconds) {
+    return {
+      meters: null,
+      isRelay: false,
+      relayCount: null,
+      isTimeBased: true,
+      durationSeconds: parseInt(timeMatchSeconds[1], 10),
+    };
+  }
+
+  // 3. Distance normale (format: "500 m", "2000m", etc.)
   const normalMatch = libelle.match(/(\d+)\s*m/i);
   if (normalMatch) {
     return {
       meters: parseInt(normalMatch[1], 10),
       isRelay: false,
       relayCount: null,
+      isTimeBased: false,
+      durationSeconds: null,
     };
   }
   
@@ -232,10 +265,15 @@ module.exports = async (manifestationId, req) => {
     epreuves.forEach((ep) => {
       const distanceInfo = extractDistance(ep.libelle_epreuve);
       if (distanceInfo) {
-        // Créer une clé unique pour chaque combinaison (meters, isRelay, relayCount)
-        const key = distanceInfo.isRelay
-          ? `${distanceInfo.meters}_relay_${distanceInfo.relayCount}`
-          : `${distanceInfo.meters}_normal`;
+        // Créer une clé unique pour chaque combinaison
+        let key;
+        if (distanceInfo.isTimeBased) {
+          key = `time_${distanceInfo.durationSeconds}`;
+        } else if (distanceInfo.isRelay) {
+          key = `${distanceInfo.meters}_relay_${distanceInfo.relayCount}`;
+        } else {
+          key = `${distanceInfo.meters}_normal`;
+        }
         uniqueDistances.set(key, distanceInfo);
       }
     });
@@ -244,9 +282,18 @@ module.exports = async (manifestationId, req) => {
       // Chercher une distance existante avec les mêmes caractéristiques
       const whereClause = {
         event_id,
-        meters: distanceInfo.meters,
         is_relay: distanceInfo.isRelay,
+        is_time_based: distanceInfo.isTimeBased || false,
       };
+      
+      // Pour les distances basées sur les mètres
+      if (distanceInfo.isTimeBased) {
+        whereClause.duration_seconds = distanceInfo.durationSeconds;
+        whereClause.meters = null;
+      } else {
+        whereClause.meters = distanceInfo.meters;
+        whereClause.duration_seconds = null;
+      }
       
       // Pour les relais, inclure relay_count dans la recherche
       if (distanceInfo.isRelay) {
@@ -263,11 +310,25 @@ module.exports = async (manifestationId, req) => {
           meters: distanceInfo.meters,
           is_relay: distanceInfo.isRelay,
           relay_count: distanceInfo.relayCount,
+          is_time_based: distanceInfo.isTimeBased || false,
+          duration_seconds: distanceInfo.durationSeconds,
         },
       });
       
       // Log pour indiquer le type de distance créée
-      if (distanceInfo.isRelay) {
+      if (distanceInfo.isTimeBased) {
+        const minutes = Math.floor(distanceInfo.durationSeconds / 60);
+        const seconds = distanceInfo.durationSeconds % 60;
+        let timeLabel;
+        if (minutes > 0 && seconds > 0) {
+          timeLabel = `${minutes}min ${seconds}s`;
+        } else if (minutes > 0) {
+          timeLabel = `${minutes}min`;
+        } else {
+          timeLabel = `${distanceInfo.durationSeconds}s`;
+        }
+        console.log(`  ✅ Course basée sur le temps créée: ${timeLabel}`);
+      } else if (distanceInfo.isRelay) {
         console.log(
           `  ✅ Relais créé: ${distanceInfo.relayCount}x${distanceInfo.meters}m`
         );
@@ -278,7 +339,7 @@ module.exports = async (manifestationId, req) => {
       // Utiliser la clé unique pour le mapping
       distanceMap[key] = distance.id;
       // Aussi mapper par meters pour compatibilité (si nécessaire)
-      if (!distanceMap[distanceInfo.meters]) {
+      if (distanceInfo.meters && !distanceMap[distanceInfo.meters]) {
         distanceMap[distanceInfo.meters] = distance.id;
       }
     }
@@ -310,7 +371,18 @@ module.exports = async (manifestationId, req) => {
       let distanceId = null;
 
       if (distanceInfo) {
-        if (distanceInfo.isRelay) {
+        if (distanceInfo.isTimeBased) {
+          // Pour les courses basées sur le temps: "CODE_120s" ou "CODE_2min"
+          const minutes = Math.floor(distanceInfo.durationSeconds / 60);
+          const seconds = distanceInfo.durationSeconds % 60;
+          if (minutes > 0 && seconds > 0) {
+            codeWithDistance = `${code}_${minutes}min${seconds}s`;
+          } else if (minutes > 0) {
+            codeWithDistance = `${code}_${minutes}min`;
+          } else {
+            codeWithDistance = `${code}_${distanceInfo.durationSeconds}s`;
+          }
+        } else if (distanceInfo.isRelay) {
           // Pour les relais: "CODE_8x250m"
           codeWithDistance = `${code}_${distanceInfo.relayCount}x${distanceInfo.meters}m`;
         } else {
@@ -319,9 +391,14 @@ module.exports = async (manifestationId, req) => {
         }
 
         // Trouver la distance correspondante dans l'événement
-        const key = distanceInfo.isRelay
-          ? `${distanceInfo.meters}_relay_${distanceInfo.relayCount}`
-          : `${distanceInfo.meters}_normal`;
+        let key;
+        if (distanceInfo.isTimeBased) {
+          key = `time_${distanceInfo.durationSeconds}`;
+        } else if (distanceInfo.isRelay) {
+          key = `${distanceInfo.meters}_relay_${distanceInfo.relayCount}`;
+        } else {
+          key = `${distanceInfo.meters}_normal`;
+        }
         distanceId = distanceMap[key] || null;
       }
 
@@ -648,9 +725,14 @@ module.exports.updateEventFromManifestation = async (manifestationId, event_id, 
     epreuves.forEach((ep) => {
       const distanceInfo = extractDistance(ep.libelle_epreuve);
       if (distanceInfo) {
-        const key = distanceInfo.isRelay
-          ? `${distanceInfo.meters}_relay_${distanceInfo.relayCount}`
-          : `${distanceInfo.meters}_normal`;
+        let key;
+        if (distanceInfo.isTimeBased) {
+          key = `time_${distanceInfo.durationSeconds}`;
+        } else if (distanceInfo.isRelay) {
+          key = `${distanceInfo.meters}_relay_${distanceInfo.relayCount}`;
+        } else {
+          key = `${distanceInfo.meters}_normal`;
+        }
         uniqueDistances.set(key, distanceInfo);
       }
     });
@@ -659,9 +741,18 @@ module.exports.updateEventFromManifestation = async (manifestationId, event_id, 
     for (const [key, distanceInfo] of uniqueDistances) {
       const whereClause = {
         event_id,
-        meters: distanceInfo.meters,
         is_relay: distanceInfo.isRelay,
+        is_time_based: distanceInfo.isTimeBased || false,
       };
+      
+      // Pour les distances basées sur les mètres
+      if (distanceInfo.isTimeBased) {
+        whereClause.duration_seconds = distanceInfo.durationSeconds;
+        whereClause.meters = null;
+      } else {
+        whereClause.meters = distanceInfo.meters;
+        whereClause.duration_seconds = null;
+      }
       
       if (distanceInfo.isRelay) {
         whereClause.relay_count = distanceInfo.relayCount;
@@ -677,21 +768,43 @@ module.exports.updateEventFromManifestation = async (manifestationId, event_id, 
           meters: distanceInfo.meters,
           is_relay: distanceInfo.isRelay,
           relay_count: distanceInfo.relayCount,
+          is_time_based: distanceInfo.isTimeBased || false,
+          duration_seconds: distanceInfo.durationSeconds,
         },
       });
       
       if (created) {
         newDistancesCount++;
+        let label;
+        if (distanceInfo.isTimeBased) {
+          const minutes = Math.floor(distanceInfo.durationSeconds / 60);
+          const seconds = distanceInfo.durationSeconds % 60;
+          if (minutes > 0 && seconds > 0) {
+            label = `${minutes}min ${seconds}s`;
+          } else if (minutes > 0) {
+            label = `${minutes}min`;
+          } else {
+            label = `${distanceInfo.durationSeconds}s`;
+          }
+        } else if (distanceInfo.isRelay) {
+          label = `${distanceInfo.relayCount}x${distanceInfo.meters}m`;
+        } else {
+          label = `${distanceInfo.meters}m`;
+        }
+        
         newDistances.push({
           id: distance.id,
           meters: distance.meters,
           is_relay: distance.is_relay,
           relay_count: distance.relay_count,
-          label: distanceInfo.isRelay
-            ? `${distanceInfo.relayCount}x${distanceInfo.meters}m`
-            : `${distanceInfo.meters}m`,
+          is_time_based: distance.is_time_based,
+          duration_seconds: distance.duration_seconds,
+          label: label,
         });
-        if (distanceInfo.isRelay) {
+        
+        if (distanceInfo.isTimeBased) {
+          console.log(`  ✅ Nouvelle course basée sur le temps créée: ${label}`);
+        } else if (distanceInfo.isRelay) {
           console.log(`  ✅ Nouvelle distance créée: ${distanceInfo.relayCount}x${distanceInfo.meters}m`);
         } else {
           console.log(`  ✅ Nouvelle distance créée: ${distanceInfo.meters}m`);
@@ -699,7 +812,7 @@ module.exports.updateEventFromManifestation = async (manifestationId, event_id, 
       }
       
       distanceMap[key] = distance.id;
-      if (!distanceMap[distanceInfo.meters]) {
+      if (distanceInfo.meters && !distanceMap[distanceInfo.meters]) {
         distanceMap[distanceInfo.meters] = distance.id;
       }
     }
@@ -724,15 +837,31 @@ module.exports.updateEventFromManifestation = async (manifestationId, event_id, 
       let distanceId = null;
 
       if (distanceInfo) {
-        if (distanceInfo.isRelay) {
+        if (distanceInfo.isTimeBased) {
+          // Pour les courses basées sur le temps
+          const minutes = Math.floor(distanceInfo.durationSeconds / 60);
+          const seconds = distanceInfo.durationSeconds % 60;
+          if (minutes > 0 && seconds > 0) {
+            codeWithDistance = `${code}_${minutes}min${seconds}s`;
+          } else if (minutes > 0) {
+            codeWithDistance = `${code}_${minutes}min`;
+          } else {
+            codeWithDistance = `${code}_${distanceInfo.durationSeconds}s`;
+          }
+        } else if (distanceInfo.isRelay) {
           codeWithDistance = `${code}_${distanceInfo.relayCount}x${distanceInfo.meters}m`;
         } else {
           codeWithDistance = `${code}_${distanceInfo.meters}m`;
         }
 
-        const key = distanceInfo.isRelay
-          ? `${distanceInfo.meters}_relay_${distanceInfo.relayCount}`
-          : `${distanceInfo.meters}_normal`;
+        let key;
+        if (distanceInfo.isTimeBased) {
+          key = `time_${distanceInfo.durationSeconds}`;
+        } else if (distanceInfo.isRelay) {
+          key = `${distanceInfo.meters}_relay_${distanceInfo.relayCount}`;
+        } else {
+          key = `${distanceInfo.meters}_normal`;
+        }
         distanceId = distanceMap[key] || null;
       }
 
