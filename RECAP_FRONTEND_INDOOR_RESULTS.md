@@ -111,7 +111,17 @@ Importe les résultats d'une course depuis le format JSON ErgRace.
 
 Récupère les résultats d'une course avec tous les détails des participants, incluant les informations des équipages (club, catégorie) si liés.
 
-**Authentification** : ✅ Requise (Bearer Token)
+**Accès public** : ✅ Accessible sans authentification si la course a le statut `"non_official"` ou `"official"`
+
+**Headers** (optionnel) :
+```
+Authorization: Bearer <token>  // Optionnel si course publique
+```
+
+**Note de sécurité** :
+- Si la course est `"non_official"` ou `"official"` → Accès public (pas besoin de token)
+- Si la course a un autre statut → Authentification requise
+- Les champs `raw_data` et `splits_data` ne sont retournés que si l'utilisateur est authentifié
 
 **Réponse (200 OK)** :
 ```json
@@ -160,7 +170,20 @@ Récupère les résultats d'une course avec tous les détails des participants, 
 **Note** : Les participants sont triés par `place` (classement).
 
 **Codes d'erreur** :
+- `401` : Authentification requise (si la course n'est pas publique)
 - `404` : Aucun résultat trouvé pour cette course
+
+**Exemple sans authentification** (course publique) :
+```bash
+# Fonctionne si la course est "non_official" ou "official"
+curl https://api-timing.ffaviron.fr/indoor-results/race/abc-123-def-456
+```
+
+**Exemple avec authentification** :
+```bash
+curl -H "Authorization: Bearer TOKEN" \
+  https://api-timing.ffaviron.fr/indoor-results/race/abc-123-def-456
+```
 
 ---
 

@@ -199,7 +199,6 @@ exports.importResults = async (req, res) => {
         include: [
           {
             model: RacePhase,
-            as: "race_phase",
           },
         ],
       });
@@ -260,25 +259,43 @@ exports.importResults = async (req, res) => {
 /**
  * Récupère les résultats d'une course
  * GET /indoor-results/race/:race_id
+ * Accessible publiquement si la course a le statut "non_official" ou "official"
  */
 exports.getRaceResults = async (req, res) => {
   try {
     const { race_id } = req.params;
 
-    const indoorRaceResult = await IndoorRaceResult.findOne({
-      where: { race_id },
+    // Vérifier que la course existe et récupérer son statut
+    const race = await Race.findByPk(race_id, {
       include: [
         {
-          model: Race,
-          as: "race",
-          include: [
-            {
-              model: require("../models/RacePhase"),
-              as: "race_phase",
-            },
-          ],
+          model: RacePhase,
+          as: "race_phase",
         },
       ],
+    });
+
+    if (!race) {
+      return res.status(404).json({
+        status: "error",
+        message: "Course introuvable",
+      });
+    }
+
+    // Vérifier si la course est accessible publiquement
+    const isPublicStatus = race.status === "non_official" || race.status === "official";
+    const isAuthenticated = !!req.user;
+
+    // Si la course n'est pas publique, exiger l'authentification
+    if (!isPublicStatus && !isAuthenticated) {
+      return res.status(401).json({
+        status: "error",
+        message: "Authentification requise pour accéder à cette course",
+      });
+    }
+
+    const indoorRaceResult = await IndoorRaceResult.findOne({
+      where: { race_id },
     });
 
     if (!indoorRaceResult) {
@@ -305,10 +322,21 @@ exports.getRaceResults = async (req, res) => {
       order: [["place", "ASC"]],
     });
 
+    // Ne pas exposer raw_data pour les requêtes publiques (sécurité)
+    const includeRawData = isAuthenticated;
+
     res.json({
       status: "success",
       data: {
-        race_result: indoorRaceResult,
+        race_result: {
+          id: indoorRaceResult.id,
+          race_id: indoorRaceResult.race_id,
+          ergrace_race_id: indoorRaceResult.ergrace_race_id,
+          race_start_time: indoorRaceResult.race_start_time,
+          race_end_time: indoorRaceResult.race_end_time,
+          duration: indoorRaceResult.duration,
+          ...(includeRawData && { raw_data: indoorRaceResult.raw_data }), // Seulement si authentifié
+        },
         participants: participantResults.map((pr) => ({
           id: pr.id,
           place: pr.place,
@@ -321,6 +349,7 @@ exports.getRaceResults = async (req, res) => {
           calories: pr.calories,
           machine_type: pr.machine_type,
           logged_time: pr.logged_time,
+          crew_id: pr.crew_id,
           crew: pr.crew
             ? {
                 id: pr.crew.id,
@@ -336,7 +365,7 @@ exports.getRaceResults = async (req, res) => {
               }
             : null,
           ergrace_participant_id: pr.ergrace_participant_id,
-          splits_data: pr.splits_data, // Inclure les splits si présents
+          ...(includeRawData && { splits_data: pr.splits_data }), // Seulement si authentifié
         })),
       },
     });

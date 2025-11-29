@@ -147,7 +147,14 @@ paths:
       description: |
         Récupère les résultats d'une course indoor avec les détails des participants,
         incluant les informations des équipages (club, catégorie) si liés.
-      security: [{ bearerAuth: [] }]
+        
+        **Accès public** : Cet endpoint est accessible publiquement (sans authentification) 
+        si la course a le statut "non_official" ou "official". Pour les autres statuts, 
+        l'authentification est requise.
+        
+        **Données sensibles** : Les champs `raw_data` et `splits_data` ne sont retournés 
+        que si l'utilisateur est authentifié.
+      security: []  # Authentification optionnelle
       parameters:
         - in: path
           name: race_id
@@ -246,6 +253,8 @@ paths:
                             splits_data:
                               type: object
                               nullable: true
+        401:
+          description: Authentification requise (si la course n'est pas publique)
         404:
           description: Aucun résultat trouvé pour cette course
 
