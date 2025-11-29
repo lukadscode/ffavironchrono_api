@@ -82,8 +82,21 @@ exports.importResults = async (req, res) => {
     const participants = results.participants || [];
     const createdParticipants = [];
     let linkedCrewsCount = 0;
+    let skippedEmptyLanes = 0;
 
     for (const participant of participants) {
+      // Ignorer les lanes vides sans résultats
+      const isEmptyLane = 
+        participant.participant === "EMPTY" || 
+        participant.class === "EMPTY" ||
+        (participant.id && participant.id.startsWith("Lane ") && 
+         (!participant.time || !participant.distance || participant.distance === 0));
+
+      if (isEmptyLane) {
+        skippedEmptyLanes++;
+        continue; // Ignorer cette lane vide
+      }
+
       // Tenter de lier avec crew_id
       let crewId = null;
       const ergraceParticipantId = participant.id;
@@ -245,6 +258,7 @@ exports.importResults = async (req, res) => {
         linked_crews_count: linkedCrewsCount,
         unlinked_participants_count:
           createdParticipants.length - linkedCrewsCount,
+        skipped_empty_lanes: skippedEmptyLanes,
       },
     });
   } catch (err) {

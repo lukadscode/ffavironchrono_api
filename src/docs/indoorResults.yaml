@@ -11,6 +11,10 @@ paths:
         Importe les résultats d'une course depuis le format JSON ErgRace.
         Les résultats sont automatiquement liés aux équipages (crews) si l'ID ErgRace correspond à un crew_id.
         Le JSON complet est conservé dans `raw_data` pour traçabilité.
+        
+        **Filtrage automatique** : Les lanes vides (sans résultats) sont automatiquement ignorées :
+        - Participants avec `participant: "EMPTY"` ou `class: "EMPTY"`
+        - Lanes avec ID au format "Lane X" sans temps ou distance valide
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
@@ -133,6 +137,9 @@ paths:
                       unlinked_participants_count:
                         type: integer
                         description: Nombre de participants non liés (ex: "Lane X")
+                      skipped_empty_lanes:
+                        type: integer
+                        description: Nombre de lanes vides ignorées lors de l'import
         200:
           description: Résultats mis à jour avec succès
         400:
