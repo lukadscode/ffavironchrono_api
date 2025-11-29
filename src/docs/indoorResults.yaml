@@ -1,0 +1,331 @@
+tags:
+  - name: indoor-results
+    description: Gestion des résultats des courses indoor (ErgRace)
+
+paths:
+  /indoor-results/import:
+    post:
+      tags: [indoor-results]
+      summary: Importer les résultats d'une course depuis ErgRace
+      description: |
+        Importe les résultats d'une course depuis le format JSON ErgRace.
+        Les résultats sont automatiquement liés aux équipages (crews) si l'ID ErgRace correspond à un crew_id.
+        Le JSON complet est conservé dans `raw_data` pour traçabilité.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [results]
+              properties:
+                results:
+                  type: object
+                  required: [race_id]
+                  properties:
+                    race_id:
+                      type: string
+                      format: uuid
+                      description: ID de la course dans ErgRace (UUID)
+                      example: "46916f84-f780-488c-813d-a5475142f86e"
+                    c2_race_id:
+                      type: string
+                      format: uuid
+                      description: ID de la course dans notre plateforme (optionnel)
+                      example: "abc-123-def-456"
+                    ergrace_version:
+                      type: string
+                      example: "03.01.01"
+                    race_start_time:
+                      type: string
+                      format: date-time
+                      example: "2025-11-28 18:33:05"
+                    race_end_time:
+                      type: string
+                      format: date-time
+                      example: "2025-11-28 18:33:44"
+                    duration:
+                      type: integer
+                      description: Durée en millisecondes
+                      example: 100
+                    time_cap:
+                      type: integer
+                      example: 0
+                    race_file_name:
+                      type: string
+                      example: "Course_test_46916f84-f780-488c-813d-a5475142f86e.rac2"
+                    participants:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            description: ID du participant (UUID du crew_id ou "Lane X")
+                            example: "c45d85a1-8493-4e3e-9440-1a7ef4852406"
+                          place:
+                            type: integer
+                            example: 1
+                          time:
+                            type: string
+                            example: "0:24.1"
+                          score:
+                            type: string
+                            example: "0:24.1"
+                          distance:
+                            type: integer
+                            example: 100
+                          avg_pace:
+                            type: string
+                            example: "2:00.5"
+                          spm:
+                            type: integer
+                            description: Strokes per minute
+                            example: 32
+                          calories:
+                            type: integer
+                            example: 6
+                          serial_number:
+                            type: integer
+                            example: 431859705
+                          machine_type:
+                            type: string
+                            example: "row"
+                          logged_time:
+                            type: string
+                            example: "28/11/2025 18:32:00"
+                          splits:
+                            type: array
+                            description: Splits détaillés (optionnel)
+      responses:
+        201:
+          description: Résultats importés avec succès
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: "Résultats importés avec succès"
+                  data:
+                    type: object
+                    properties:
+                      indoor_race_result_id:
+                        type: string
+                        format: uuid
+                      race_id:
+                        type: string
+                        format: uuid
+                        nullable: true
+                      ergrace_race_id:
+                        type: string
+                        format: uuid
+                      participants_count:
+                        type: integer
+                      linked_crews_count:
+                        type: integer
+                        description: Nombre d'équipages liés automatiquement
+                      unlinked_participants_count:
+                        type: integer
+                        description: Nombre de participants non liés (ex: "Lane X")
+        200:
+          description: Résultats mis à jour avec succès
+        400:
+          description: Format JSON invalide
+        404:
+          description: Course introuvable (si c2_race_id fourni)
+
+  /indoor-results/race/{race_id}:
+    get:
+      tags: [indoor-results]
+      summary: Récupérer les résultats d'une course
+      description: |
+        Récupère les résultats d'une course indoor avec les détails des participants,
+        incluant les informations des équipages (club, catégorie) si liés.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: race_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID de la course dans la plateforme
+      responses:
+        200:
+          description: Résultats récupérés avec succès
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: object
+                    properties:
+                      race_result:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            format: uuid
+                          race_id:
+                            type: string
+                            format: uuid
+                          ergrace_race_id:
+                            type: string
+                            format: uuid
+                          race_start_time:
+                            type: string
+                            format: date-time
+                          race_end_time:
+                            type: string
+                            format: date-time
+                          duration:
+                            type: integer
+                      participants:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            place:
+                              type: integer
+                            time_display:
+                              type: string
+                            time_ms:
+                              type: integer
+                            score:
+                              type: string
+                            distance:
+                              type: integer
+                            avg_pace:
+                              type: string
+                            spm:
+                              type: integer
+                            calories:
+                              type: integer
+                            machine_type:
+                              type: string
+                            logged_time:
+                              type: string
+                              format: date-time
+                            crew:
+                              type: object
+                              nullable: true
+                              properties:
+                                id:
+                                  type: string
+                                  format: uuid
+                                club_name:
+                                  type: string
+                                club_code:
+                                  type: string
+                                category:
+                                  type: object
+                                  nullable: true
+                                  properties:
+                                    id:
+                                      type: string
+                                      format: uuid
+                                    code:
+                                      type: string
+                                    label:
+                                      type: string
+                            ergrace_participant_id:
+                              type: string
+                            splits_data:
+                              type: object
+                              nullable: true
+        404:
+          description: Aucun résultat trouvé pour cette course
+
+  /indoor-results/event/{event_id}:
+    get:
+      tags: [indoor-results]
+      summary: Récupérer tous les résultats d'un événement
+      description: |
+        Récupère tous les résultats des courses indoor d'un événement.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: event_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID de l'événement
+      responses:
+        200:
+          description: Liste des résultats récupérée avec succès
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        race:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            name:
+                              type: string
+                            race_number:
+                              type: integer
+                        result:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            race_start_time:
+                              type: string
+                              format: date-time
+                            race_end_time:
+                              type: string
+                              format: date-time
+                            duration:
+                              type: integer
+                        participants:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              place:
+                                type: integer
+                              time_display:
+                                type: string
+                              crew:
+                                type: object
+                                nullable: true
+                                properties:
+                                  club_name:
+                                    type: string
+                                  category:
+                                    type: string
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+

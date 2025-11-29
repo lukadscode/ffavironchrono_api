@@ -14,6 +14,8 @@ const RaceCrew = require("./RaceCrew");
 const TimingPoint = require("./TimingPoint");
 const Timing = require("./Timing");
 const TimingAssignment = require("./TimingAssignment");
+const IndoorRaceResult = require("./IndoorRaceResult");
+const IndoorParticipantResult = require("./IndoorParticipantResult");
 
 // Relations User
 User.hasMany(UserSession, { foreignKey: "user_id" });
@@ -151,3 +153,22 @@ Notification.belongsTo(Race, { foreignKey: "race_id", as: "race" });
 
 Notification.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 User.hasMany(Notification, { foreignKey: "created_by" });
+
+// Relations Indoor Results
+const IndoorRaceResult = require("./IndoorRaceResult");
+const IndoorParticipantResult = require("./IndoorParticipantResult");
+
+IndoorRaceResult.belongsTo(Race, { foreignKey: "race_id", as: "race" });
+Race.hasMany(IndoorRaceResult, { foreignKey: "race_id", as: "indoor_results" });
+
+IndoorParticipantResult.belongsTo(IndoorRaceResult, { 
+  foreignKey: "indoor_race_result_id", 
+  as: "indoor_race_result" 
+});
+IndoorRaceResult.hasMany(IndoorParticipantResult, { 
+  foreignKey: "indoor_race_result_id", 
+  as: "participant_results" 
+});
+
+IndoorParticipantResult.belongsTo(Crew, { foreignKey: "crew_id", as: "crew" });
+Crew.hasMany(IndoorParticipantResult, { foreignKey: "crew_id", as: "indoor_results" });

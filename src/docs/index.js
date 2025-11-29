@@ -26,6 +26,7 @@ const miscDoc = YAML.load(path.join(__dirname, "misc.yaml"));
 const rankingDoc = YAML.load(path.join(__dirname, "ranking.yaml"));
 const notificationDoc = YAML.load(path.join(__dirname, "notification.yaml"));
 const clubDoc = YAML.load(path.join(__dirname, "club.yaml"));
+const indoorResultsDoc = YAML.load(path.join(__dirname, "indoorResults.yaml"));
 
 // Fusionner les chemins
 const swaggerDocument = {
@@ -56,6 +57,7 @@ const swaggerDocument = {
     ...rankingDoc.paths, // Ajouter les chemins pour les classements
     ...notificationDoc.paths, // Ajouter les chemins pour les notifications
     ...clubDoc.paths, // Ajouter les chemins pour les clubs
+    ...indoorResultsDoc.paths, // Ajouter les chemins pour les résultats indoor
   },
   components: {
     ...authDoc.components,
@@ -79,6 +81,7 @@ const swaggerDocument = {
     ...rankingDoc.components, // Ajouter les composants pour les classements
     ...notificationDoc.components, // Ajouter les composants pour les notifications
     ...clubDoc.components, // Ajouter les composants pour les clubs
+    ...indoorResultsDoc.components, // Ajouter les composants pour les résultats indoor
   },
   tags: [
     ...(authDoc.tags || []),
@@ -102,6 +105,7 @@ const swaggerDocument = {
     ...(rankingDoc.tags || []), // Ajouter les tags pour les classements
     ...(notificationDoc.tags || []), // Ajouter les tags pour les notifications
     ...(clubDoc.tags || []), // Ajouter les tags pour les clubs
+    ...(indoorResultsDoc.tags || []), // Ajouter les tags pour les résultats indoor
   ],
   security: authDoc.security || [],
 };

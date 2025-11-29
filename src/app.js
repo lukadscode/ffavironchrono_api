@@ -24,6 +24,7 @@ const rankingRoutes = require("./routes/rankingRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const clubRoutes = require("./routes/clubRoutes");
 const userRoutes = require("./routes/userRoutes");
+const indoorResultRoutes = require("./routes/indoorResultRoutes");
 
 const swaggerUi = require("swagger-ui-express");
 const openapiSpec = require("./docs");
@@ -64,6 +65,7 @@ app.use("/rankings", rankingRoutes); // Ranking routes
 app.use("/notifications", notificationRoutes); // Notification routes
 app.use("/clubs", clubRoutes); // Club routes
 app.use("/users", userRoutes); // User routes (admin only)
+app.use("/indoor-results", indoorResultRoutes); // Indoor results routes
 app.use("/", miscRoutes); // Assuming you have a miscRoutes file for miscellaneous routes
 
 app.get("/swagger.json", (req, res) => {
