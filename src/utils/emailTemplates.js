@@ -47,18 +47,23 @@ const baseTemplate = (content, title) => `
       padding: 40px 30px;
     }
     .email-content {
-      color: #555555;
+      color: #1f2937;
       font-size: 16px;
       line-height: 1.8;
     }
     .email-content h2 {
-      color: #333333;
+      color: #111827;
       font-size: 24px;
       margin-bottom: 20px;
-      font-weight: 600;
+      font-weight: 700;
     }
     .email-content p {
       margin-bottom: 16px;
+      color: #374151;
+    }
+    .email-content strong {
+      color: #111827;
+      font-weight: 600;
     }
     .button-container {
       text-align: center;
@@ -67,7 +72,8 @@ const baseTemplate = (content, title) => `
     .button {
       display: inline-block;
       padding: 16px 40px;
-      background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+      background-color: #2563eb;
+      background: #2563eb; /* Fallback pour compatibilité email */
       color: #ffffff !important;
       text-decoration: none;
       border-radius: 8px;
@@ -75,27 +81,33 @@ const baseTemplate = (content, title) => `
       font-size: 16px;
       box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4);
       transition: transform 0.2s, box-shadow 0.2s;
-      border: none;
+      border: 2px solid #1d4ed8;
     }
     .button:hover {
+      background-color: #1d4ed8;
+      background: #1d4ed8;
       transform: translateY(-2px);
       box-shadow: 0 6px 20px rgba(37, 99, 235, 0.5);
-      background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
     }
     .info-box {
-      background-color: #f8f9fa;
-      border-left: 4px solid #667eea;
+      background-color: #e8f0fe;
+      border-left: 4px solid #2563eb;
       padding: 20px;
       margin: 25px 0;
       border-radius: 4px;
+      border: 1px solid #cbd5e0;
     }
     .info-box strong {
-      color: #667eea;
+      color: #1e40af;
       display: block;
       margin-bottom: 8px;
       font-size: 14px;
       text-transform: uppercase;
       letter-spacing: 0.5px;
+      font-weight: 700;
+    }
+    .info-box p {
+      color: #1f2937;
     }
     .credentials-box {
       background-color: #fff5f5;
@@ -130,16 +142,21 @@ const baseTemplate = (content, title) => `
       word-break: break-all;
     }
     .warning-box {
-      background-color: #fffaf0;
-      border-left: 4px solid #f6ad55;
+      background-color: #fef3c7;
+      border-left: 4px solid #f59e0b;
       padding: 20px;
       margin: 25px 0;
       border-radius: 4px;
+      border: 1px solid #fcd34d;
     }
     .warning-box strong {
-      color: #c05621;
+      color: #92400e;
       display: block;
       margin-bottom: 8px;
+      font-weight: 700;
+    }
+    .warning-box p {
+      color: #1f2937;
     }
     .email-footer {
       background-color: #f7fafc;
@@ -219,16 +236,16 @@ exports.verificationEmail = (token, userName = "Utilisateur") => {
         <a href="${verifyUrl}" class="button">Vérifier mon email</a>
       </div>
       
-      <div class="info-box">
-        <strong>🔒 Sécurité</strong>
-        <p>Ce lien est valide pendant 24 heures. Si vous n'avez pas créé de compte, vous pouvez ignorer cet email.</p>
+      <div class="info-box" style="background-color: #f0f9ff; border-left: 4px solid #0ea5e9;">
+        <strong style="color: #0c4a6e; font-weight: 700;">🔒 SÉCURITÉ</strong>
+        <p style="color: #1f2937;">Ce lien est valide pendant 24 heures. Si vous n'avez pas créé de compte, vous pouvez ignorer cet email.</p>
       </div>
       
       <div class="divider"></div>
       
-      <p style="font-size: 14px; color: #718096;">
+      <p style="font-size: 14px; color: #4b5563;">
         Si le bouton ne fonctionne pas, copiez et collez ce lien dans votre navigateur :<br>
-        <a href="${verifyUrl}" style="color: #667eea; word-break: break-all;">${verifyUrl}</a>
+        <a href="${verifyUrl}" style="color: #2563eb; word-break: break-all; font-weight: 600;">${verifyUrl}</a>
       </p>
     </div>
   `;
@@ -273,11 +290,11 @@ exports.accountCreationEmail = (userName, email, temporaryPassword, token) => {
         <a href="${BASE_URL}/login" class="button">Se connecter</a>
       </div>
       
-      <div class="info-box">
-        <strong>📧 Activation du compte</strong>
-        <p>Pour activer votre compte, veuillez vérifier votre adresse email en cliquant sur le lien ci-dessous :</p>
+      <div class="info-box" style="background-color: #f0f9ff; border-left: 4px solid #0ea5e9;">
+        <strong style="color: #0c4a6e; font-weight: 700;">📧 ACTIVATION DU COMPTE</strong>
+        <p style="color: #1f2937;">Pour activer votre compte, veuillez vérifier votre adresse email en cliquant sur le lien ci-dessous :</p>
         <div style="margin-top: 15px;">
-          <a href="${verifyUrl}" style="color: #667eea; text-decoration: underline;">Activer mon compte</a>
+          <a href="${verifyUrl}" style="color: #2563eb; text-decoration: underline; font-weight: 600;">Activer mon compte</a>
         </div>
       </div>
     </div>
@@ -324,11 +341,11 @@ exports.eventInvitationEmail = (userName, email, temporaryPassword, eventName, t
         <a href="${BASE_URL}/login" class="button">Accéder à l'événement</a>
       </div>
       
-      <div class="info-box">
-        <strong>📧 Activation du compte</strong>
-        <p>Pour activer votre compte, veuillez vérifier votre adresse email :</p>
+      <div class="info-box" style="background-color: #f0f9ff; border-left: 4px solid #0ea5e9;">
+        <strong style="color: #0c4a6e; font-weight: 700;">📧 ACTIVATION DU COMPTE</strong>
+        <p style="color: #1f2937;">Pour activer votre compte, veuillez vérifier votre adresse email :</p>
         <div style="margin-top: 15px;">
-          <a href="${verifyUrl}" style="color: #667eea; text-decoration: underline;">Activer mon compte</a>
+          <a href="${verifyUrl}" style="color: #2563eb; text-decoration: underline; font-weight: 600;">Activer mon compte</a>
         </div>
       </div>
     </div>
@@ -360,9 +377,9 @@ exports.eventAddedEmail = (userName, eventName, role) => {
       <p>Bonjour <strong>${userName}</strong>,</p>
       <p>Vous avez été ajouté à l'événement <strong>${eventName}</strong> sur <strong>FFAVIRON - TIMING</strong>.</p>
       
-      <div class="info-box">
-        <strong>👤 Votre rôle</strong>
-        <p style="font-size: 18px; color: #667eea; font-weight: 600; margin-top: 8px;">${roleLabel}</p>
+      <div class="info-box" style="background-color: #dbeafe; border-left: 4px solid #2563eb; border: 1px solid #93c5fd;">
+        <strong style="color: #1e40af; font-weight: 700;">👤 VOTRE RÔLE</strong>
+        <p style="font-size: 20px; color: #1e40af; font-weight: 700; margin-top: 12px; background-color: #ffffff; padding: 12px; border-radius: 6px; border: 2px solid #2563eb; display: inline-block; min-width: 150px; text-align: center;">${roleLabel}</p>
       </div>
       
       <p>Vous pouvez maintenant accéder à cet événement avec votre compte existant.</p>
@@ -371,9 +388,9 @@ exports.eventAddedEmail = (userName, eventName, role) => {
         <a href="${BASE_URL}/login" class="button">Accéder à l'événement</a>
       </div>
       
-      <div class="info-box">
-        <strong>💡 Information</strong>
-        <p>Utilisez vos identifiants habituels pour vous connecter. Si vous avez oublié votre mot de passe, vous pouvez le réinitialiser depuis la page de connexion.</p>
+      <div class="info-box" style="background-color: #f0f9ff; border-left: 4px solid #0ea5e9;">
+        <strong style="color: #0c4a6e; font-weight: 700;">💡 INFORMATION</strong>
+        <p style="color: #1f2937;">Utilisez vos identifiants habituels pour vous connecter. Si vous avez oublié votre mot de passe, vous pouvez le réinitialiser depuis la page de connexion.</p>
       </div>
     </div>
   `;
@@ -402,16 +419,16 @@ exports.passwordResetEmail = (userName, token) => {
         <a href="${resetUrl}" class="button">Réinitialiser mon mot de passe</a>
       </div>
       
-      <div class="info-box">
-        <strong>🔒 Sécurité</strong>
-        <p>Ce lien est valide pendant <strong>1 heure</strong>. Si vous n'avez pas demandé cette réinitialisation, vous pouvez ignorer cet email en toute sécurité.</p>
+      <div class="info-box" style="background-color: #f0f9ff; border-left: 4px solid #0ea5e9;">
+        <strong style="color: #0c4a6e; font-weight: 700;">🔒 SÉCURITÉ</strong>
+        <p style="color: #1f2937;">Ce lien est valide pendant <strong style="color: #111827;">1 heure</strong>. Si vous n'avez pas demandé cette réinitialisation, vous pouvez ignorer cet email en toute sécurité.</p>
       </div>
       
       <div class="divider"></div>
       
-      <p style="font-size: 14px; color: #718096;">
+      <p style="font-size: 14px; color: #4b5563;">
         Si le bouton ne fonctionne pas, copiez et collez ce lien dans votre navigateur :<br>
-        <a href="${resetUrl}" style="color: #667eea; word-break: break-all;">${resetUrl}</a>
+        <a href="${resetUrl}" style="color: #2563eb; word-break: break-all; font-weight: 600;">${resetUrl}</a>
       </p>
     </div>
   `;
@@ -433,9 +450,9 @@ exports.passwordChangedEmail = (userName) => {
       <p>Bonjour <strong>${userName}</strong>,</p>
       <p>Votre mot de passe a été modifié avec succès.</p>
       
-      <div class="info-box">
-        <strong>🔒 Sécurité</strong>
-        <p>Si vous n'avez pas effectué cette modification, veuillez <strong>contacter immédiatement</strong> le support.</p>
+      <div class="info-box" style="background-color: #f0f9ff; border-left: 4px solid #0ea5e9;">
+        <strong style="color: #0c4a6e; font-weight: 700;">🔒 SÉCURITÉ</strong>
+        <p style="color: #1f2937;">Si vous n'avez pas effectué cette modification, veuillez <strong style="color: #111827;">contacter immédiatement</strong> le support.</p>
       </div>
       
       <div class="button-container">
