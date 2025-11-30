@@ -706,15 +706,51 @@ module.exports.updateEventFromManifestation = async (manifestationId, event_id, 
     const existingCrews = await Crew.findAll({
       where: { event_id },
       attributes: ['id', 'category_id', 'club_name', 'club_code'],
+      include: [
+        {
+          model: CrewParticipant,
+          as: 'crew_participants',
+          attributes: ['participant_id', 'seat_position', 'is_coxswain'],
+          include: [
+            {
+              model: Participant,
+              as: 'participant',
+              attributes: ['license_number', 'first_name', 'last_name'],
+            },
+          ],
+        },
+      ],
     });
     
-    // Créer un Set pour vérifier rapidement si un équipage existe déjà
-    // Clé: "category_id|club_name|club_code"
-    const existingCrewKeys = new Set();
+    // Normaliser une chaîne pour la comparaison (enlever espaces multiples, mettre en minuscules)
+    const normalizeString = (str) => {
+      if (!str) return '';
+      return str.trim().toLowerCase().replace(/\s+/g, ' ');
+    };
+    
+    // Créer un map pour comparer les participants des équipages existants
+    // Clé: "category_id|sorted_license_numbers" (triés pour comparaison)
+    // Valeur: true (juste pour vérifier l'existence)
+    const existingCrewByParticipants = new Map();
     existingCrews.forEach((crew) => {
-      const key = `${crew.category_id}|${crew.club_name || ''}|${crew.club_code || ''}`;
-      existingCrewKeys.add(key);
+      const participantLicenses = [];
+      if (crew.crew_participants) {
+        crew.crew_participants.forEach((cp) => {
+          if (cp.participant && cp.participant.license_number) {
+            participantLicenses.push(cp.participant.license_number);
+          }
+        });
+      }
+      
+      // Créer une clé basée sur la catégorie et les participants (triés)
+      if (participantLicenses.length > 0) {
+        const sortedLicenses = participantLicenses.sort().join('|');
+        const key = `${crew.category_id}|${sortedLicenses}`;
+        existingCrewByParticipants.set(key, true);
+      }
     });
+    
+    console.log(`📊 ${existingCrews.length} équipages existants analysés pour détection des doublons`);
 
     // 5. Création des distances (uniquement les nouvelles)
     console.log("📏 Vérification des distances...");
@@ -957,11 +993,35 @@ module.exports.updateEventFromManifestation = async (manifestationId, event_id, 
       const club_name = isNumber ? clubParts.slice(0, -1).join(" ") : clubInfo;
       const club_code = ins.num_club_rameur_1 || ins.club_abrege_rameur_1 || club_name || "";
 
-      // Vérifier si l'équipage existe déjà
-      const crewKey = `${category_id}|${club_name || ''}|${club_code || ''}`;
-      if (existingCrewKeys.has(crewKey)) {
-        // Équipage déjà existant, on passe
-        continue;
+      // Récupérer les numéros de licence des participants de cette inscription
+      const inscriptionLicenses = [];
+      for (let i = 1; i <= 8; i++) {
+        const licenseNumber = ins[`numero_licence_rameur_${i}`];
+        if (licenseNumber) {
+          inscriptionLicenses.push(licenseNumber);
+        }
+      }
+      if (ins.numero_licence_barreur) {
+        inscriptionLicenses.push(ins.numero_licence_barreur);
+      }
+      
+      // Vérifier si un équipage avec les mêmes participants dans la même catégorie existe déjà
+      if (inscriptionLicenses.length > 0) {
+        const sortedLicenses = inscriptionLicenses.sort().join('|');
+        const crewKey = `${category_id}|${sortedLicenses}`;
+        
+        if (existingCrewByParticipants.has(crewKey)) {
+          // Même équipage (même catégorie, mêmes participants)
+          // On passe cette inscription car l'équipage existe déjà
+          if (processedInscriptions % 100 === 0 || processedInscriptions === totalInscriptions) {
+            console.log(`  ⏭️  Équipage déjà existant ignoré: ${club_name} (${inscriptionLicenses.length} participants)`);
+          }
+          continue;
+        }
+      } else {
+        // Pas de numéros de licence, on ne peut pas comparer efficacement
+        // On va créer l'équipage mais avec un warning
+        console.warn(`⚠️  Inscription sans numéros de licence pour ${club_name}, création de l'équipage...`);
       }
 
       // Créer le nouvel équipage
@@ -976,7 +1036,13 @@ module.exports.updateEventFromManifestation = async (manifestationId, event_id, 
           status: 8,
         });
         newCrewCount++;
-        existingCrewKeys.add(crewKey); // Ajouter à la liste pour éviter les doublons dans cette session
+        
+        // Ajouter à la liste des équipages existants pour éviter les doublons dans cette session
+        if (inscriptionLicenses.length > 0) {
+          const sortedLicenses = inscriptionLicenses.sort().join('|');
+          const newCrewKey = `${category_id}|${sortedLicenses}`;
+          existingCrewByParticipants.set(newCrewKey, true);
+        }
         
         // Récupérer la catégorie pour les détails
         const category = await Category.findByPk(category_id);
