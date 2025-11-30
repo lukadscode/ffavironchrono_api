@@ -17,8 +17,17 @@ const Crew = sequelize.define(
       allowNull: false,
     },
     status: {
-      type: DataTypes.INTEGER,
-      defaultValue: 8,
+      type: DataTypes.ENUM(
+        "registered",
+        "dns",
+        "dnf",
+        "disqualified",
+        "changed",
+        "withdrawn",
+        "scratch"
+      ),
+      defaultValue: "registered",
+      allowNull: false,
     },
     club_name: {
       type: DataTypes.STRING,

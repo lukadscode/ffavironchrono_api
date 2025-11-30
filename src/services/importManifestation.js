@@ -11,6 +11,7 @@ const CrewParticipant = require("../models/CrewParticipant");
 const RacePhase = require("../models/RacePhase");
 const Race = require("../models/Race");
 const Distance = require("../models/Distance");
+const { REGISTERED } = require("../constants/crewStatus");
 
 /**
  * Parse une date au format DD/MM/YYYY
@@ -518,7 +519,7 @@ module.exports = async (manifestationId, req) => {
           category_id,
           club_name: club_name || "Non spécifié",
           club_code: club_code,
-          status: 8, // Statut par défaut
+          status: REGISTERED, // Statut par défaut : inscrit
         });
         crewCount++;
       } catch (crewError) {
@@ -1033,7 +1034,7 @@ module.exports.updateEventFromManifestation = async (manifestationId, event_id, 
           category_id,
           club_name: club_name || "Non spécifié",
           club_code: club_code,
-          status: 8,
+          status: REGISTERED, // Statut par défaut : inscrit
         });
         newCrewCount++;
         

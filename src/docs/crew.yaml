@@ -28,7 +28,17 @@ paths:
                 category_id:
                   type: string
                 status:
-                  type: integer
+                  type: string
+                  enum:
+                    - registered
+                    - dns
+                    - dnf
+                    - disqualified
+                    - changed
+                    - withdrawn
+                    - scratch
+                  default: registered
+                  description: Statut de l'équipage
                 club_name:
                   type: string
                 club_code:
@@ -107,7 +117,17 @@ paths:
                 category_id:
                   type: string
                 status:
-                  type: integer
+                  type: string
+                  enum:
+                    - registered
+                    - dns
+                    - dnf
+                    - disqualified
+                    - changed
+                    - withdrawn
+                    - scratch
+                  default: registered
+                  description: Statut de l'équipage
                 club_name:
                   type: string
                 club_code:
@@ -150,7 +170,25 @@ components:
         category_id:
           type: string
         status:
-          type: integer
+          type: string
+          enum:
+            - registered
+            - dns
+            - dnf
+            - disqualified
+            - changed
+            - withdrawn
+            - scratch
+          default: registered
+          description: |
+            Statut de l'équipage :
+            - registered : Inscrit (par défaut)
+            - dns : Did Not Start (n'a pas pris le départ)
+            - dnf : Did Not Finish (n'a pas terminé)
+            - disqualified : Disqualifié
+            - changed : Changement d'équipage
+            - withdrawn : Retiré
+            - scratch : Scratch (retiré avant le départ)
         club_name:
           type: string
         club_code:
