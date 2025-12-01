@@ -5,11 +5,42 @@ const Category = require("../models/Category");
 const CrewParticipant = require("../models/CrewParticipant");
 const Participant = require("../models/Participant");
 const RaceCrew = require("../models/RaceCrew");
+const CREW_STATUS = require("../constants/crewStatus");
 
 exports.createCrew = async (req, res) => {
   try {
     const data = req.body;
-    const crew = await Crew.create({ ...data, id: uuidv4() });
+
+    // Normaliser le statut pour gérer l'ancien format numérique (ex: 8)
+    let normalizedStatus = data.status;
+
+    // Si le front envoie encore un nombre (ancienne version)
+    if (typeof normalizedStatus === "number") {
+      // 8 était la valeur par défaut historique => "registered"
+      if (normalizedStatus === 8) {
+        normalizedStatus = CREW_STATUS.REGISTERED;
+      } else {
+        // Pour toute autre valeur numérique inconnue, on se rabat sur "registered"
+        normalizedStatus = CREW_STATUS.REGISTERED;
+      }
+    }
+
+    // Si le statut est une chaîne vide ou invalide, on force sur "registered"
+    if (
+      typeof normalizedStatus === "string" &&
+      !CREW_STATUS.VALID_STATUSES.includes(normalizedStatus)
+    ) {
+      normalizedStatus = CREW_STATUS.REGISTERED;
+    }
+
+    const payload = {
+      ...data,
+      id: uuidv4(),
+      // Ne pas écraser la valeur par défaut du modèle si aucun statut n'est fourni
+      ...(normalizedStatus ? { status: normalizedStatus } : {}),
+    };
+
+    const crew = await Crew.create(payload);
     res.status(201).json({ status: "success", data: crew });
   } catch (err) {
     res.status(500).json({ status: "error", message: err.message });
