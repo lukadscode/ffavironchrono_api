@@ -7,6 +7,7 @@ Cette migration crée une table intermédiaire `EventDistance` pour lier les év
 ### Architecture
 
 **Structure** :
+
 - **`distances`** : Distances globales (sans `event_id`) - partagées entre tous les événements
 - **`categories`** : Garde `distance_id` (comme avant) - une catégorie a une distance
 - **`event_distances`** : Table intermédiaire Event ↔ Distance - permet de savoir quelles distances sont utilisées dans un événement
@@ -35,12 +36,12 @@ mysqldump -u [user] -p [database_name] > backup_before_migration_event_distance.
 SELECT COUNT(*) as total_distances FROM distances;
 
 -- Vérifier les distances avec event_id
-SELECT COUNT(*) as distances_with_event_id 
-FROM distances 
+SELECT COUNT(*) as distances_with_event_id
+FROM distances
 WHERE event_id IS NOT NULL;
 
 -- Vérifier les distances dupliquées (même caractéristiques, event_id différent)
-SELECT 
+SELECT
   meters, is_relay, relay_count, is_time_based, duration_seconds,
   COUNT(*) as count,
   GROUP_CONCAT(id) as distance_ids
@@ -60,6 +61,7 @@ mysql -u [user] -p [database_name] < docs/migrations/003_migrate_to_event_distan
 ### 1. Création de la table `event_distances`
 
 La table est créée avec :
+
 - Contrainte unique sur `(event_id, distance_id)` pour éviter les doublons
 - Clés étrangères avec `ON DELETE CASCADE`
 
@@ -70,6 +72,7 @@ Pour chaque distance qui a un `event_id`, la migration crée une entrée dans `e
 ### 3. Fusion des distances dupliquées
 
 La migration identifie et fusionne les distances identiques qui ont été créées pour différents événements :
+
 - Garde une seule distance (ex: "500m")
 - Met à jour toutes les références (races, categories, event_distances)
 - Supprime les distances dupliquées
@@ -83,17 +86,17 @@ Une fois les distances fusionnées, la colonne `event_id` est retirée de la tab
 ### 1. Vérifier que la table existe
 
 ```sql
-SELECT COUNT(*) as event_distances_count 
+SELECT COUNT(*) as event_distances_count
 FROM event_distances;
 ```
 
 ### 2. Vérifier qu'il n'y a plus de `event_id` dans `distances`
 
 ```sql
-SELECT COUNT(*) as distances_with_event_id 
-FROM information_schema.COLUMNS 
-WHERE TABLE_SCHEMA = DATABASE() 
-  AND TABLE_NAME = 'distances' 
+SELECT COUNT(*) as distances_with_event_id
+FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE()
+  AND TABLE_NAME = 'distances'
   AND COLUMN_NAME = 'event_id';
 -- Résultat attendu : 0
 ```
@@ -101,7 +104,7 @@ WHERE TABLE_SCHEMA = DATABASE()
 ### 3. Vérifier les associations créées
 
 ```sql
-SELECT 
+SELECT
   e.name as event_name,
   d.meters,
   d.is_relay,
@@ -115,7 +118,7 @@ LIMIT 10;
 ### 4. Vérifier qu'il n'y a plus de distances dupliquées
 
 ```sql
-SELECT 
+SELECT
   meters, is_relay, relay_count, is_time_based, duration_seconds,
   COUNT(*) as count
 FROM distances
@@ -139,6 +142,7 @@ HAVING COUNT(*) > 1;
 ### Comportement de l'import
 
 Lors de l'import d'un événement :
+
 1. Les distances sont créées globalement (sans `event_id`)
 2. Les catégories sont créées avec leur `distance_id` (comme avant)
 3. Les associations `EventDistance` sont créées automatiquement
@@ -159,11 +163,13 @@ Lors de l'import d'un événement :
 Si vous devez annuler la migration :
 
 1. **Restaurer `event_id` dans `distances`** (si supprimé)
+
 ```sql
 ALTER TABLE distances ADD COLUMN event_id CHAR(36) NULL;
 ```
 
 2. **Migrer les données depuis `event_distances` vers `distances`**
+
 ```sql
 UPDATE distances d
 INNER JOIN event_distances ed ON ed.distance_id = d.id
@@ -172,6 +178,7 @@ WHERE d.event_id IS NULL;
 ```
 
 3. **Supprimer la table `event_distances`**
+
 ```sql
 DROP TABLE IF EXISTS event_distances;
 ```
@@ -203,4 +210,3 @@ mysql -u [user] -p [database_name] < backup_before_migration_event_distance.sql
 **Version** : 1.0  
 **Date** : 2024  
 **Auteur** : Équipe backend
-

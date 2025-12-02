@@ -7,10 +7,12 @@ Une refactorisation a été effectuée pour éviter la duplication des distances
 ### Problème résolu
 
 **Avant** :
+
 - Chaque événement créait ses propres distances (ex: "500m" pour Event A, "500m" pour Event B)
 - Résultat : duplication inutile et gestion complexe
 
 **Après** :
+
 - Les distances sont **globales** et partagées entre tous les événements
 - Une distance "500m" n'existe qu'**une seule fois** dans la base de données
 - Une table intermédiaire `event_distances` lie les événements aux distances
@@ -24,16 +26,19 @@ Les endpoints existants continuent de fonctionner **exactement comme avant** :
 #### Endpoints inchangés
 
 - **`GET /categories/event/:event_id/with-crews`**
+
   - Retourne toujours `distance_id` dans chaque catégorie
   - Format de réponse identique
   - Aucun changement nécessaire
 
 - **`PUT /categories/:id`**
+
   - Accepte toujours `distance_id` dans le body
   - Met à jour toujours `category.distance_id`
   - Aucun changement nécessaire
 
 - **`GET /distances`**
+
   - Retourne toutes les distances globales
   - Format identique
   - Aucun changement nécessaire
@@ -41,6 +46,27 @@ Les endpoints existants continuent de fonctionner **exactement comme avant** :
 - **`POST /distances`**
   - Crée une distance globale
   - **Changement mineur** : plus besoin d'envoyer `event_id` (optionnel, sera ignoré)
+
+### 🆕 Nouveaux endpoints (optionnels)
+
+- **`POST /event-distances`**
+
+  - Associer une distance à un événement
+  - Body: `{ event_id, distance_id }`
+  - Utile si vous créez manuellement une distance et voulez l'associer à un événement
+
+- **`POST /event-distances/batch`**
+
+  - Associer plusieurs distances à un événement en une fois
+  - Body: `{ event_id, distance_ids: [id1, id2, ...] }`
+
+- **`GET /event-distances/event/:event_id`**
+
+  - Récupérer toutes les associations distance-événement pour un événement
+  - Alternative à `GET /distances/event/:event_id` (retourne plus d'informations)
+
+- **`DELETE /event-distances/event/:event_id/distance/:distance_id`**
+  - Dissocier une distance d'un événement
 
 ### 📊 Nouveau comportement
 
@@ -101,6 +127,28 @@ GET /distances/event/:eventId
 // Retourne les distances utilisées dans cet événement
 ```
 
+### 5. Association manuelle Event ↔ Distance
+
+Si vous créez une distance manuellement et voulez l'associer à un événement :
+
+```typescript
+// ✅ Nouveau endpoint disponible
+POST /event-distances
+{
+  "event_id": "xxx",
+  "distance_id": "yyy"
+}
+
+// Ou pour plusieurs distances en une fois :
+POST /event-distances/batch
+{
+  "event_id": "xxx",
+  "distance_ids": ["yyy", "zzz", "aaa"]
+}
+```
+
+**Note** : Cette association se fait **automatiquement** lors de l'import d'un événement. Vous n'avez besoin de ces endpoints que si vous créez manuellement des distances.
+
 ### 4. Gestion des catégories avec distances
 
 Aucun changement dans la façon de récupérer les catégories avec leurs distances :
@@ -132,10 +180,12 @@ GET /categories/event/:eventId/with-crews
 const fetchCategories = async (eventId: string) => {
   const response = await fetch(`/categories/event/${eventId}/with-crews`);
   const data = await response.json();
-  
+
   // distance_id est toujours présent
-  data.data.forEach(category => {
-    console.log(`Catégorie ${category.label} a la distance ${category.distance_id}`);
+  data.data.forEach((category) => {
+    console.log(
+      `Catégorie ${category.label} a la distance ${category.distance_id}`
+    );
   });
 };
 ```
@@ -144,11 +194,14 @@ const fetchCategories = async (eventId: string) => {
 
 ```typescript
 // Aucun changement nécessaire
-const updateCategoryDistance = async (categoryId: string, distanceId: string) => {
+const updateCategoryDistance = async (
+  categoryId: string,
+  distanceId: string
+) => {
   await fetch(`/categories/${categoryId}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ distance_id: distanceId })
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ distance_id: distanceId }),
   });
 };
 ```
@@ -158,15 +211,47 @@ const updateCategoryDistance = async (categoryId: string, distanceId: string) =>
 ```typescript
 // ⚠️ Changement mineur : ne plus envoyer event_id
 const createDistance = async (meters: number) => {
-  await fetch('/distances', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+  const response = await fetch("/distances", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       meters: meters,
       is_relay: false,
       // event_id: eventId // ❌ Plus nécessaire (sera ignoré si envoyé)
-    })
+    }),
   });
+  const data = await response.json();
+  return data.data; // Retourne la distance créée avec son id
+};
+```
+
+### React/TypeScript - Associer une distance à un événement
+
+```typescript
+// 🆕 Nouveau : Associer une distance à un événement
+const associateDistanceToEvent = async (
+  eventId: string,
+  distanceId: string
+) => {
+  await fetch("/event-distances", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      event_id: eventId,
+      distance_id: distanceId,
+    }),
+  });
+};
+
+// Exemple d'utilisation : créer une distance et l'associer
+const createAndAssociateDistance = async (eventId: string, meters: number) => {
+  // 1. Créer la distance
+  const distance = await createDistance(meters);
+
+  // 2. L'associer à l'événement
+  await associateDistanceToEvent(eventId, distance.id);
+
+  return distance;
 };
 ```
 
@@ -185,8 +270,8 @@ const createDistance = async (meters: number) => {
 ```typescript
 // Test 1 : Vérifier que distance_id est toujours présent
 const categories = await fetchCategories(eventId);
-categories.forEach(cat => {
-  expect(cat).toHaveProperty('distance_id'); // Peut être null
+categories.forEach((cat) => {
+  expect(cat).toHaveProperty("distance_id"); // Peut être null
 });
 
 // Test 2 : Vérifier la mise à jour
@@ -202,9 +287,9 @@ expect(updated.distance_id).toBe(newDistanceId);
 Une catégorie peut avoir `distance_id: null`. Assurez-vous de gérer ce cas :
 
 ```typescript
-const distanceLabel = category.distance_id 
+const distanceLabel = category.distance_id
   ? `Distance: ${category.distance_id}`
-  : 'Aucune distance assignée';
+  : "Aucune distance assignée";
 ```
 
 ### 2. Distances partagées
@@ -216,6 +301,7 @@ Les distances sont maintenant partagées entre événements. Si vous modifiez un
 ### 3. Import automatique
 
 Lors de l'import d'un événement depuis l'API FFAviron, les distances sont automatiquement :
+
 - Créées si elles n'existent pas (globales)
 - Réutilisées si elles existent déjà
 - Liées à l'événement via `event_distances`
@@ -262,12 +348,13 @@ En cas de problème :
 
 ## 📅 Résumé
 
-| Aspect | Avant | Après | Action Frontend |
-|--------|-------|-------|-----------------|
-| Création distance | Avec `event_id` | Sans `event_id` | Optionnel : retirer `event_id` |
-| Récupération catégories | `distance_id` présent | `distance_id` présent | ✅ Aucun changement |
-| Mise à jour catégorie | `distance_id` dans body | `distance_id` dans body | ✅ Aucun changement |
-| Distances par événement | Via `distances.event_id` | Via `event_distances` | ✅ Aucun changement (format identique) |
+| Aspect                     | Avant                    | Après                   | Action Frontend                        |
+| -------------------------- | ------------------------ | ----------------------- | -------------------------------------- |
+| Création distance          | Avec `event_id`          | Sans `event_id`         | Optionnel : retirer `event_id`         |
+| Récupération catégories    | `distance_id` présent    | `distance_id` présent   | ✅ Aucun changement                    |
+| Mise à jour catégorie      | `distance_id` dans body  | `distance_id` dans body | ✅ Aucun changement                    |
+| Distances par événement    | Via `distances.event_id` | Via `event_distances`   | ✅ Aucun changement (format identique) |
+| Association Event↔Distance | Automatique (import)     | Automatique + manuelle  | 🆕 Nouveaux endpoints disponibles      |
 
 **Conclusion** : **Aucun changement critique requis**. Les endpoints fonctionnent comme avant. Seule la création de distances peut être simplifiée (retirer `event_id`).
 
@@ -276,4 +363,3 @@ En cas de problème :
 **Version** : 1.0  
 **Date** : 2024  
 **Auteur** : Équipe backend
-
