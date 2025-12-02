@@ -44,8 +44,9 @@ Les endpoints existants continuent de fonctionner **exactement comme avant** :
   - Aucun changement nécessaire
 
 - **`POST /distances`**
-  - Crée une distance globale
+  - Crée une distance globale **ou réutilise une distance existante** si identique
   - **Changement mineur** : plus besoin d'envoyer `event_id` (optionnel, sera ignoré)
+  - **Comportement** : Vérifie automatiquement si une distance identique existe déjà (même `meters`, `is_relay`, `relay_count`, `is_time_based`, `duration_seconds`) et la réutilise au lieu de créer un doublon
 
 ### 🆕 Nouveaux endpoints (optionnels)
 
@@ -210,6 +211,7 @@ const updateCategoryDistance = async (
 
 ```typescript
 // ⚠️ Changement mineur : ne plus envoyer event_id
+// ✅ La distance est automatiquement réutilisée si elle existe déjà
 const createDistance = async (meters: number) => {
   const response = await fetch("/distances", {
     method: "POST",
@@ -221,7 +223,15 @@ const createDistance = async (meters: number) => {
     }),
   });
   const data = await response.json();
-  return data.data; // Retourne la distance créée avec son id
+
+  // data.created indique si la distance a été créée (true) ou réutilisée (false)
+  if (data.created) {
+    console.log("Nouvelle distance créée");
+  } else {
+    console.log("Distance existante réutilisée");
+  }
+
+  return data.data; // Retourne la distance (créée ou existante) avec son id
 };
 ```
 
@@ -292,11 +302,20 @@ const distanceLabel = category.distance_id
   : "Aucune distance assignée";
 ```
 
-### 2. Distances partagées
+### 2. Distances partagées et déduplication automatique
 
-Les distances sont maintenant partagées entre événements. Si vous modifiez une distance, elle affectera **tous les événements** qui l'utilisent.
+Les distances sont maintenant partagées entre événements. **L'API évite automatiquement les doublons** :
 
-**Recommandation** : Ne modifiez pas directement les distances existantes. Créez plutôt une nouvelle distance si nécessaire.
+- Si vous créez une distance "500m" qui existe déjà → L'API réutilise la distance existante
+- Si vous créez un relais "4x250m" qui existe déjà → L'API réutilise le relais existant
+- Si vous créez un temps "2min30s" qui existe déjà → L'API réutilise le temps existant
+
+**Comportement de `POST /distances`** :
+
+- Retourne `created: true` si la distance a été créée
+- Retourne `created: false` si une distance identique existait déjà (réutilisée)
+
+**Recommandation** : Ne modifiez pas directement les distances existantes. Créez plutôt une nouvelle distance si nécessaire. L'API gère automatiquement la déduplication.
 
 ### 3. Import automatique
 
@@ -348,13 +367,13 @@ En cas de problème :
 
 ## 📅 Résumé
 
-| Aspect                     | Avant                    | Après                   | Action Frontend                        |
-| -------------------------- | ------------------------ | ----------------------- | -------------------------------------- |
-| Création distance          | Avec `event_id`          | Sans `event_id`         | Optionnel : retirer `event_id`         |
-| Récupération catégories    | `distance_id` présent    | `distance_id` présent   | ✅ Aucun changement                    |
-| Mise à jour catégorie      | `distance_id` dans body  | `distance_id` dans body | ✅ Aucun changement                    |
-| Distances par événement    | Via `distances.event_id` | Via `event_distances`   | ✅ Aucun changement (format identique) |
-| Association Event↔Distance | Automatique (import)     | Automatique + manuelle  | 🆕 Nouveaux endpoints disponibles      |
+| Aspect                     | Avant                    | Après                                | Action Frontend                        |
+| -------------------------- | ------------------------ | ------------------------------------ | -------------------------------------- |
+| Création distance          | Avec `event_id`          | Sans `event_id` + déduplication auto | Optionnel : retirer `event_id`         |
+| Récupération catégories    | `distance_id` présent    | `distance_id` présent                | ✅ Aucun changement                    |
+| Mise à jour catégorie      | `distance_id` dans body  | `distance_id` dans body              | ✅ Aucun changement                    |
+| Distances par événement    | Via `distances.event_id` | Via `event_distances`                | ✅ Aucun changement (format identique) |
+| Association Event↔Distance | Automatique (import)     | Automatique + manuelle               | 🆕 Nouveaux endpoints disponibles      |
 
 **Conclusion** : **Aucun changement critique requis**. Les endpoints fonctionnent comme avant. Seule la création de distances peut être simplifiée (retirer `event_id`).
 
