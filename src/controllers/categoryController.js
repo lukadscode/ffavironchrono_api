@@ -63,6 +63,8 @@ exports.getCategoriesByEventWithCrews = async (req, res) => {
       gender: cat.gender,
       boat_seats: cat.boat_seats,
       has_coxswain: cat.has_coxswain,
+      // 🔗 ID de la distance associée à la catégorie (pour le front)
+      distance_id: cat.distance_id,
       crew_count: cat.Crews?.length || 0,
       crews: cat.Crews || [],
     }));
