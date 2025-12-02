@@ -8,10 +8,8 @@ const Distance = sequelize.define(
       type: DataTypes.CHAR(36),
       primaryKey: true,
     },
-    event_id: {
-      type: DataTypes.CHAR(36),
-      allowNull: false,
-    },
+    // NOTE: event_id retiré - les distances sont maintenant globales et partagées entre événements
+    // L'association Event <-> Distance se fait via EventDistance
     meters: {
       type: DataTypes.INTEGER,
       allowNull: true, // Nullable pour permettre les courses basées sur le temps
@@ -48,7 +46,7 @@ Distance.prototype.getFormattedLabel = function () {
   if (this.is_time_based && this.duration_seconds) {
     const minutes = Math.floor(this.duration_seconds / 60);
     const seconds = this.duration_seconds % 60;
-    
+
     if (minutes > 0 && seconds > 0) {
       return `${minutes}min ${seconds}s`;
     } else if (minutes > 0) {
@@ -57,17 +55,17 @@ Distance.prototype.getFormattedLabel = function () {
       return `${this.duration_seconds}s`;
     }
   }
-  
+
   // Relais
   if (this.is_relay && this.relay_count && this.meters) {
     return `${this.relay_count}x${this.meters}m`;
   }
-  
+
   // Course normale basée sur la distance
   if (this.meters) {
     return `${this.meters}m`;
   }
-  
+
   // Fallback (ne devrait jamais arriver)
   return "Distance inconnue";
 };

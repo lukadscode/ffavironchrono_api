@@ -5,6 +5,7 @@ const moment = require("moment");
 const Event = require("../models/Event");
 const Category = require("../models/Category");
 const EventCategory = require("../models/EventCategory");
+const EventDistance = require("../models/EventDistance");
 const Crew = require("../models/Crew");
 const Participant = require("../models/Participant");
 const CrewParticipant = require("../models/CrewParticipant");
@@ -61,7 +62,7 @@ function hasCoxswain(bateauCode) {
  */
 function extractDistance(libelle) {
   if (!libelle) return null;
-  
+
   // 1. Détecter les relais (format: "8x250m", "4x500 m", "8 x 250 m", etc.)
   const relayMatch = libelle.match(/(\d+)\s*x\s*(\d+)\s*m/i);
   if (relayMatch) {
@@ -111,7 +112,7 @@ function extractDistance(libelle) {
       durationSeconds: null,
     };
   }
-  
+
   return null;
 }
 
@@ -207,7 +208,7 @@ module.exports = async (manifestationId, req) => {
     };
 
     console.log(`📥 Récupération de la manifestation ${manifestationId}...`);
-    const { data } = await axios.get(url, { 
+    const { data } = await axios.get(url, {
       headers,
       timeout: 60000, // 60 secondes de timeout pour l'API externe
     });
@@ -280,13 +281,14 @@ module.exports = async (manifestationId, req) => {
     });
 
     for (const [key, distanceInfo] of uniqueDistances) {
-      // Chercher une distance existante avec les mêmes caractéristiques
+      // Chercher une distance existante GLOBALE (sans event_id) avec les mêmes caractéristiques
+      // Les distances sont maintenant partagées entre tous les événements
       const whereClause = {
-        event_id,
+        // NOTE: event_id retiré - les distances sont globales
         is_relay: distanceInfo.isRelay,
         is_time_based: distanceInfo.isTimeBased || false,
       };
-      
+
       // Pour les distances basées sur les mètres
       if (distanceInfo.isTimeBased) {
         whereClause.duration_seconds = distanceInfo.durationSeconds;
@@ -295,7 +297,7 @@ module.exports = async (manifestationId, req) => {
         whereClause.meters = distanceInfo.meters;
         whereClause.duration_seconds = null;
       }
-      
+
       // Pour les relais, inclure relay_count dans la recherche
       if (distanceInfo.isRelay) {
         whereClause.relay_count = distanceInfo.relayCount;
@@ -303,11 +305,11 @@ module.exports = async (manifestationId, req) => {
         whereClause.relay_count = null;
       }
 
-      const [distance] = await Distance.findOrCreate({
+      const [distance, distanceCreated] = await Distance.findOrCreate({
         where: whereClause,
         defaults: {
           id: uuidv4(),
-          event_id,
+          // NOTE: event_id retiré - les distances sont globales
           meters: distanceInfo.meters,
           is_relay: distanceInfo.isRelay,
           relay_count: distanceInfo.relayCount,
@@ -315,8 +317,8 @@ module.exports = async (manifestationId, req) => {
           duration_seconds: distanceInfo.durationSeconds,
         },
       });
-      
-      // Log pour indiquer le type de distance créée
+
+      // Log pour indiquer si la distance a été créée ou trouvée
       if (distanceInfo.isTimeBased) {
         const minutes = Math.floor(distanceInfo.durationSeconds / 60);
         const seconds = distanceInfo.durationSeconds % 60;
@@ -328,24 +330,64 @@ module.exports = async (manifestationId, req) => {
         } else {
           timeLabel = `${distanceInfo.durationSeconds}s`;
         }
-        console.log(`  ✅ Course basée sur le temps créée: ${timeLabel}`);
+        if (distanceCreated) {
+          console.log(`  ✅ Course basée sur le temps créée: ${timeLabel}`);
+        } else {
+          console.log(
+            `  ℹ️  Course basée sur le temps trouvée (déjà existante): ${timeLabel}`
+          );
+        }
       } else if (distanceInfo.isRelay) {
-        console.log(
-          `  ✅ Relais créé: ${distanceInfo.relayCount}x${distanceInfo.meters}m`
-        );
+        if (distanceCreated) {
+          console.log(
+            `  ✅ Relais créé: ${distanceInfo.relayCount}x${distanceInfo.meters}m`
+          );
+        } else {
+          console.log(
+            `  ℹ️  Relais trouvé (déjà existant): ${distanceInfo.relayCount}x${distanceInfo.meters}m`
+          );
+        }
       } else {
-        console.log(`  ✅ Distance créée: ${distanceInfo.meters}m`);
+        if (distanceCreated) {
+          console.log(`  ✅ Distance créée: ${distanceInfo.meters}m`);
+        } else {
+          console.log(
+            `  ℹ️  Distance trouvée (déjà existante): ${distanceInfo.meters}m`
+          );
+        }
       }
-      
+
       // Utiliser la clé unique pour le mapping
       distanceMap[key] = distance.id;
       // Aussi mapper par meters pour compatibilité (si nécessaire)
       if (distanceInfo.meters && !distanceMap[distanceInfo.meters]) {
         distanceMap[distanceInfo.meters] = distance.id;
       }
+
+      // Créer l'association EventDistance pour lier la distance à l'événement
+      const [eventDistance, eventDistanceCreated] =
+        await EventDistance.findOrCreate({
+          where: {
+            event_id,
+            distance_id: distance.id,
+          },
+          defaults: {
+            id: uuidv4(),
+            event_id,
+            distance_id: distance.id,
+          },
+        });
+
+      if (!eventDistanceCreated) {
+        console.log(
+          `  ℹ️  Association EventDistance déjà existante pour cette distance`
+        );
+      }
     }
-    
-    console.log(`✅ ${uniqueDistances.size} distance(s) unique(s) créée(s)`);
+
+    console.log(
+      `✅ ${uniqueDistances.size} distance(s) unique(s) traitée(s) et liée(s) à l'événement`
+    );
 
     // 4. Création des catégories à partir des épreuves
     console.log("🏷️  Création des catégories...");
@@ -421,9 +463,9 @@ module.exports = async (manifestationId, req) => {
           gender,
           boat_seats: boatSeats,
           has_coxswain: hasCox,
-          distance_id: distanceId, // Lier directement à la distance
+          distance_id: distanceId, // Lier directement à la distance via category.distance_id
         });
-        
+
         const distanceLabel = distanceId
           ? distanceInfo.isRelay
             ? ` (${distanceInfo.relayCount}x${distanceInfo.meters}m)`
@@ -479,9 +521,12 @@ module.exports = async (manifestationId, req) => {
 
     for (const ins of inscriptions) {
       processedInscriptions++;
-      
+
       // Log de progression tous les 50 équipages
-      if (processedInscriptions % 50 === 0 || processedInscriptions === totalInscriptions) {
+      if (
+        processedInscriptions % 50 === 0 ||
+        processedInscriptions === totalInscriptions
+      ) {
         console.log(
           `  📊 Progression: ${processedInscriptions}/${totalInscriptions} inscriptions traitées (${crewCount} équipages créés)`
         );
@@ -667,7 +712,11 @@ module.exports = async (manifestationId, req) => {
  * Met à jour un événement existant en ajoutant uniquement les nouveaux éléments
  * (catégories, participants, équipages) sans toucher à l'existant
  */
-module.exports.updateEventFromManifestation = async (manifestationId, event_id, req) => {
+module.exports.updateEventFromManifestation = async (
+  manifestationId,
+  event_id,
+  req
+) => {
   try {
     // 1. Vérifier que l'événement existe
     const event = await Event.findByPk(event_id);
@@ -681,8 +730,10 @@ module.exports.updateEventFromManifestation = async (manifestationId, event_id, 
       Authorization: `Bearer ${process.env.EXTERNAL_API_TOKEN}`,
     };
 
-    console.log(`📥 Mise à jour de l'événement ${event_id} depuis la manifestation ${manifestationId}...`);
-    const { data } = await axios.get(url, { 
+    console.log(
+      `📥 Mise à jour de l'événement ${event_id} depuis la manifestation ${manifestationId}...`
+    );
+    const { data } = await axios.get(url, {
       headers,
       timeout: 60000,
     });
@@ -692,7 +743,9 @@ module.exports.updateEventFromManifestation = async (manifestationId, event_id, 
     const inscriptions = data.inscriptions || [];
 
     console.log(`✅ Manifestation récupérée: ${m.libelle}`);
-    console.log(`📊 ${epreuves.length} épreuves, ${inscriptions.length} inscriptions`);
+    console.log(
+      `📊 ${epreuves.length} épreuves, ${inscriptions.length} inscriptions`
+    );
 
     // 3. Récupérer les catégories existantes pour cet événement
     const existingEventCategories = await EventCategory.findAll({
@@ -706,29 +759,29 @@ module.exports.updateEventFromManifestation = async (manifestationId, event_id, 
     // 4. Récupérer les équipages existants pour cet événement (pour éviter les doublons)
     const existingCrews = await Crew.findAll({
       where: { event_id },
-      attributes: ['id', 'category_id', 'club_name', 'club_code'],
+      attributes: ["id", "category_id", "club_name", "club_code"],
       include: [
         {
           model: CrewParticipant,
-          as: 'crew_participants',
-          attributes: ['participant_id', 'seat_position', 'is_coxswain'],
+          as: "crew_participants",
+          attributes: ["participant_id", "seat_position", "is_coxswain"],
           include: [
             {
               model: Participant,
-              as: 'participant',
-              attributes: ['license_number', 'first_name', 'last_name'],
+              as: "participant",
+              attributes: ["license_number", "first_name", "last_name"],
             },
           ],
         },
       ],
     });
-    
+
     // Normaliser une chaîne pour la comparaison (enlever espaces multiples, mettre en minuscules)
     const normalizeString = (str) => {
-      if (!str) return '';
-      return str.trim().toLowerCase().replace(/\s+/g, ' ');
+      if (!str) return "";
+      return str.trim().toLowerCase().replace(/\s+/g, " ");
     };
-    
+
     // Créer un map pour comparer les participants des équipages existants
     // Clé: "category_id|sorted_license_numbers" (triés pour comparaison)
     // Valeur: true (juste pour vérifier l'existence)
@@ -742,16 +795,18 @@ module.exports.updateEventFromManifestation = async (manifestationId, event_id, 
           }
         });
       }
-      
+
       // Créer une clé basée sur la catégorie et les participants (triés)
       if (participantLicenses.length > 0) {
-        const sortedLicenses = participantLicenses.sort().join('|');
+        const sortedLicenses = participantLicenses.sort().join("|");
         const key = `${crew.category_id}|${sortedLicenses}`;
         existingCrewByParticipants.set(key, true);
       }
     });
-    
-    console.log(`📊 ${existingCrews.length} équipages existants analysés pour détection des doublons`);
+
+    console.log(
+      `📊 ${existingCrews.length} équipages existants analysés pour détection des doublons`
+    );
 
     // 5. Création des distances (uniquement les nouvelles)
     console.log("📏 Vérification des distances...");
@@ -776,12 +831,13 @@ module.exports.updateEventFromManifestation = async (manifestationId, event_id, 
 
     let newDistancesCount = 0;
     for (const [key, distanceInfo] of uniqueDistances) {
+      // Chercher une distance existante GLOBALE (sans event_id) avec les mêmes caractéristiques
       const whereClause = {
-        event_id,
+        // NOTE: event_id retiré - les distances sont globales
         is_relay: distanceInfo.isRelay,
         is_time_based: distanceInfo.isTimeBased || false,
       };
-      
+
       // Pour les distances basées sur les mètres
       if (distanceInfo.isTimeBased) {
         whereClause.duration_seconds = distanceInfo.durationSeconds;
@@ -790,7 +846,7 @@ module.exports.updateEventFromManifestation = async (manifestationId, event_id, 
         whereClause.meters = distanceInfo.meters;
         whereClause.duration_seconds = null;
       }
-      
+
       if (distanceInfo.isRelay) {
         whereClause.relay_count = distanceInfo.relayCount;
       } else {
@@ -801,7 +857,7 @@ module.exports.updateEventFromManifestation = async (manifestationId, event_id, 
         where: whereClause,
         defaults: {
           id: uuidv4(),
-          event_id,
+          // NOTE: event_id retiré - les distances sont globales
           meters: distanceInfo.meters,
           is_relay: distanceInfo.isRelay,
           relay_count: distanceInfo.relayCount,
@@ -809,7 +865,7 @@ module.exports.updateEventFromManifestation = async (manifestationId, event_id, 
           duration_seconds: distanceInfo.durationSeconds,
         },
       });
-      
+
       if (created) {
         newDistancesCount++;
         let label;
@@ -828,7 +884,7 @@ module.exports.updateEventFromManifestation = async (manifestationId, event_id, 
         } else {
           label = `${distanceInfo.meters}m`;
         }
-        
+
         newDistances.push({
           id: distance.id,
           meters: distance.meters,
@@ -838,19 +894,68 @@ module.exports.updateEventFromManifestation = async (manifestationId, event_id, 
           duration_seconds: distance.duration_seconds,
           label: label,
         });
-        
+
         if (distanceInfo.isTimeBased) {
-          console.log(`  ✅ Nouvelle course basée sur le temps créée: ${label}`);
+          console.log(
+            `  ✅ Nouvelle course basée sur le temps créée: ${label}`
+          );
         } else if (distanceInfo.isRelay) {
-          console.log(`  ✅ Nouvelle distance créée: ${distanceInfo.relayCount}x${distanceInfo.meters}m`);
+          console.log(
+            `  ✅ Nouvelle distance créée: ${distanceInfo.relayCount}x${distanceInfo.meters}m`
+          );
         } else {
           console.log(`  ✅ Nouvelle distance créée: ${distanceInfo.meters}m`);
         }
+      } else {
+        // Distance trouvée (déjà existante)
+        let label;
+        if (distanceInfo.isTimeBased) {
+          const minutes = Math.floor(distanceInfo.durationSeconds / 60);
+          const seconds = distanceInfo.durationSeconds % 60;
+          if (minutes > 0 && seconds > 0) {
+            label = `${minutes}min ${seconds}s`;
+          } else if (minutes > 0) {
+            label = `${minutes}min`;
+          } else {
+            label = `${distanceInfo.durationSeconds}s`;
+          }
+          console.log(
+            `  ℹ️  Course basée sur le temps trouvée (déjà existante): ${label}`
+          );
+        } else if (distanceInfo.isRelay) {
+          console.log(
+            `  ℹ️  Relais trouvé (déjà existant): ${distanceInfo.relayCount}x${distanceInfo.meters}m`
+          );
+        } else {
+          console.log(
+            `  ℹ️  Distance trouvée (déjà existante): ${distanceInfo.meters}m`
+          );
+        }
       }
-      
+
       distanceMap[key] = distance.id;
       if (distanceInfo.meters && !distanceMap[distanceInfo.meters]) {
         distanceMap[distanceInfo.meters] = distance.id;
+      }
+
+      // Créer l'association EventDistance pour lier la distance à l'événement
+      const [eventDistance, eventDistanceCreated] =
+        await EventDistance.findOrCreate({
+          where: {
+            event_id,
+            distance_id: distance.id,
+          },
+          defaults: {
+            id: uuidv4(),
+            event_id,
+            distance_id: distance.id,
+          },
+        });
+
+      if (!eventDistanceCreated) {
+        console.log(
+          `  ℹ️  Association EventDistance déjà existante pour cette distance`
+        );
       }
     }
 
@@ -920,9 +1025,9 @@ module.exports.updateEventFromManifestation = async (manifestationId, event_id, 
           gender,
           boat_seats: boatSeats,
           has_coxswain: hasCox,
-          distance_id: distanceId,
+          distance_id: distanceId, // Lier directement à la distance via category.distance_id
         });
-        
+
         newCategoriesCount++;
         newCategories.push({
           id: category.id,
@@ -939,11 +1044,15 @@ module.exports.updateEventFromManifestation = async (manifestationId, event_id, 
             ? ` (${distanceInfo.relayCount}x${distanceInfo.meters}m)`
             : ` (${distanceInfo.meters}m)`
           : "";
-        console.log(`  ✅ Nouvelle catégorie créée: ${codeWithDistance} - ${category.label}${distanceLabel}`);
+        console.log(
+          `  ✅ Nouvelle catégorie créée: ${codeWithDistance} - ${category.label}${distanceLabel}`
+        );
       } else if (!category.distance_id && distanceId) {
         // Mettre à jour la catégorie existante si elle n'a pas de distance_id
         await category.update({ distance_id: distanceId });
-        console.log(`  ✅ Distance assignée à la catégorie existante: ${codeWithDistance}`);
+        console.log(
+          `  ✅ Distance assignée à la catégorie existante: ${codeWithDistance}`
+        );
       }
 
       categoryMap[identifiant] = category.id;
@@ -969,8 +1078,11 @@ module.exports.updateEventFromManifestation = async (manifestationId, event_id, 
 
     for (const ins of inscriptions) {
       processedInscriptions++;
-      
-      if (processedInscriptions % 50 === 0 || processedInscriptions === totalInscriptions) {
+
+      if (
+        processedInscriptions % 50 === 0 ||
+        processedInscriptions === totalInscriptions
+      ) {
         console.log(
           `  📊 Progression: ${processedInscriptions}/${totalInscriptions} inscriptions traitées (${newCrewCount} nouveaux équipages)`
         );
@@ -992,7 +1104,8 @@ module.exports.updateEventFromManifestation = async (manifestationId, event_id, 
       const lastPart = clubParts[clubParts.length - 1];
       const isNumber = /^\d+$/.test(lastPart);
       const club_name = isNumber ? clubParts.slice(0, -1).join(" ") : clubInfo;
-      const club_code = ins.num_club_rameur_1 || ins.club_abrege_rameur_1 || club_name || "";
+      const club_code =
+        ins.num_club_rameur_1 || ins.club_abrege_rameur_1 || club_name || "";
 
       // Récupérer les numéros de licence des participants de cette inscription
       const inscriptionLicenses = [];
@@ -1005,24 +1118,31 @@ module.exports.updateEventFromManifestation = async (manifestationId, event_id, 
       if (ins.numero_licence_barreur) {
         inscriptionLicenses.push(ins.numero_licence_barreur);
       }
-      
+
       // Vérifier si un équipage avec les mêmes participants dans la même catégorie existe déjà
       if (inscriptionLicenses.length > 0) {
-        const sortedLicenses = inscriptionLicenses.sort().join('|');
+        const sortedLicenses = inscriptionLicenses.sort().join("|");
         const crewKey = `${category_id}|${sortedLicenses}`;
-        
+
         if (existingCrewByParticipants.has(crewKey)) {
           // Même équipage (même catégorie, mêmes participants)
           // On passe cette inscription car l'équipage existe déjà
-          if (processedInscriptions % 100 === 0 || processedInscriptions === totalInscriptions) {
-            console.log(`  ⏭️  Équipage déjà existant ignoré: ${club_name} (${inscriptionLicenses.length} participants)`);
+          if (
+            processedInscriptions % 100 === 0 ||
+            processedInscriptions === totalInscriptions
+          ) {
+            console.log(
+              `  ⏭️  Équipage déjà existant ignoré: ${club_name} (${inscriptionLicenses.length} participants)`
+            );
           }
           continue;
         }
       } else {
         // Pas de numéros de licence, on ne peut pas comparer efficacement
         // On va créer l'équipage mais avec un warning
-        console.warn(`⚠️  Inscription sans numéros de licence pour ${club_name}, création de l'équipage...`);
+        console.warn(
+          `⚠️  Inscription sans numéros de licence pour ${club_name}, création de l'équipage...`
+        );
       }
 
       // Créer le nouvel équipage
@@ -1037,14 +1157,14 @@ module.exports.updateEventFromManifestation = async (manifestationId, event_id, 
           status: REGISTERED, // Statut par défaut : inscrit
         });
         newCrewCount++;
-        
+
         // Ajouter à la liste des équipages existants pour éviter les doublons dans cette session
         if (inscriptionLicenses.length > 0) {
-          const sortedLicenses = inscriptionLicenses.sort().join('|');
+          const sortedLicenses = inscriptionLicenses.sort().join("|");
           const newCrewKey = `${category_id}|${sortedLicenses}`;
           existingCrewByParticipants.set(newCrewKey, true);
         }
-        
+
         // Récupérer la catégorie pour les détails
         const category = await Category.findByPk(category_id);
         newCrews.push({
@@ -1180,7 +1300,9 @@ module.exports.updateEventFromManifestation = async (manifestationId, event_id, 
 
     console.log(`✅ ${newCrewCount} nouveaux équipages créés`);
     console.log(`✅ ${newParticipantCount} nouveaux participants créés`);
-    console.log(`✅ ${totalParticipantCount} participants totaux liés aux nouveaux équipages`);
+    console.log(
+      `✅ ${totalParticipantCount} participants totaux liés aux nouveaux équipages`
+    );
 
     return {
       event_id,

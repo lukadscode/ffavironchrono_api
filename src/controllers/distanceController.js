@@ -22,8 +22,18 @@ exports.getDistances = async (req, res) => {
     const list = await Distance.findAll({
       order: [
         ["is_time_based", "ASC"], // Distances d'abord (false = 0), puis temps (true = 1)
-        [sequelize.literal("CASE WHEN meters IS NOT NULL THEN meters ELSE 999999 END"), "ASC"], // Pour les distances
-        [sequelize.literal("CASE WHEN duration_seconds IS NOT NULL THEN duration_seconds ELSE 999999 END"), "ASC"], // Pour les temps
+        [
+          sequelize.literal(
+            "CASE WHEN meters IS NOT NULL THEN meters ELSE 999999 END"
+          ),
+          "ASC",
+        ], // Pour les distances
+        [
+          sequelize.literal(
+            "CASE WHEN duration_seconds IS NOT NULL THEN duration_seconds ELSE 999999 END"
+          ),
+          "ASC",
+        ], // Pour les temps
       ],
     });
     res.json({ status: "success", data: list });
@@ -35,22 +45,38 @@ exports.getDistances = async (req, res) => {
 exports.getDistancesByEvent = async (req, res) => {
   try {
     const { event_id } = req.params;
+    const EventDistance = require("../models/EventDistance");
 
-    const distances = await Distance.findAll({
+    // Récupérer les distances via EventDistance pour cet événement
+    const eventDistances = await EventDistance.findAll({
+      where: { event_id },
       include: [
         {
-          model: Event,
-          where: { id: event_id },
-          attributes: [],
+          model: Distance,
+          as: "distance",
+          required: true,
         },
       ],
-      group: ["Distance.id"],
-      order: [
-        ["is_time_based", "ASC"], // Distances d'abord, puis temps
-        [sequelize.literal("CASE WHEN meters IS NOT NULL THEN meters ELSE 999999 END"), "ASC"],
-        [sequelize.literal("CASE WHEN duration_seconds IS NOT NULL THEN duration_seconds ELSE 999999 END"), "ASC"],
-      ],
     });
+
+    // Extraire les distances
+    const distances = eventDistances
+      .map((ed) => ed.distance)
+      .filter((d) => d !== null)
+      .sort((a, b) => {
+        // Trier : distances d'abord, puis temps
+        if (a.is_time_based !== b.is_time_based) {
+          return a.is_time_based ? 1 : -1;
+        }
+        if (a.meters !== b.meters) {
+          const aMeters = a.meters || 999999;
+          const bMeters = b.meters || 999999;
+          return aMeters - bMeters;
+        }
+        const aDuration = a.duration_seconds || 999999;
+        const bDuration = b.duration_seconds || 999999;
+        return aDuration - bDuration;
+      });
 
     res.json({ status: "success", data: distances });
   } catch (err) {

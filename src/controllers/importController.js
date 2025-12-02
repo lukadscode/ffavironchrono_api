@@ -12,52 +12,61 @@ const { Op } = require("sequelize");
 exports.importManifestation = async (req, res) => {
   const startTime = Date.now();
   let event_id = null;
-  
+
   try {
     const { id } = req.params;
     console.log(`🚀 Début de l'import de la manifestation ${id}...`);
-    
+
     const result = await importManifestation(id, req);
     event_id = result.event_id;
-    
+
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
     console.log(`✅ Import terminé avec succès en ${duration}s`);
-    console.log(`📊 Résumé: ${result.crews_count} équipages, ${result.participants_count} participants, ${result.categories_count} catégories`);
-    
+    console.log(
+      `📊 Résumé: ${result.crews_count} équipages, ${result.participants_count} participants, ${result.categories_count} catégories`
+    );
+
     res.status(201).json({ status: "success", data: result });
   } catch (err) {
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
     console.error(`❌ Import error après ${duration}s:`, err);
     console.error("Stack trace:", err.stack);
-    
+
     // Si un événement a été créé, on pourrait le supprimer pour éviter les données partiellement importées
     // Mais on ne le fait pas automatiquement car l'utilisateur pourrait vouloir réessayer
-    
+
     // Retourner un message d'erreur plus détaillé
     const errorMessage = err.message || "Erreur inconnue lors de l'import";
-    const errorDetails = process.env.NODE_ENV === "development" 
-      ? { 
-          message: errorMessage,
-          stack: err.stack,
-          duration: `${duration}s`,
-          event_id: event_id || null
-        }
-      : { 
-          message: errorMessage,
-          duration: `${duration}s`
-        };
-    
-    res.status(500).json({ 
-      status: "error", 
+    const errorDetails =
+      process.env.NODE_ENV === "development"
+        ? {
+            message: errorMessage,
+            stack: err.stack,
+            duration: `${duration}s`,
+            event_id: event_id || null,
+          }
+        : {
+            message: errorMessage,
+            duration: `${duration}s`,
+          };
+
+    res.status(500).json({
+      status: "error",
       message: errorMessage,
-      details: errorDetails
+      details: errorDetails,
     });
   }
 };
 
 exports.generateInitialRaces = async (req, res) => {
   try {
-    const { phase_id, lane_count, start_time, interval_minutes, category_order } = req.body;
+    const {
+      phase_id,
+      lane_count,
+      start_time,
+      interval_minutes,
+      category_order,
+    } = req.body;
 
     if (!phase_id || !lane_count || lane_count < 1)
       return res
@@ -75,13 +84,21 @@ exports.generateInitialRaces = async (req, res) => {
     let categories = await Category.findAll({
       include: [
         { model: Crew, where: { event_id }, required: true },
-        { model: Distance, as: "distance", required: false },
+        {
+          model: Distance,
+          as: "distance",
+          required: false,
+        },
       ],
       order: [["code", "ASC"]],
     });
 
     // Trier les catégories selon l'ordre fourni (si présent)
-    if (category_order && Array.isArray(category_order) && category_order.length > 0) {
+    if (
+      category_order &&
+      Array.isArray(category_order) &&
+      category_order.length > 0
+    ) {
       const orderMap = new Map();
       category_order.forEach((code, index) => {
         orderMap.set(code, index);
@@ -99,7 +116,9 @@ exports.generateInitialRaces = async (req, res) => {
       });
 
       console.log(
-        `📋 Catégories triées selon l'ordre personnalisé: ${category_order.join(", ")}`
+        `📋 Catégories triées selon l'ordre personnalisé: ${category_order.join(
+          ", "
+        )}`
       );
     } else {
       console.log("📋 Catégories triées par code (ordre par défaut)");
@@ -120,7 +139,10 @@ exports.generateInitialRaces = async (req, res) => {
 
       if (distanceId && category.distance) {
         let distanceLabel;
-        if (category.distance.is_time_based && category.distance.duration_seconds) {
+        if (
+          category.distance.is_time_based &&
+          category.distance.duration_seconds
+        ) {
           const minutes = Math.floor(category.distance.duration_seconds / 60);
           const seconds = category.distance.duration_seconds % 60;
           if (minutes > 0 && seconds > 0) {
@@ -205,7 +227,14 @@ exports.generateInitialRaces = async (req, res) => {
 
 exports.generateRacesFromSeries = async (req, res) => {
   try {
-    const { phase_id, lane_count, start_time, interval_minutes, series, save_only } = req.body;
+    const {
+      phase_id,
+      lane_count,
+      start_time,
+      interval_minutes,
+      series,
+      save_only,
+    } = req.body;
 
     if (!phase_id || !lane_count || lane_count < 1)
       return res
@@ -213,9 +242,10 @@ exports.generateRacesFromSeries = async (req, res) => {
         .json({ status: "error", message: "phase_id et lane_count requis" });
 
     if (!series || !Array.isArray(series) || series.length === 0)
-      return res
-        .status(400)
-        .json({ status: "error", message: "series est requis et doit être un tableau non vide" });
+      return res.status(400).json({
+        status: "error",
+        message: "series est requis et doit être un tableau non vide",
+      });
 
     const phase = await RacePhase.findByPk(phase_id);
     if (!phase)
@@ -288,7 +318,13 @@ exports.generateRacesFromSeries = async (req, res) => {
         const currentUsage = categoryUsageCount.get(code) || 0;
         if (currentUsage + requestedCount > availableCount) {
           validationErrors.push(
-            `Série ${i + 1}: La catégorie "${code}" n'a que ${availableCount} équipages disponibles (${category.Crews?.length || 0} au total, ${alreadyAssignedCrewIds.size} déjà assignés), mais ${currentUsage + requestedCount} sont demandés au total`
+            `Série ${
+              i + 1
+            }: La catégorie "${code}" n'a que ${availableCount} équipages disponibles (${
+              category.Crews?.length || 0
+            } au total, ${alreadyAssignedCrewIds.size} déjà assignés), mais ${
+              currentUsage + requestedCount
+            } sont demandés au total`
           );
         }
 
@@ -306,14 +342,18 @@ exports.generateRacesFromSeries = async (req, res) => {
       // Vérifier que le total ne dépasse pas lane_count
       if (totalParticipants > lane_count) {
         validationErrors.push(
-          `Série ${i + 1}: Le nombre total de participants (${totalParticipants}) dépasse le nombre de lignes d'eau (${lane_count})`
+          `Série ${
+            i + 1
+          }: Le nombre total de participants (${totalParticipants}) dépasse le nombre de lignes d'eau (${lane_count})`
         );
       }
 
       // Vérifier que toutes les catégories ont la même distance (ou aucune)
       if (distances.size > 1) {
         validationErrors.push(
-          `Série ${i + 1}: Les catégories ont des distances différentes. Toutes les catégories d'une série doivent avoir la même distance.`
+          `Série ${
+            i + 1
+          }: Les catégories ont des distances différentes. Toutes les catégories d'une série doivent avoir la même distance.`
         );
       }
     }
@@ -476,7 +516,7 @@ exports.generateRacesFromSeries = async (req, res) => {
 exports.updateEventFromManifestation = async (req, res) => {
   const startTime = Date.now();
   let event_id = null;
-  
+
   try {
     const { id } = req.params; // manifestation_id
     const { event_id: providedEventId } = req.body;
@@ -490,50 +530,60 @@ exports.updateEventFromManifestation = async (req, res) => {
 
     event_id = providedEventId;
 
-    console.log(`🔄 Début de la mise à jour de l'événement ${event_id} depuis la manifestation ${id}...`);
-    
-    const result = await importManifestation.updateEventFromManifestation(id, event_id, req);
-    
+    console.log(
+      `🔄 Début de la mise à jour de l'événement ${event_id} depuis la manifestation ${id}...`
+    );
+
+    const result = await importManifestation.updateEventFromManifestation(
+      id,
+      event_id,
+      req
+    );
+
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
     console.log(`✅ Mise à jour terminée avec succès en ${duration}s`);
-    console.log(`📊 Résumé: ${result.new_crews_count} nouveaux équipages, ${result.new_participants_count} nouveaux participants, ${result.new_categories_count} nouvelles catégories`);
-    
-    res.status(200).json({ 
-      status: "success", 
+    console.log(
+      `📊 Résumé: ${result.new_crews_count} nouveaux équipages, ${result.new_participants_count} nouveaux participants, ${result.new_categories_count} nouvelles catégories`
+    );
+
+    res.status(200).json({
+      status: "success",
       message: "Événement mis à jour avec succès",
-      data: result 
+      data: result,
     });
   } catch (err) {
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
     console.error(`❌ Erreur de mise à jour après ${duration}s:`, err);
     console.error("Stack trace:", err.stack);
-    
-    const errorMessage = err.message || "Erreur inconnue lors de la mise à jour";
-    const errorDetails = process.env.NODE_ENV === "development" 
-      ? { 
-          message: errorMessage,
-          stack: err.stack,
-          duration: `${duration}s`,
-          event_id: event_id || null
-        }
-      : { 
-          message: errorMessage,
-          duration: `${duration}s`
-        };
-    
+
+    const errorMessage =
+      err.message || "Erreur inconnue lors de la mise à jour";
+    const errorDetails =
+      process.env.NODE_ENV === "development"
+        ? {
+            message: errorMessage,
+            stack: err.stack,
+            duration: `${duration}s`,
+            event_id: event_id || null,
+          }
+        : {
+            message: errorMessage,
+            duration: `${duration}s`,
+          };
+
     // Vérifier si c'est une erreur 404 (événement introuvable)
     if (errorMessage.includes("introuvable")) {
-      return res.status(404).json({ 
-        status: "error", 
+      return res.status(404).json({
+        status: "error",
         message: errorMessage,
-        details: errorDetails
+        details: errorDetails,
       });
     }
-    
-    res.status(500).json({ 
-      status: "error", 
+
+    res.status(500).json({
+      status: "error",
       message: errorMessage,
-      details: errorDetails
+      details: errorDetails,
     });
   }
 };

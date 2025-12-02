@@ -16,6 +16,7 @@ const Timing = require("./Timing");
 const TimingAssignment = require("./TimingAssignment");
 const IndoorRaceResult = require("./IndoorRaceResult");
 const IndoorParticipantResult = require("./IndoorParticipantResult");
+const EventDistance = require("./EventDistance");
 
 // Relations User
 User.hasMany(UserSession, { foreignKey: "user_id" });
@@ -37,11 +38,17 @@ Event.belongsToMany(Category, {
 Crew.belongsTo(Event, { foreignKey: "event_id" });
 
 // Relations Crew / Participant
-Crew.hasMany(CrewParticipant, { foreignKey: "crew_id", as: "crew_participants" });
+Crew.hasMany(CrewParticipant, {
+  foreignKey: "crew_id",
+  as: "crew_participants",
+});
 CrewParticipant.belongsTo(Crew, { foreignKey: "crew_id" });
 
 Participant.hasMany(CrewParticipant, { foreignKey: "participant_id" });
-CrewParticipant.belongsTo(Participant, { foreignKey: "participant_id", as: "participant" });
+CrewParticipant.belongsTo(Participant, {
+  foreignKey: "participant_id",
+  as: "participant",
+});
 
 // Relations Race / Phase / Distance
 Race.belongsTo(RacePhase, { foreignKey: "phase_id" });
@@ -50,7 +57,7 @@ RacePhase.hasMany(Race, { foreignKey: "phase_id" });
 Race.belongsTo(Distance, { foreignKey: "distance_id" });
 Distance.hasMany(Race, { foreignKey: "distance_id" });
 
-// Relation Category / Distance
+// Relation Category / Distance (directe via category.distance_id)
 Category.belongsTo(Distance, { foreignKey: "distance_id", as: "distance" });
 Distance.hasMany(Category, { foreignKey: "distance_id" });
 
@@ -94,8 +101,10 @@ UserEvent.belongsTo(Event, { foreignKey: "event_id" });
 UserEvent.belongsTo(User, { foreignKey: "user_id", as: "user" });
 UserEvent.belongsTo(Event, { foreignKey: "event_id", as: "event" });
 
-Event.hasMany(Distance, { foreignKey: "event_id" });
-Distance.belongsTo(Event, { foreignKey: "event_id" });
+// NOTE: Les distances ne sont plus liées directement aux événements
+// L'association se fait via EventDistance
+// Event.hasMany(Distance, { foreignKey: "event_id" }); // DÉPRÉCIÉ
+// Distance.belongsTo(Event, { foreignKey: "event_id" }); // DÉPRÉCIÉ
 
 Event.hasMany(TimingPoint, { foreignKey: "event_id", as: "timing_points" });
 TimingPoint.belongsTo(Event, { foreignKey: "event_id" });
@@ -118,7 +127,6 @@ Category.hasMany(EventCategory, { foreignKey: "category_id" });
 EventCategory.belongsTo(Event, { foreignKey: "event_id" });
 Event.hasMany(EventCategory, { foreignKey: "event_id" });
 
-
 Race.hasMany(RaceCrew, { foreignKey: "race_id" });
 RaceCrew.belongsTo(Race, { foreignKey: "race_id" });
 
@@ -136,7 +144,10 @@ const RankingPoint = require("./RankingPoint");
 Event.hasMany(ClubRanking, { foreignKey: "event_id" });
 ClubRanking.belongsTo(Event, { foreignKey: "event_id" });
 
-ClubRanking.hasMany(RankingPoint, { foreignKey: "club_ranking_id", as: "ranking_points" });
+ClubRanking.hasMany(RankingPoint, {
+  foreignKey: "club_ranking_id",
+  as: "ranking_points",
+});
 RankingPoint.belongsTo(ClubRanking, { foreignKey: "club_ranking_id" });
 
 RankingPoint.belongsTo(Race, { foreignKey: "race_id" });
@@ -158,14 +169,33 @@ User.hasMany(Notification, { foreignKey: "created_by" });
 IndoorRaceResult.belongsTo(Race, { foreignKey: "race_id", as: "race" });
 Race.hasMany(IndoorRaceResult, { foreignKey: "race_id", as: "indoor_results" });
 
-IndoorParticipantResult.belongsTo(IndoorRaceResult, { 
-  foreignKey: "indoor_race_result_id", 
-  as: "indoor_race_result" 
+IndoorParticipantResult.belongsTo(IndoorRaceResult, {
+  foreignKey: "indoor_race_result_id",
+  as: "indoor_race_result",
 });
-IndoorRaceResult.hasMany(IndoorParticipantResult, { 
-  foreignKey: "indoor_race_result_id", 
-  as: "participant_results" 
+IndoorRaceResult.hasMany(IndoorParticipantResult, {
+  foreignKey: "indoor_race_result_id",
+  as: "participant_results",
 });
 
 IndoorParticipantResult.belongsTo(Crew, { foreignKey: "crew_id", as: "crew" });
-Crew.hasMany(IndoorParticipantResult, { foreignKey: "crew_id", as: "indoor_results" });
+Crew.hasMany(IndoorParticipantResult, {
+  foreignKey: "crew_id",
+  as: "indoor_results",
+});
+
+// Relations EventDistance (table intermédiaire Event <-> Distance)
+EventDistance.belongsTo(Event, { foreignKey: "event_id", as: "event" });
+Event.hasMany(EventDistance, {
+  foreignKey: "event_id",
+  as: "distances",
+});
+
+EventDistance.belongsTo(Distance, {
+  foreignKey: "distance_id",
+  as: "distance",
+});
+Distance.hasMany(EventDistance, {
+  foreignKey: "distance_id",
+  as: "events",
+});

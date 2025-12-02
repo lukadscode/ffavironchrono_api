@@ -51,6 +51,11 @@ exports.getCategoriesByEventWithCrews = async (req, res) => {
           where: { event_id },
           attributes: [],
         },
+        {
+          model: require("../models/Distance"),
+          as: "distance",
+          required: false,
+        },
       ],
       order: [["label", "ASC"]],
     });
@@ -63,7 +68,7 @@ exports.getCategoriesByEventWithCrews = async (req, res) => {
       gender: cat.gender,
       boat_seats: cat.boat_seats,
       has_coxswain: cat.has_coxswain,
-      // 🔗 ID de la distance associée à la catégorie (pour le front)
+      // 🔗 ID de la distance associée à la catégorie (via category.distance_id)
       distance_id: cat.distance_id,
       crew_count: cat.Crews?.length || 0,
       crews: cat.Crews || [],

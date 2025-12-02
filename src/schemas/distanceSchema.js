@@ -1,7 +1,7 @@
 const Joi = require("joi");
 
 exports.createSchema = Joi.object({
-  event_id: Joi.string().required(),
+  // NOTE: event_id retiré - les distances sont maintenant globales et partagées entre événements
   meters: Joi.number()
     .integer()
     .min(100)
