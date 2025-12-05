@@ -190,7 +190,32 @@ exports.generateInitialRaces = async (req, res) => {
         raceNumber++;
       }
 
-      const shuffledCrews = crews.sort(() => 0.5 - Math.random());
+      // Trier les équipages par temps pronostique (du plus rapide au plus lent)
+      // Les équipages sans temps pronostique sont placés à la fin
+      const sortedCrews = [...crews].sort((a, b) => {
+        const timeA = a.temps_pronostique;
+        const timeB = b.temps_pronostique;
+        
+        // Si les deux ont un temps pronostique, trier du plus rapide au plus lent
+        if (timeA !== null && timeA !== undefined && timeB !== null && timeB !== undefined) {
+          return timeA - timeB; // Plus petit temps = plus rapide = en premier
+        }
+        
+        // Si seul A a un temps, A vient avant B
+        if (timeA !== null && timeA !== undefined) {
+          return -1;
+        }
+        
+        // Si seul B a un temps, B vient avant A
+        if (timeB !== null && timeB !== undefined) {
+          return 1;
+        }
+        
+        // Si aucun n'a de temps, conserver l'ordre original (ou aléatoire)
+        return 0;
+      });
+      
+      const shuffledCrews = sortedCrews;
       const baseSize = Math.floor(crewCount / raceCount);
       let remainder = crewCount % raceCount;
       let index = 0;
@@ -461,9 +486,33 @@ exports.generateRacesFromSeries = async (req, res) => {
             !alreadyAssignedCrewIds.has(crew.id)
         );
 
-        // Sélectionner aléatoirement le nombre demandé
-        const shuffled = unassignedCrews.sort(() => 0.5 - Math.random());
-        const selectedCrews = shuffled.slice(0, requestedCount);
+        // Trier les équipages par temps pronostique (du plus rapide au plus lent)
+        // Les équipages sans temps pronostique sont placés à la fin
+        const sortedCrews = [...unassignedCrews].sort((a, b) => {
+          const timeA = a.temps_pronostique;
+          const timeB = b.temps_pronostique;
+          
+          // Si les deux ont un temps pronostique, trier du plus rapide au plus lent
+          if (timeA !== null && timeA !== undefined && timeB !== null && timeB !== undefined) {
+            return timeA - timeB; // Plus petit temps = plus rapide = en premier
+          }
+          
+          // Si seul A a un temps, A vient avant B
+          if (timeA !== null && timeA !== undefined) {
+            return -1;
+          }
+          
+          // Si seul B a un temps, B vient avant A
+          if (timeB !== null && timeB !== undefined) {
+            return 1;
+          }
+          
+          // Si aucun n'a de temps, conserver l'ordre original
+          return 0;
+        });
+        
+        // Sélectionner les équipages triés (du plus rapide au plus lent)
+        const selectedCrews = sortedCrews.slice(0, requestedCount);
 
         // Créer les RaceCrew pour chaque équipage sélectionné
         for (const crew of selectedCrews) {
