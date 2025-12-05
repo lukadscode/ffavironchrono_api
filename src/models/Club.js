@@ -21,6 +21,10 @@ const Club = sequelize.define(
       allowNull: false,
       unique: true, // Le code doit être unique
     },
+    code_court: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+    },
     etat: {
       type: DataTypes.STRING(1), // "A" pour actif, etc.
       allowNull: true,
@@ -45,6 +49,9 @@ const Club = sequelize.define(
       },
       {
         fields: ["nom_court"], // Index pour recherche par nom_court
+      },
+      {
+        fields: ["code_court"], // Index pour recherche par code_court
       },
       {
         fields: ["type"], // Index pour filtrer par type

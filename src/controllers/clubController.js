@@ -129,7 +129,7 @@ exports.syncClubs = async (req, res) => {
  */
 exports.getClubs = async (req, res) => {
   try {
-    const { code, nom_court, type } = req.query;
+    const { code, nom_court, code_court, type } = req.query;
 
     const whereClause = {};
 
@@ -141,6 +141,11 @@ exports.getClubs = async (req, res) => {
     // Filtrer par nom_court si fourni
     if (nom_court) {
       whereClause.nom_court = nom_court;
+    }
+
+    // Filtrer par code_court si fourni
+    if (code_court) {
+      whereClause.code_court = code_court;
     }
 
     // Filtrer par type si fourni
@@ -229,6 +234,130 @@ exports.getClubByNomCourt = async (req, res) => {
     res.status(500).json({
       status: "error",
       message: err.message || "Erreur lors de la récupération du club",
+    });
+  }
+};
+
+/**
+ * Récupérer un club par son code_court
+ *
+ * GET /clubs/code-court/:code_court
+ */
+exports.getClubByCodeCourt = async (req, res) => {
+  try {
+    const { code_court } = req.params;
+
+    const club = await Club.findOne({
+      where: { code_court },
+    });
+
+    if (!club) {
+      return res.status(404).json({
+        status: "error",
+        message: "Club non trouvé",
+      });
+    }
+
+    res.json({
+      status: "success",
+      data: club,
+    });
+  } catch (err) {
+    console.error("❌ Erreur lors de la récupération du club:", err.message);
+    res.status(500).json({
+      status: "error",
+      message: err.message || "Erreur lors de la récupération du club",
+    });
+  }
+};
+
+/**
+ * Importer les codes courts des clubs depuis un fichier JSON
+ * Le fichier doit contenir un tableau d'objets avec les champs "code" et "code_court"
+ *
+ * POST /clubs/import-code-court
+ * Body: { clubs: [{ code: "C130001", code_court: "CAM" }, ...] }
+ */
+exports.importCodeCourt = async (req, res) => {
+  try {
+    const { clubs } = req.body;
+
+    if (!clubs || !Array.isArray(clubs) || clubs.length === 0) {
+      return res.status(400).json({
+        status: "error",
+        message:
+          "Le body doit contenir un tableau 'clubs' avec au moins un élément",
+      });
+    }
+
+    let updatedCount = 0;
+    let notFoundCount = 0;
+    let errorCount = 0;
+    const errors = [];
+
+    for (const clubData of clubs) {
+      // Vérifier que les champs requis sont présents
+      if (!clubData.code) {
+        errors.push({
+          club: clubData,
+          error: "Le champ 'code' est requis",
+        });
+        errorCount++;
+        continue;
+      }
+
+      if (!clubData.code_court) {
+        errors.push({
+          club: clubData,
+          error: "Le champ 'code_court' est requis",
+        });
+        errorCount++;
+        continue;
+      }
+
+      // Trouver le club par son code
+      const club = await Club.findOne({
+        where: { code: clubData.code },
+      });
+
+      if (!club) {
+        notFoundCount++;
+        errors.push({
+          code: clubData.code,
+          error: "Club non trouvé avec ce code",
+        });
+        continue;
+      }
+
+      // Mettre à jour le code_court
+      club.code_court = clubData.code_court;
+      await club.save();
+      updatedCount++;
+    }
+
+    console.log(
+      `✅ Import des codes courts terminé: ${updatedCount} mis à jour, ${notFoundCount} non trouvés, ${errorCount} erreurs`
+    );
+
+    res.json({
+      status: "success",
+      message: "Import des codes courts terminé",
+      data: {
+        total: clubs.length,
+        updated: updatedCount,
+        not_found: notFoundCount,
+        errors: errorCount,
+        details: errors.length > 0 ? errors : undefined,
+      },
+    });
+  } catch (err) {
+    console.error(
+      "❌ Erreur lors de l'import des codes courts:",
+      err.message
+    );
+    res.status(500).json({
+      status: "error",
+      message: err.message || "Erreur lors de l'import des codes courts",
     });
   }
 };
