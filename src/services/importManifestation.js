@@ -117,6 +117,89 @@ function extractDistance(libelle) {
 }
 
 /**
+ * Parse un temps pronostique depuis une chaîne
+ * Formats supportés :
+ * - "Temps pronostique: 8:00.0" => 480 secondes
+ * - "Temps pronostique: 1:08:00.0" => 4080 secondes
+ * - "8:00.0" => 480 secondes
+ * - "1:08:00.0" => 4080 secondes
+ * Retourne null si le format n'est pas reconnu
+ */
+function parseTempsPronostique(timeStr) {
+  if (!timeStr || typeof timeStr !== "string") return null;
+
+  // Extraire le temps si format "Temps pronostique: 8:00.0"
+  let timeValue = timeStr.trim();
+  const match = timeValue.match(/temps\s+pronostique\s*:\s*(.+)/i);
+  if (match) {
+    timeValue = match[1].trim();
+  }
+
+  // Parser le format MM:SS.S ou HH:MM:SS.S
+  // Format: "8:00.0" ou "1:08:00.0"
+  const parts = timeValue.split(":");
+  if (parts.length === 2) {
+    // Format MM:SS.S
+    const minutes = parseInt(parts[0], 10);
+    const seconds = parseFloat(parts[1]);
+    if (!isNaN(minutes) && !isNaN(seconds)) {
+      return Math.round(minutes * 60 + seconds);
+    }
+  } else if (parts.length === 3) {
+    // Format HH:MM:SS.S
+    const hours = parseInt(parts[0], 10);
+    const minutes = parseInt(parts[1], 10);
+    const seconds = parseFloat(parts[2]);
+    if (!isNaN(hours) && !isNaN(minutes) && !isNaN(seconds)) {
+      return Math.round(hours * 3600 + minutes * 60 + seconds);
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Calcule le temps pronostique total pour un équipage
+ * Somme tous les temps pronostiques des rameurs (1-8) et du barreur
+ * ainsi que le temps_pronostique au niveau de l'inscription
+ */
+function calculateTempsPronostique(inscription) {
+  let totalSeconds = 0;
+
+  // Extraire les temps des rameurs (1 à 8)
+  for (let i = 1; i <= 8; i++) {
+    const infos = inscription[`infos_complementaires_rameur_${i}`];
+    if (infos) {
+      const seconds = parseTempsPronostique(infos);
+      if (seconds !== null) {
+        totalSeconds += seconds;
+      }
+    }
+  }
+
+  // Extraire le temps du barreur
+  if (inscription.infos_complementaires_barreur) {
+    const seconds = parseTempsPronostique(
+      inscription.infos_complementaires_barreur
+    );
+    if (seconds !== null) {
+      totalSeconds += seconds;
+    }
+  }
+
+  // Ajouter le temps_pronostique au niveau de l'inscription si présent
+  if (inscription.temps_pronostique) {
+    const seconds = parseTempsPronostique(inscription.temps_pronostique);
+    if (seconds !== null) {
+      totalSeconds += seconds;
+    }
+  }
+
+  // Retourner null si aucun temps n'a été trouvé, sinon retourner le total
+  return totalSeconds > 0 ? totalSeconds : null;
+}
+
+/**
  * Trouve ou crée un participant de manière cohérente
  * Si le participant existe déjà (même nom/prénom), il est réutilisé
  * pour éviter les doublons quand un participant participe à plusieurs courses
@@ -555,6 +638,9 @@ module.exports = async (manifestationId, req) => {
       const club_code =
         ins.num_club_rameur_1 || ins.club_abrege_rameur_1 || club_name || "";
 
+      // Calculer le temps pronostique (somme de tous les temps des rameurs)
+      const tempsPronostique = calculateTempsPronostique(ins);
+
       // Créer l'équipage
       let crew;
       try {
@@ -565,6 +651,7 @@ module.exports = async (manifestationId, req) => {
           club_name: club_name || "Non spécifié",
           club_code: club_code,
           status: REGISTERED, // Statut par défaut : inscrit
+          temps_pronostique: tempsPronostique,
         });
         crewCount++;
       } catch (crewError) {
@@ -1107,6 +1194,9 @@ module.exports.updateEventFromManifestation = async (
       const club_code =
         ins.num_club_rameur_1 || ins.club_abrege_rameur_1 || club_name || "";
 
+      // Calculer le temps pronostique (somme de tous les temps des rameurs)
+      const tempsPronostique = calculateTempsPronostique(ins);
+
       // Récupérer les numéros de licence des participants de cette inscription
       const inscriptionLicenses = [];
       for (let i = 1; i <= 8; i++) {
@@ -1155,6 +1245,7 @@ module.exports.updateEventFromManifestation = async (
           club_name: club_name || "Non spécifié",
           club_code: club_code,
           status: REGISTERED, // Statut par défaut : inscrit
+          temps_pronostique: tempsPronostique,
         });
         newCrewCount++;
 

@@ -41,6 +41,11 @@ const Crew = sequelize.define(
       type: DataTypes.STRING,
       allowNull: true,
     },
+    temps_pronostique: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      comment: "Temps pronostique en secondes (somme des temps des rameurs)",
+    },
   },
   {
     tableName: "crews",
