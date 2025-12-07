@@ -1,29 +1,35 @@
-# Guide Frontend : Résultats d'Événement par Catégorie
+# Guide Frontend : Résultats d'Événement Indoor par Catégorie
 
 ## 📋 Vue d'ensemble
 
-Cette route permet de récupérer tous les résultats d'un événement, **groupés par catégorie**. Les résultats sont automatiquement triés par temps (du plus rapide au plus lent) et les positions sont calculées pour chaque catégorie.
+Cette route permet de récupérer tous les résultats **indoor** d'un événement, **groupés par catégorie**. Les résultats sont automatiquement triés par place (1, 2, 3, ...) dans chaque catégorie.
 
 Cette route est idéale pour afficher :
-- Un classement général par catégorie
+- Un classement général par catégorie pour les courses indoor
 - Les podiums par catégorie
 - Les statistiques par catégorie
-- Un tableau de résultats complet organisé par catégorie
+- Un tableau de résultats complet organisé par catégorie avec les informations détaillées des équipages (code club, participants)
 
 ## 📡 Endpoint API
 
-### GET `/events/:id/results-by-category`
+### GET `/indoor-results/event/:event_id/bycategorie`
 
-Récupère tous les résultats d'un événement, groupés et triés par catégorie.
+Récupère tous les résultats indoor d'un événement, groupés et triés par catégorie.
 
 **Paramètres** :
-- `id` (dans l'URL) : ID de l'événement
+- `event_id` (dans l'URL) : ID de l'événement
+
+**Authentification** : Requise (Bearer token)
 
 **Exemple de requête** :
 
 ```typescript
 const eventId = "7c38e42f-198a-4bd6-9c59-9854094a1ea0";
-const response = await fetch(`/events/${eventId}/results-by-category`);
+const response = await fetch(`/indoor-results/event/${eventId}/bycategorie`, {
+  headers: {
+    Authorization: `Bearer ${token}`,
+  },
+});
 const data = await response.json();
 ```
 
@@ -51,19 +57,40 @@ interface CategoryResult {
 interface Result {
   race_id: string;
   race_number: number;
-  phase_id: string;
-  phase_name: string;
-  crew_id: string;
-  lane: number;
-  club_name: string | null;
-  club_code: string | null;
-  position: number | null;        // Position dans la catégorie (1, 2, 3, ...)
-  finish_time: string | null;     // Timestamp ISO de l'arrivée
-  final_time: string | null;      // Temps en millisecondes (string)
-  time_seconds: string | null;    // Temps en secondes avec décimales (string, ex: "420.000")
-  time_formatted: string | null;  // Temps formaté lisible (ex: "7:00.000" ou "45.500")
-  has_timing: boolean;            // Indique si l'équipage a un temps enregistré
-  // Note: category n'est PAS inclus dans le résultat individuel car il est déjà au niveau du groupement
+  race_name: string | null;
+  place: number | null;           // Place dans la course (1, 2, 3, ...)
+  time_display: string | null;   // Temps formaté lisible (ex: "7:00.0")
+  time_ms: number | null;         // Temps en millisecondes
+  score: number | null;
+  distance: number | null;        // Distance en mètres
+  avg_pace: string | null;        // Allure moyenne
+  spm: number | null;             // Coups par minute
+  calories: number | null;
+  machine_type: string | null;
+  logged_time: string | null;    // Timestamp ISO
+  crew_id: string | null;
+  crew: {
+    id: string;
+    club_name: string | null;
+    club_code: string | null;     // Code du club
+    category: {
+      id: string;
+      code: string | null;
+      label: string | null;
+      age_group: string | null;
+      gender: "Homme" | "Femme" | "Mixte" | null;
+    } | null;
+    participants: Participant[];   // Liste des participants de l'équipage
+  } | null;
+}
+
+interface Participant {
+  id: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  license_number: string | null;
+  seat_position: number | null;  // Position dans le bateau (1-8)
+  is_coxswain: boolean;            // Indique si c'est le barreur
 }
 ```
 
@@ -85,34 +112,86 @@ interface Result {
         {
           "race_id": "race-uuid-1",
           "race_number": 1,
-          "phase_id": "phase-uuid-1",
-          "phase_name": "Série A",
+          "race_name": "Course 1",
+          "place": 1,
+          "time_display": "7:00.0",
+          "time_ms": 420000,
+          "score": 1000,
+          "distance": 2000,
+          "avg_pace": "1:45.0",
+          "spm": 32,
+          "calories": 250,
+          "machine_type": "Concept2",
+          "logged_time": "2025-01-15T10:30:45.000Z",
           "crew_id": "crew-uuid-1",
-          "lane": 1,
-          "club_name": "Club Aviron Paris",
-          "club_code": "PAR",
-          "position": 1,
-          "finish_time": "2025-01-15T10:30:45.000Z",
-          "final_time": "420000",
-          "time_seconds": "420.000",
-          "time_formatted": "7:00.000",
-          "has_timing": true
+          "crew": {
+            "id": "crew-uuid-1",
+            "club_name": "Club Aviron Paris",
+            "club_code": "PAR",
+            "category": {
+              "id": "cat-uuid-1",
+              "code": "M23",
+              "label": "Hommes 23 ans",
+              "age_group": "23",
+              "gender": "Homme"
+            },
+            "participants": [
+              {
+                "id": "participant-uuid-1",
+                "first_name": "Jean",
+                "last_name": "Dupont",
+                "license_number": "12345",
+                "seat_position": 1,
+                "is_coxswain": false
+              },
+              {
+                "id": "participant-uuid-2",
+                "first_name": "Pierre",
+                "last_name": "Martin",
+                "license_number": "12346",
+                "seat_position": 2,
+                "is_coxswain": false
+              }
+            ]
+          }
         },
         {
           "race_id": "race-uuid-2",
           "race_number": 2,
-          "phase_id": "phase-uuid-1",
-          "phase_name": "Série A",
+          "race_name": "Course 2",
+          "place": 2,
+          "time_display": "7:27.0",
+          "time_ms": 447000,
+          "score": 950,
+          "distance": 2000,
+          "avg_pace": "1:51.8",
+          "spm": 30,
+          "calories": 240,
+          "machine_type": "Concept2",
+          "logged_time": "2025-01-15T10:31:12.000Z",
           "crew_id": "crew-uuid-2",
-          "lane": 2,
-          "club_name": "Club Aviron Lyon",
-          "club_code": "LYO",
-          "position": 2,
-          "finish_time": "2025-01-15T10:31:12.000Z",
-          "final_time": "447000",
-          "time_seconds": "447.000",
-          "time_formatted": "7:27.000",
-          "has_timing": true
+          "crew": {
+            "id": "crew-uuid-2",
+            "club_name": "Club Aviron Lyon",
+            "club_code": "LYO",
+            "category": {
+              "id": "cat-uuid-1",
+              "code": "M23",
+              "label": "Hommes 23 ans",
+              "age_group": "23",
+              "gender": "Homme"
+            },
+            "participants": [
+              {
+                "id": "participant-uuid-3",
+                "first_name": "Paul",
+                "last_name": "Bernard",
+                "license_number": "12347",
+                "seat_position": 1,
+                "is_coxswain": false
+              }
+            ]
+          }
         }
       ]
     },
@@ -128,34 +207,31 @@ interface Result {
         {
           "race_id": "race-uuid-4",
           "race_number": 4,
-          "phase_id": "phase-uuid-1",
-          "phase_name": "Série A",
+          "race_name": "Course 4",
+          "place": 1,
+          "time_display": "7:35.0",
+          "time_ms": 455000,
+          "score": 980,
+          "distance": 2000,
+          "avg_pace": "1:53.8",
+          "spm": 31,
+          "calories": 230,
+          "machine_type": "Concept2",
+          "logged_time": "2025-01-15T10:35:20.000Z",
           "crew_id": "crew-uuid-4",
-          "lane": 1,
-          "club_name": "Club Aviron Bordeaux",
-          "club_code": "BOR",
-          "position": 1,
-          "finish_time": "2025-01-15T10:35:20.000Z",
-          "final_time": "455000",
-          "time_seconds": "455.000",
-          "time_formatted": "7:35.000",
-          "has_timing": true
-        },
-        {
-          "race_id": "race-uuid-5",
-          "race_number": 5,
-          "phase_id": "phase-uuid-1",
-          "phase_name": "Série A",
-          "crew_id": "crew-uuid-5",
-          "lane": 2,
-          "club_name": "Club Aviron Nice",
-          "club_code": "NIC",
-          "position": null,
-          "finish_time": null,
-          "final_time": null,
-          "time_seconds": null,
-          "time_formatted": null,
-          "has_timing": false
+          "crew": {
+            "id": "crew-uuid-4",
+            "club_name": "Club Aviron Bordeaux",
+            "club_code": "BOR",
+            "category": {
+              "id": "cat-uuid-2",
+              "code": "F23",
+              "label": "Femmes 23 ans",
+              "age_group": "23",
+              "gender": "Femme"
+            },
+            "participants": []
+          }
         }
       ]
     }
@@ -165,26 +241,28 @@ interface Result {
 
 ## 🔍 Comportement de la route
 
-### Tri et positions
+### Tri et places
 
-1. **Tri automatique** : Les résultats sont triés par temps (du plus rapide au plus lent) **dans chaque catégorie**
-2. **Calcul des positions** : Les positions (1, 2, 3, ...) sont calculées automatiquement pour chaque catégorie
-3. **Équipages sans timing** : Les équipages sans temps enregistré (`has_timing = false`) apparaissent à la fin avec `position: null`
+1. **Tri automatique** : Les résultats sont triés par place (1, 2, 3, ...) **dans chaque catégorie**
+2. **Place** : La place dans la course est fournie directement depuis les résultats indoor (`place`)
+3. **Groupement** : Tous les résultats de toutes les courses sont regroupés par catégorie
 
 ### Groupement par catégorie
 
-- Tous les résultats d'un même événement sont regroupés par catégorie
-- Chaque catégorie contient tous les équipages de cette catégorie, peu importe la phase ou la course
+- Tous les résultats indoor d'un même événement sont regroupés par catégorie
+- Chaque catégorie contient tous les équipages de cette catégorie, peu importe la course
 - Les catégories sans résultats n'apparaissent pas dans la réponse
 
 ### Informations incluses
 
 Pour chaque résultat, vous avez accès à :
-- **Informations de course** : `race_id`, `race_number`, `phase_id`, `phase_name`
-- **Informations d'équipage** : `crew_id`, `lane`, `club_name`, `club_code`
-- **Informations de catégorie** : Toutes les infos de la catégorie dans l'objet `category`
-- **Temps** : `finish_time` (timestamp), `final_time` (millisecondes en string)
-- **Position** : Position dans la catégorie (1 = premier, 2 = deuxième, etc.)
+- **Informations de course** : `race_id`, `race_number`, `race_name`
+- **Informations de résultat** : `place`, `time_display`, `time_ms`, `score`, `distance`, `avg_pace`, `spm`, `calories`, `machine_type`
+- **Informations d'équipage** : `crew_id`, `club_name`, `club_code`
+- **Informations de catégorie** : Disponible à deux niveaux :
+  - Au niveau du groupement : `category` (id, code, label, age_group, gender)
+  - Dans l'équipage : `crew.category` (mêmes informations)
+- **Participants** : Liste complète des participants avec leurs informations (nom, prénom, licence, position dans le bateau)
 
 ## 💻 Exemples d'utilisation côté frontend
 
@@ -231,9 +309,14 @@ interface EventResultsByCategoryResponse {
 
 ```typescript
 async function getEventResultsByCategory(
-  eventId: string
+  eventId: string,
+  token: string
 ): Promise<CategoryResult[]> {
-  const response = await fetch(`/events/${eventId}/results-by-category`);
+  const response = await fetch(`/indoor-results/event/${eventId}/bycategorie`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
   
   if (!response.ok) {
     throw new Error(`Erreur ${response.status}: ${response.statusText}`);
@@ -251,32 +334,31 @@ async function getEventResultsByCategory(
 
 ### Helper pour formater le temps (optionnel)
 
-Le backend fournit déjà le temps formaté dans `time_formatted`, mais vous pouvez utiliser cette fonction si vous avez besoin de formater manuellement :
+Le backend fournit déjà le temps formaté dans `time_display`, mais vous pouvez utiliser cette fonction si vous avez besoin de formater manuellement :
 
 ```typescript
 /**
- * Convertit un temps en millisecondes (string) en format lisible
- * @param finalTime Temps en millisecondes (string) ou null
- * @returns Format "MM:SS.mmm" ou "SS.mmm" ou null
+ * Convertit un temps en millisecondes en format lisible
+ * @param timeMs Temps en millisecondes (number) ou null
+ * @returns Format "M:SS.m" ou "SS.m" ou null
  */
-function formatTime(finalTime: string | null): string | null {
-  if (!finalTime) return null;
+function formatTime(timeMs: number | null): string | null {
+  if (!timeMs) return null;
   
-  const ms = parseInt(finalTime, 10);
-  const totalSeconds = Math.floor(ms / 1000);
+  const totalSeconds = Math.floor(timeMs / 1000);
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
-  const milliseconds = ms % 1000;
+  const milliseconds = Math.floor((timeMs % 1000) / 100);
   
   if (minutes > 0) {
-    return `${minutes}:${seconds.toString().padStart(2, "0")}.${milliseconds.toString().padStart(3, "0")}`;
+    return `${minutes}:${seconds.toString().padStart(2, "0")}.${milliseconds}`;
   }
   
-  return `${seconds}.${milliseconds.toString().padStart(3, "0")}`;
+  return `${seconds}.${milliseconds}`;
 }
 
-// Note : Le backend fournit déjà time_formatted, donc vous pouvez utiliser directement :
-// result.time_formatted au lieu de formatTime(result.final_time)
+// Note : Le backend fournit déjà time_display, donc vous pouvez utiliser directement :
+// result.time_display au lieu de formatTime(result.time_ms)
 ```
 
 ### Affichage d'un tableau de résultats par catégorie
@@ -329,27 +411,29 @@ function EventResultsByCategory({ eventId }: { eventId: string }) {
               {categoryResult.results.map((result) => (
                 <tr key={result.crew_id}>
                   <td>
-                    {result.position !== null ? (
-                      <span className="position">{result.position}</span>
+                    {result.place !== null ? (
+                      <span className="position">{result.place}</span>
                     ) : (
                       <span className="no-position">-</span>
                     )}
                   </td>
                   <td>
-                    {result.club_name}
-                    {result.club_code && ` (${result.club_code})`}
+                    {result.crew?.club_name || "-"}
+                    {result.crew?.club_code && ` (${result.crew.club_code})`}
                   </td>
                   <td>
-                    {result.phase_name} - Course {result.race_number}
+                    {result.race_name || `Course ${result.race_number}`}
                   </td>
                   <td>
-                    {result.has_timing && result.time_formatted ? (
-                      result.time_formatted
+                    {result.time_display ? (
+                      result.time_display
                     ) : (
-                      <span className="no-time">DNS/DNF</span>
+                      <span className="no-time">-</span>
                     )}
                   </td>
-                  <td>{result.lane}</td>
+                  <td>
+                    {result.crew?.participants?.length || 0} participant(s)
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -375,7 +459,7 @@ function CategoryPodiums({ eventId }: { eventId: string }) {
     <div className="podiums">
       {results.map((categoryResult) => {
         const topThree = categoryResult.results
-          .filter((r) => r.has_timing)
+          .filter((r) => r.place !== null)
           .slice(0, 3);
 
         if (topThree.length === 0) return null;
@@ -387,22 +471,22 @@ function CategoryPodiums({ eventId }: { eventId: string }) {
               {topThree[1] && (
                 <div className="podium-second">
                   <div className="medal">🥈</div>
-                  <div className="club">{topThree[1].club_name}</div>
-                  <div className="time">{topThree[1].time_formatted || "N/A"}</div>
+                  <div className="club">{topThree[1].crew?.club_name || "-"}</div>
+                  <div className="time">{topThree[1].time_display || "N/A"}</div>
                 </div>
               )}
               {topThree[0] && (
                 <div className="podium-first">
                   <div className="medal">🥇</div>
-                  <div className="club">{topThree[0].club_name}</div>
-                  <div className="time">{topThree[0].time_formatted || "N/A"}</div>
+                  <div className="club">{topThree[0].crew?.club_name || "-"}</div>
+                  <div className="time">{topThree[0].time_display || "N/A"}</div>
                 </div>
               )}
               {topThree[2] && (
                 <div className="podium-third">
                   <div className="medal">🥉</div>
-                  <div className="club">{topThree[2].club_name}</div>
-                  <div className="time">{topThree[2].time_formatted || "N/A"}</div>
+                  <div className="club">{topThree[2].crew?.club_name || "-"}</div>
+                  <div className="time">{topThree[2].time_display || "N/A"}</div>
                 </div>
               )}
             </div>
@@ -427,42 +511,38 @@ function CategoryStatistics({ eventId }: { eventId: string }) {
   return (
     <div className="statistics">
       {results.map((categoryResult) => {
-        const withTiming = categoryResult.results.filter((r) => r.has_timing);
-        const withoutTiming = categoryResult.results.filter((r) => !r.has_timing);
+        const withResults = categoryResult.results.filter((r) => r.time_ms !== null);
         
-        // Calculer le temps moyen (en secondes)
-        const averageTime = withTiming.length > 0
-          ? withTiming.reduce((sum, r) => {
-              const seconds = parseFloat(r.time_seconds || "0");
-              return sum + seconds;
-            }, 0) / withTiming.length
+        // Calculer le temps moyen (en millisecondes)
+        const averageTime = withResults.length > 0
+          ? withResults.reduce((sum, r) => sum + (r.time_ms || 0), 0) / withResults.length
           : null;
 
         // Formater le temps moyen
-        const formatAverageTime = (seconds: number): string => {
-          const minutes = Math.floor(seconds / 60);
-          const secs = Math.floor(seconds % 60);
-          const ms = Math.floor((seconds % 1) * 1000);
+        const formatAverageTime = (ms: number): string => {
+          const totalSeconds = Math.floor(ms / 1000);
+          const minutes = Math.floor(totalSeconds / 60);
+          const seconds = totalSeconds % 60;
+          const milliseconds = Math.floor((ms % 1000) / 100);
           if (minutes > 0) {
-            return `${minutes}:${secs.toString().padStart(2, "0")}.${ms.toString().padStart(3, "0")}`;
+            return `${minutes}:${seconds.toString().padStart(2, "0")}.${milliseconds}`;
           }
-          return `${secs}.${ms.toString().padStart(3, "0")}`;
+          return `${seconds}.${milliseconds}`;
         };
 
-        // Temps le plus rapide
-        const fastest = withTiming[0] || null;
+        // Temps le plus rapide (première place)
+        const fastest = categoryResult.results.find((r) => r.place === 1) || null;
 
         return (
           <div key={categoryResult.category.id} className="category-stats">
             <h3>{categoryResult.category.label}</h3>
             <ul>
               <li>Total équipages : {categoryResult.results.length}</li>
-              <li>Avec temps : {withTiming.length}</li>
-              <li>Sans temps : {withoutTiming.length}</li>
+              <li>Avec résultats : {withResults.length}</li>
               {fastest && (
                 <li>
-                  Temps le plus rapide : {fastest.time_formatted || "N/A"} 
-                  ({fastest.club_name})
+                  Meilleur temps : {fastest.time_display || "N/A"} 
+                  ({fastest.crew?.club_name || "-"})
                 </li>
               )}
               {averageTime && (
@@ -653,21 +733,26 @@ Si l'événement n'a pas de points de timing ou de courses, la réponse sera :
 
 ## 🔄 Comparaison avec d'autres routes
 
-| Route | Usage | Groupement |
-|-------|-------|------------|
-| `GET /races/:race_id/results` | Résultats d'une course spécifique | Non groupé |
-| `GET /events/:id/results-by-category` | Tous les résultats d'un événement | Par catégorie |
+| Route | Usage | Groupement | Type |
+|-------|-------|------------|------|
+| `GET /indoor-results/race/:race_id` | Résultats d'une course indoor spécifique | Non groupé | Indoor |
+| `GET /indoor-results/event/:event_id` | Tous les résultats indoor d'un événement | Par course | Indoor |
+| `GET /indoor-results/event/:event_id/bycategorie` | Tous les résultats indoor d'un événement | Par catégorie | Indoor |
 
-La route `results-by-category` est idéale pour un **aperçu global** de tous les résultats d'un événement, tandis que la route par course est utile pour les **détails d'une course spécifique**.
+La route `bycategorie` est idéale pour un **aperçu global** de tous les résultats indoor d'un événement groupés par catégorie, avec les informations détaillées des équipages (code club, participants).
 
 ## 📚 Ressources
 
-- **Endpoint** : `GET /events/:id/results-by-category`
-- **Route associée** : `GET /races/:race_id/results` (résultats d'une course spécifique)
+- **Endpoint** : `GET /indoor-results/event/:event_id/bycategorie`
+- **Routes associées** : 
+  - `GET /indoor-results/race/:race_id` (résultats d'une course indoor spécifique)
+  - `GET /indoor-results/event/:event_id` (tous les résultats indoor d'un événement par course)
 - **Modèle Category** : Voir la documentation des modèles pour plus de détails sur les catégories
+- **Swagger** : Disponible sur `/docs` → Section `indoor-results`
 
 ---
 
 **Date de création** : 2025-01-XX  
-**Version API** : Compatible avec toutes les versions existantes
+**Version API** : Compatible avec toutes les versions existantes  
+**Type** : Résultats Indoor uniquement
 
