@@ -15,6 +15,11 @@ router.get(
   auth,
   controller.getClubPoints
 );
+router.get(
+  "/clubs/by-type/:event_type",
+  auth,
+  controller.getClubRankingsByEventType
+);
 router.post(
   "/event/:event_id/recalculate",
   auth,

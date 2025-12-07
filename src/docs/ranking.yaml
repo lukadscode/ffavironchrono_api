@@ -156,6 +156,111 @@ paths:
                               type: string
                               enum: [individuel, relais]
 
+  /rankings/clubs/by-type/{event_type}:
+    get:
+      tags: [rankings]
+      summary: Récupère les classements des clubs groupés par événement pour un type d'événement
+      description: |
+        Récupère tous les événements d'un type donné (indoor, mer, rivière) et leurs classements de clubs.
+        Les résultats sont groupés par événement, avec les classements des clubs pour chaque événement.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: event_type
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Type d'événement (ex: "indoor", "mer", "rivière")
+          example: indoor
+        - name: ranking_type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [indoor_points, defis_capitaux, custom]
+            default: indoor_points
+          description: Type de classement à utiliser
+      responses:
+        200:
+          description: Classements récupérés avec succès
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        event:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            name:
+                              type: string
+                            location:
+                              type: string
+                            start_date:
+                              type: string
+                              format: date-time
+                            end_date:
+                              type: string
+                              format: date-time
+                            race_type:
+                              type: string
+                        rankings:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              id:
+                                type: string
+                                format: uuid
+                              club_name:
+                                type: string
+                              club_code:
+                                type: string
+                                nullable: true
+                              total_points:
+                                type: number
+                              rank:
+                                type: integer
+                                nullable: true
+                              points_count:
+                                type: integer
+                                description: Nombre de points détaillés attribués
+              example:
+                status: success
+                data:
+                  - event:
+                      id: "event-uuid-1"
+                      name: "Championnat Indoor 2025"
+                      location: "Paris"
+                      start_date: "2025-01-15T00:00:00.000Z"
+                      end_date: "2025-01-16T00:00:00.000Z"
+                      race_type: "indoor"
+                    rankings:
+                      - id: "ranking-uuid-1"
+                        club_name: "Club Aviron Paris"
+                        club_code: "PAR"
+                        total_points: 150.5
+                        rank: 1
+                        points_count: 12
+                      - id: "ranking-uuid-2"
+                        club_name: "Club Aviron Lyon"
+                        club_code: "LYO"
+                        total_points: 120.0
+                        rank: 2
+                        points_count: 10
+        500:
+          description: Erreur serveur
+
   /rankings/templates:
     get:
       tags: [rankings]

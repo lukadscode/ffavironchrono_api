@@ -361,6 +361,60 @@ async function getClubRanking(eventId, rankingType = "indoor_points") {
   return rankings;
 }
 
+/**
+ * Récupère les classements des clubs groupés par événement pour un type d'événement donné
+ */
+async function getClubRankingsByEventType(eventType, rankingType = "indoor_points") {
+  const Event = require("../models/Event");
+  
+  // Récupérer tous les événements du type spécifié
+  const events = await Event.findAll({
+    where: { race_type: eventType },
+    order: [["start_date", "DESC"]],
+  });
+
+  const results = [];
+
+  // Pour chaque événement, récupérer les classements des clubs
+  for (const event of events) {
+    const rankings = await ClubRanking.findAll({
+      where: { event_id: event.id, ranking_type: rankingType },
+      include: [
+        {
+          model: RankingPoint,
+          as: "ranking_points",
+          required: false,
+        },
+      ],
+      order: [["rank", "ASC"], ["total_points", "DESC"]],
+    });
+
+    // Ne pas inclure les événements sans classements
+    if (rankings.length > 0) {
+      results.push({
+        event: {
+          id: event.id,
+          name: event.name,
+          location: event.location,
+          start_date: event.start_date,
+          end_date: event.end_date,
+          race_type: event.race_type,
+        },
+        rankings: rankings.map((r) => ({
+          id: r.id,
+          club_name: r.club_name,
+          club_code: r.club_code,
+          total_points: parseFloat(r.total_points) || 0,
+          rank: r.rank,
+          points_count: r.ranking_points ? r.ranking_points.length : 0,
+        })),
+      });
+    }
+  }
+
+  return results;
+}
+
 module.exports = {
   getScoringTemplate,
   calculateIndoorPoints,
@@ -368,5 +422,6 @@ module.exports = {
   recalculateRanks,
   getClubRanking,
   getRaceResultsWithPositions,
+  getClubRankingsByEventType,
 };
 

@@ -142,5 +142,23 @@ exports.getClubPoints = async (req, res) => {
   }
 };
 
+/**
+ * Récupère les classements des clubs groupés par événement pour un type d'événement donné
+ */
+exports.getClubRankingsByEventType = async (req, res) => {
+  try {
+    const { event_type } = req.params;
+    const { ranking_type = "indoor_points" } = req.query;
 
+    const rankings = await rankingService.getClubRankingsByEventType(
+      event_type,
+      ranking_type
+    );
+
+    res.json({ status: "success", data: rankings });
+  } catch (err) {
+    console.error("Error fetching club rankings by event type:", err);
+    res.status(500).json({ status: "error", message: err.message });
+  }
+};
 
