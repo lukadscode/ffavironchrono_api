@@ -363,10 +363,23 @@ async function getClubRanking(eventId, rankingType = "indoor_points") {
 
 /**
  * Récupère les classements des clubs groupés par événement pour un type d'événement donné
+ * Calcule les points à la volée depuis les résultats indoor
  */
 async function getClubRankingsByEventType(eventType, rankingType = "indoor_points") {
   const Event = require("../models/Event");
+  const Race = require("../models/Race");
+  const IndoorRaceResult = require("../models/IndoorRaceResult");
+  const IndoorParticipantResult = require("../models/IndoorParticipantResult");
+  const Crew = require("../models/Crew");
+  const Category = require("../models/Category");
+  const Distance = require("../models/Distance");
+  const ScoringTemplate = require("../models/ScoringTemplate");
   
+  // Récupérer le template de points "Points Indoor"
+  const scoringTemplate = await ScoringTemplate.findOne({
+    where: { name: "Points Indoor" },
+  });
+
   // Récupérer tous les événements du type spécifié
   const events = await Event.findAll({
     where: { race_type: eventType },
@@ -375,19 +388,196 @@ async function getClubRankingsByEventType(eventType, rankingType = "indoor_point
 
   const results = [];
 
-  // Pour chaque événement, récupérer les classements des clubs
+  // Fonction helper pour calculer les points
+  const getPointsRange = (participantCount) => {
+    if (participantCount >= 1 && participantCount <= 3) {
+      return "1_3_participants";
+    } else if (participantCount >= 4 && participantCount <= 6) {
+      return "4_6_participants";
+    } else if (participantCount >= 7 && participantCount <= 12) {
+      return "7_12_participants";
+    } else {
+      return "13_plus_participants";
+    }
+  };
+
+  const calculatePoints = (template, position, participantCount, isRelay) => {
+    if (!template || !template.config || !position) {
+      return null;
+    }
+
+    const config = template.config;
+    const pointsIndoor = config.points_indoor;
+    if (!pointsIndoor) {
+      return null;
+    }
+
+    const range = getPointsRange(participantCount);
+    const rangeConfig = pointsIndoor[range];
+    if (!rangeConfig) {
+      return null;
+    }
+
+    // Pour "13+", on utilise la dernière entrée
+    if (range === "13_plus_participants" && position > 12) {
+      const lastEntry = rangeConfig[rangeConfig.length - 1];
+      return isRelay ? lastEntry.relais : lastEntry.individuel;
+    }
+
+    // Trouver la configuration pour cette position
+    const placeConfig = rangeConfig.find((p) => p.place === position);
+    if (!placeConfig) {
+      return null;
+    }
+
+    return isRelay ? placeConfig.relais : placeConfig.individuel;
+  };
+
+  // Pour chaque événement, calculer les classements des clubs
   for (const event of events) {
-    const rankings = await ClubRanking.findAll({
-      where: { event_id: event.id, ranking_type: rankingType },
+    // Récupérer toutes les courses de l'événement avec leurs résultats
+    const races = await Race.findAll({
       include: [
         {
-          model: RankingPoint,
-          as: "ranking_points",
+          model: require("../models/RacePhase"),
+          where: { event_id: event.id },
+          required: true,
+        },
+        {
+          model: IndoorRaceResult,
+          as: "indoor_results",
+          required: true,
+        },
+        {
+          model: Distance,
           required: false,
         },
       ],
-      order: [["rank", "ASC"], ["total_points", "DESC"]],
     });
+
+    // Collecter tous les résultats par catégorie pour calculer les positions
+    const resultsByCategory = {};
+
+    for (const race of races) {
+      if (race.indoor_results && race.indoor_results.length > 0) {
+        const indoorResult = race.indoor_results[0];
+        const participantResults = await IndoorParticipantResult.findAll({
+          where: { indoor_race_result_id: indoorResult.id },
+          include: [
+            {
+              model: Crew,
+              as: "crew",
+              include: [
+                {
+                  model: Category,
+                  as: "category",
+                },
+              ],
+            },
+          ],
+          order: [["place", "ASC"]],
+        });
+
+        for (const pr of participantResults) {
+          if (!pr.crew || !pr.crew.category) {
+            continue;
+          }
+
+          const cat = pr.crew.category;
+          const categoryKey = cat.id;
+
+          if (!resultsByCategory[categoryKey]) {
+            resultsByCategory[categoryKey] = [];
+          }
+
+          // Vérifier si la distance est éligible pour les points
+          const distance = race.Distance;
+          const isEligibleDistance = distance && (
+            (distance.meters === 2000 && !distance.is_relay) ||
+            (distance.meters === 500 && !distance.is_relay) ||
+            (distance.is_relay && distance.meters === 250 && distance.relay_count === 8)
+          );
+
+          // Vérifier si la catégorie est exclue des points
+          const excludedCategoryCodes = ['U15', 'U14', 'U13', 'U12', 'U11', 'U10', 'J15', 'J14', 'J13', 'J12', 'J11', 'J10'];
+          const categoryCode = pr.crew?.category?.code || '';
+          const isExcludedCategory = excludedCategoryCodes.some(code => categoryCode.includes(code));
+
+          resultsByCategory[categoryKey].push({
+            crew_id: pr.crew_id,
+            club_name: pr.crew.club_name,
+            club_code: pr.crew.club_code,
+            time_ms: pr.time_ms,
+            distance_info: distance ? {
+              is_relay: distance.is_relay,
+            } : null,
+            is_eligible_for_points: isEligibleDistance && pr.time_ms !== null && pr.time_ms !== 0 && !isExcludedCategory,
+          });
+        }
+      }
+    }
+
+    // Trier les résultats dans chaque catégorie par temps et calculer les positions et points
+    const clubPoints = {}; // { club_name: { club_code, total_points, points_count } }
+
+    for (const categoryKey in resultsByCategory) {
+      const categoryResults = resultsByCategory[categoryKey];
+      
+      // Séparer les résultats avec et sans temps
+      const withTime = categoryResults.filter((r) => r.time_ms !== null && r.time_ms !== 0);
+      const withoutTime = categoryResults.filter((r) => r.time_ms === null || r.time_ms === 0);
+      
+      // Trier par temps (du plus rapide au plus lent)
+      withTime.sort((a, b) => {
+        const timeA = a.time_ms || 999999999;
+        const timeB = b.time_ms || 999999999;
+        return timeA - timeB;
+      });
+      
+      // Calculer les positions dans la catégorie
+      withTime.forEach((r, index) => {
+        r.position = index + 1;
+      });
+      
+      // Calculer les points pour chaque résultat éligible
+      const participantCount = withTime.length;
+      withTime.forEach((r) => {
+        if (r.is_eligible_for_points && r.position && scoringTemplate) {
+          // Déterminer si c'est un relais
+          const isRelay = r.distance_info?.is_relay || false;
+          const points = calculatePoints(scoringTemplate, r.position, participantCount, isRelay);
+          
+          if (points !== null && points > 0) {
+            // Initialiser le club si nécessaire
+            if (!clubPoints[r.club_name]) {
+              clubPoints[r.club_name] = {
+                club_code: r.club_code,
+                total_points: 0,
+                points_count: 0,
+              };
+            }
+            
+            // Ajouter les points
+            clubPoints[r.club_name].total_points += points;
+            clubPoints[r.club_name].points_count += 1;
+          }
+        }
+      });
+    }
+
+    // Convertir en tableau et trier par points décroissants
+    const rankings = Object.entries(clubPoints)
+      .map(([club_name, data]) => ({
+        club_name,
+        club_code: data.club_code,
+        total_points: data.total_points,
+        points_count: data.points_count,
+      }))
+      .sort((a, b) => b.total_points - a.total_points)
+      .map((ranking, index) => ({
+        ...ranking,
+        rank: index + 1,
+      }));
 
     // Ne pas inclure les événements sans classements
     if (rankings.length > 0) {
@@ -400,14 +590,7 @@ async function getClubRankingsByEventType(eventType, rankingType = "indoor_point
           end_date: event.end_date,
           race_type: event.race_type,
         },
-        rankings: rankings.map((r) => ({
-          id: r.id,
-          club_name: r.club_name,
-          club_code: r.club_code,
-          total_points: parseFloat(r.total_points) || 0,
-          rank: r.rank,
-          points_count: r.ranking_points ? r.ranking_points.length : 0,
-        })),
+        rankings: rankings,
       });
     }
   }
