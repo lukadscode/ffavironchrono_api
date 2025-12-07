@@ -479,6 +479,168 @@ exports.getEventResults = async (req, res) => {
 };
 
 /**
+ * Récupère tous les résultats d'un événement groupés par catégorie
+ * GET /indoor-results/event/:event_id/bycategorie
+ */
+exports.getEventResultsByCategory = async (req, res) => {
+  try {
+    const { event_id } = req.params;
+    const CrewParticipant = require("../models/CrewParticipant");
+    const Participant = require("../models/Participant");
+
+    // Récupérer toutes les courses de l'événement avec leurs résultats
+    const races = await Race.findAll({
+      include: [
+        {
+          model: require("../models/RacePhase"),
+          where: { event_id },
+          required: true,
+        },
+        {
+          model: IndoorRaceResult,
+          as: "indoor_results",
+          required: true,
+        },
+      ],
+    });
+
+    // Collecter tous les résultats par catégorie
+    const resultsByCategory = {};
+    const categoriesMap = {};
+
+    for (const race of races) {
+      if (race.indoor_results && race.indoor_results.length > 0) {
+        const indoorResult = race.indoor_results[0];
+        const participantResults = await IndoorParticipantResult.findAll({
+          where: { indoor_race_result_id: indoorResult.id },
+          include: [
+            {
+              model: Crew,
+              as: "crew",
+              include: [
+                {
+                  model: Category,
+                  as: "category",
+                },
+                {
+                  model: CrewParticipant,
+                  as: "crew_participants",
+                  include: [
+                    {
+                      model: Participant,
+                      as: "participant",
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+          order: [["place", "ASC"]],
+        });
+
+        for (const pr of participantResults) {
+          if (!pr.crew || !pr.crew.category) {
+            continue;
+          }
+
+          const cat = pr.crew.category;
+          const categoryKey = cat.id;
+
+          // Stocker les informations de catégorie
+          if (!categoriesMap[categoryKey]) {
+            categoriesMap[categoryKey] = {
+              id: cat.id,
+              code: cat.code,
+              label: cat.label,
+              age_group: cat.age_group,
+              gender: cat.gender,
+            };
+          }
+
+          // Initialiser la catégorie si nécessaire
+          if (!resultsByCategory[categoryKey]) {
+            resultsByCategory[categoryKey] = {
+              category: categoriesMap[categoryKey],
+              results: [],
+            };
+          }
+
+          // Récupérer les participants de l'équipage (triés par seat_position)
+          const participants = pr.crew.crew_participants
+            ? pr.crew.crew_participants
+                .sort((a, b) => {
+                  const posA = a.seat_position || 999;
+                  const posB = b.seat_position || 999;
+                  return posA - posB;
+                })
+                .map((cp) => ({
+                  id: cp.participant?.id || null,
+                  first_name: cp.participant?.first_name || null,
+                  last_name: cp.participant?.last_name || null,
+                  license_number: cp.participant?.license_number || null,
+                  seat_position: cp.seat_position || null,
+                  is_coxswain: cp.is_coxswain || false,
+                }))
+            : [];
+
+          // Ajouter le résultat
+          resultsByCategory[categoryKey].results.push({
+            race_id: race.id,
+            race_number: race.race_number,
+            race_name: race.name || null,
+            place: pr.place,
+            time_display: pr.time_display,
+            time_ms: pr.time_ms,
+            score: pr.score,
+            distance: pr.distance,
+            avg_pace: pr.avg_pace,
+            spm: pr.spm,
+            calories: pr.calories,
+            machine_type: pr.machine_type,
+            logged_time: pr.logged_time,
+            crew_id: pr.crew_id,
+            crew: pr.crew
+              ? {
+                  id: pr.crew.id,
+                  club_name: pr.crew.club_name,
+                  club_code: pr.crew.club_code,
+                  participants: participants,
+                }
+              : null,
+          });
+        }
+      }
+    }
+
+    // Trier les résultats dans chaque catégorie par place (du meilleur au moins bon)
+    for (const categoryKey in resultsByCategory) {
+      const categoryData = resultsByCategory[categoryKey];
+      
+      // Trier par place (1, 2, 3, ...)
+      categoryData.results.sort((a, b) => {
+        const placeA = a.place || 999999;
+        const placeB = b.place || 999999;
+        return placeA - placeB;
+      });
+    }
+
+    // Convertir en tableau
+    const formattedResults = Object.values(resultsByCategory);
+
+    res.json({
+      status: "success",
+      data: formattedResults,
+    });
+  } catch (err) {
+    console.error("Error fetching event results by category:", err);
+    res.status(500).json({
+      status: "error",
+      message: err.message || "Erreur lors de la récupération des résultats",
+    });
+  }
+};
+
+/**
  * Fonction utilitaire : Convertit un temps formaté "0:24.1" en millisecondes
  */
 function parseTimeToMs(timeString) {

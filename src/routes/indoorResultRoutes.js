@@ -20,5 +20,8 @@ router.get("/race/:race_id", optionalAuth, controller.getRaceResults);
 // Récupérer tous les résultats d'un événement
 router.get("/event/:event_id", auth, controller.getEventResults);
 
+// Récupérer tous les résultats d'un événement groupés par catégorie
+router.get("/event/:event_id/bycategorie", auth, controller.getEventResultsByCategory);
+
 module.exports = router;
 

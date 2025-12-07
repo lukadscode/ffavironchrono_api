@@ -7,7 +7,6 @@ const schema = require("../schemas/eventSchema");
 
 router.get("/", eventController.getEvents);
 router.get("/:id", eventController.getEvent);
-router.get("/:id/results-by-category", eventController.getEventResultsByCategory);
 router.post(
   "/",
   auth,

@@ -338,6 +338,146 @@ paths:
                                   category:
                                     type: string
 
+  /indoor-results/event/{event_id}/bycategorie:
+    get:
+      tags: [indoor-results]
+      summary: Récupérer tous les résultats d'un événement classé par catégorie
+      description: |
+        Récupère tous les résultats des courses indoor d'un événement, groupés et triés par catégorie.
+        Inclut les informations détaillées sur les équipages (code club et participants).
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: event_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID de l'événement
+      responses:
+        200:
+          description: Résultats groupés par catégorie récupérés avec succès
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        category:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            code:
+                              type: string
+                              nullable: true
+                            label:
+                              type: string
+                              nullable: true
+                            age_group:
+                              type: string
+                              nullable: true
+                            gender:
+                              type: string
+                              nullable: true
+                              enum: [Homme, Femme, Mixte]
+                        results:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              race_id:
+                                type: string
+                                format: uuid
+                              race_number:
+                                type: integer
+                              race_name:
+                                type: string
+                                nullable: true
+                              place:
+                                type: integer
+                                nullable: true
+                              time_display:
+                                type: string
+                                nullable: true
+                              time_ms:
+                                type: integer
+                                nullable: true
+                              score:
+                                type: integer
+                                nullable: true
+                              distance:
+                                type: integer
+                                nullable: true
+                              avg_pace:
+                                type: string
+                                nullable: true
+                              spm:
+                                type: integer
+                                nullable: true
+                              calories:
+                                type: integer
+                                nullable: true
+                              machine_type:
+                                type: string
+                                nullable: true
+                              logged_time:
+                                type: string
+                                format: date-time
+                                nullable: true
+                              crew_id:
+                                type: string
+                                format: uuid
+                                nullable: true
+                              crew:
+                                type: object
+                                nullable: true
+                                properties:
+                                  id:
+                                    type: string
+                                    format: uuid
+                                  club_name:
+                                    type: string
+                                    nullable: true
+                                  club_code:
+                                    type: string
+                                    nullable: true
+                                  participants:
+                                    type: array
+                                    items:
+                                      type: object
+                                      properties:
+                                        id:
+                                          type: string
+                                          format: uuid
+                                          nullable: true
+                                        first_name:
+                                          type: string
+                                          nullable: true
+                                        last_name:
+                                          type: string
+                                          nullable: true
+                                        license_number:
+                                          type: string
+                                          nullable: true
+                                        seat_position:
+                                          type: integer
+                                          nullable: true
+                                        is_coxswain:
+                                          type: boolean
+        404:
+          description: Événement non trouvé
+        500:
+          description: Erreur serveur
+
 components:
   securitySchemes:
     bearerAuth:
