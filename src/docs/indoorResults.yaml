@@ -413,10 +413,10 @@ paths:
                               points:
                                 type: number
                                 nullable: true
-                                description: Points attribués selon le classement de la catégorie (basé sur le template "Points Indoor"). Null si non éligible (temps 0, distance non éligible, etc.)
+                                description: Points attribués selon le classement de la catégorie (basé sur le template "Points Indoor"). Null si non éligible (temps 0, distance non éligible, catégorie exclue, etc.)
                               is_eligible_for_points:
                                 type: boolean
-                                description: Indique si le résultat est éligible pour les points (distance 2000m, 500m ou relais 8x250, et temps non nul)
+                                description: Indique si le résultat est éligible pour les points (distance 2000m, 500m ou relais 8x250, temps non nul, et catégorie non exclue). Les catégories avec codes U15, U14, U13, U12, U11, U10, J15, J14, J13, J12, J11, J10 sont exclues.
                               time_display:
                                 type: string
                                 nullable: true

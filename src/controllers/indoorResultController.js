@@ -602,6 +602,11 @@ exports.getEventResultsByCategory = async (req, res) => {
             (distance.is_relay && distance.meters === 250 && distance.relay_count === 8)
           );
 
+          // Vérifier si la catégorie est exclue des points (codes U15, U14, U13, U12, U11, U10, J15, J14, J13, J12, J11, J10)
+          const excludedCategoryCodes = ['U15', 'U14', 'U13', 'U12', 'U11', 'U10', 'J15', 'J14', 'J13', 'J12', 'J11', 'J10'];
+          const categoryCode = pr.crew?.category?.code || '';
+          const isExcludedCategory = excludedCategoryCodes.some(code => categoryCode.includes(code));
+
           // Ajouter le résultat (sans position et points pour l'instant, sera calculé après le tri)
           resultsByCategory[categoryKey].results.push({
             race_id: race.id,
@@ -644,7 +649,7 @@ exports.getEventResultsByCategory = async (req, res) => {
               : null,
             position: null, // Sera calculé après le tri par catégorie
             points: null, // Sera calculé après le tri et le calcul des positions
-            is_eligible_for_points: isEligibleDistance && pr.time_ms !== null && pr.time_ms !== 0,
+            is_eligible_for_points: isEligibleDistance && pr.time_ms !== null && pr.time_ms !== 0 && !isExcludedCategory,
           });
         }
       }
