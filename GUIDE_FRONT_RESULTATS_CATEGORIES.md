@@ -678,19 +678,21 @@ table td {
 
 ## ⚠️ Points d'attention
 
-1. **Temps formaté** : Le backend fournit maintenant `time_formatted` qui est déjà formaté et prêt à être affiché. Utilisez ce champ plutôt que de formater manuellement.
+1. **Temps formaté** : Le backend fournit `time_display` qui est déjà formaté et prêt à être affiché (ex: "7:00.0"). Utilisez ce champ plutôt que de formater manuellement.
 
-2. **Temps en millisecondes** : Le champ `final_time` est une **string** représentant des millisecondes. Utilisez `time_seconds` (string avec décimales) pour les calculs mathématiques.
+2. **Temps en millisecondes** : Le champ `time_ms` est un **number** représentant des millisecondes. Utilisez-le pour les calculs mathématiques.
 
-2. **Équipages sans timing** : Les équipages sans temps (`has_timing = false`) ont `position: null` et `final_time: null`. Pensez à les gérer dans votre UI.
+3. **Place** : La `place` est fournie directement depuis les résultats indoor. Elle peut être `null` si l'équipage n'a pas terminé.
 
-3. **Tri déjà effectué** : Les résultats sont déjà triés par temps dans chaque catégorie. Vous n'avez pas besoin de les re-trier.
+4. **Tri déjà effectué** : Les résultats sont déjà triés par place (1, 2, 3, ...) dans chaque catégorie. Vous n'avez pas besoin de les re-trier.
 
-4. **Positions** : Les positions sont calculées uniquement pour les équipages avec timing. Les équipages sans timing ont `position: null`.
+5. **Participants** : Les participants sont triés par `seat_position` (position dans le bateau). Le barreur a `is_coxswain: true` et peut ne pas avoir de `seat_position`.
 
-5. **Catégories vides** : Les catégories sans résultats n'apparaissent pas dans la réponse.
+6. **Catégories vides** : Les catégories sans résultats n'apparaissent pas dans la réponse.
 
-6. **Performance** : Cette route peut être lourde si l'événement contient beaucoup de courses. Pensez à mettre en cache les résultats côté frontend.
+7. **Authentification** : Cette route nécessite une authentification (Bearer token).
+
+8. **Performance** : Cette route peut être lourde si l'événement contient beaucoup de courses. Pensez à mettre en cache les résultats côté frontend.
 
 ## 🐛 Gestion des erreurs
 
