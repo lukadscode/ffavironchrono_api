@@ -64,6 +64,7 @@ interface ClubRanking {
   total_points: number;        // Total des points du club pour cet événement
   rank: number | null;          // Rang dans le classement (1 = premier)
   points_count: number;        // Nombre de points détaillés attribués
+  results_count: number;       // Nombre de résultats distincts (équipages) qui ont marqué des points
 }
 ```
 
@@ -86,26 +87,29 @@ interface ClubRanking {
         {
           "id": "ranking-uuid-1",
           "club_name": "Club Aviron Paris",
-          "club_code": "PAR",
-          "total_points": 150.5,
-          "rank": 1,
-          "points_count": 12
+                        "club_code": "PAR",
+                        "total_points": 150.5,
+                        "rank": 1,
+                        "points_count": 12,
+                        "results_count": 10
         },
         {
           "id": "ranking-uuid-2",
           "club_name": "Club Aviron Lyon",
-          "club_code": "LYO",
-          "total_points": 120.0,
-          "rank": 2,
-          "points_count": 10
+                        "club_code": "LYO",
+                        "total_points": 120.0,
+                        "rank": 2,
+                        "points_count": 10,
+                        "results_count": 8
         },
         {
           "id": "ranking-uuid-3",
           "club_name": "Club Aviron Bordeaux",
-          "club_code": "BOR",
-          "total_points": 95.5,
-          "rank": 3,
-          "points_count": 8
+                        "club_code": "BOR",
+                        "total_points": 95.5,
+                        "rank": 3,
+                        "points_count": 8,
+                        "results_count": 6
         }
       ]
     },
@@ -122,18 +126,20 @@ interface ClubRanking {
         {
           "id": "ranking-uuid-4",
           "club_name": "Club Aviron Lyon",
-          "club_code": "LYO",
-          "total_points": 180.0,
-          "rank": 1,
-          "points_count": 15
+                        "club_code": "LYO",
+                        "total_points": 180.0,
+                        "rank": 1,
+                        "points_count": 15,
+                        "results_count": 12
         },
         {
           "id": "ranking-uuid-5",
           "club_name": "Club Aviron Paris",
-          "club_code": "PAR",
-          "total_points": 165.5,
-          "rank": 2,
-          "points_count": 14
+                        "club_code": "PAR",
+                        "total_points": 165.5,
+                        "rank": 2,
+                        "points_count": 14,
+                        "results_count": 11
         }
       ]
     }
@@ -394,6 +400,7 @@ export const RankingsByType: React.FC<RankingsByTypeProps> = ({
                 <th>Code</th>
                 <th>Points</th>
                 <th>Nb points</th>
+                <th>Nb résultats</th>
               </tr>
             </thead>
             <tbody>
@@ -413,6 +420,7 @@ export const RankingsByType: React.FC<RankingsByTypeProps> = ({
                   <td className="club-code">{ranking.club_code || "-"}</td>
                   <td className="points">{ranking.total_points.toFixed(2)}</td>
                   <td className="points-count">{ranking.points_count}</td>
+                  <td className="results-count">{ranking.results_count}</td>
                 </tr>
               ))}
             </tbody>
@@ -559,6 +567,8 @@ export const RankingsByType: React.FC<RankingsByTypeProps> = ({
 6. **Rang** : Le champ `rank` peut être `null` si le rang n'a pas encore été calculé. Utilisez `points_count` pour vérifier si des points ont été attribués.
 
 7. **Points détaillés** : Le champ `points_count` indique le nombre d'entrées de points détaillés. Pour obtenir les détails, utilisez la route `/rankings/event/{event_id}/club/{club_name}/points`.
+
+8. **Nombre de résultats** : Le champ `results_count` indique le nombre de résultats distincts (équipages/crews) qui ont marqué des points pour ce club dans cet événement. Par exemple, si un club a 112 résultats qui ont marqué des points, `results_count` sera 112. Ce nombre peut être différent de `points_count` car un même équipage peut marquer des points dans plusieurs catégories.
 
 8. **Authentification** : Cette route nécessite une authentification (Bearer token). Assurez-vous de gérer les erreurs 401 (non authentifié) et 403 (non autorisé).
 

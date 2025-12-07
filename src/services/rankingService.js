@@ -518,7 +518,7 @@ async function getClubRankingsByEventType(eventType, rankingType = "indoor_point
     }
 
     // Trier les résultats dans chaque catégorie par temps et calculer les positions et points
-    const clubPoints = {}; // { club_name: { club_code, total_points, points_count } }
+    const clubPoints = {}; // { club_name: { club_code, total_points, points_count, results_with_points: Set } }
 
     for (const categoryKey in resultsByCategory) {
       const categoryResults = resultsByCategory[categoryKey];
@@ -541,6 +541,7 @@ async function getClubRankingsByEventType(eventType, rankingType = "indoor_point
       
       // Calculer les points pour chaque résultat éligible
       const participantCount = withTime.length;
+      
       withTime.forEach((r) => {
         if (r.is_eligible_for_points && r.position && scoringTemplate) {
           // Déterminer si c'est un relais
@@ -554,12 +555,16 @@ async function getClubRankingsByEventType(eventType, rankingType = "indoor_point
                 club_code: r.club_code,
                 total_points: 0,
                 points_count: 0,
+                results_with_points: new Set(), // Pour compter les résultats distincts (crew_id) qui ont marqué des points
               };
             }
             
             // Ajouter les points
             clubPoints[r.club_name].total_points += points;
             clubPoints[r.club_name].points_count += 1;
+            
+            // Ajouter le crew_id au Set pour compter les résultats distincts
+            clubPoints[r.club_name].results_with_points.add(r.crew_id);
           }
         }
       });
@@ -572,6 +577,7 @@ async function getClubRankingsByEventType(eventType, rankingType = "indoor_point
         club_code: data.club_code,
         total_points: data.total_points,
         points_count: data.points_count,
+        results_count: data.results_with_points.size, // Nombre de résultats distincts (équipages) qui ont marqué des points
       }))
       .sort((a, b) => b.total_points - a.total_points)
       .map((ranking, index) => ({

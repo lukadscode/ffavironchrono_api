@@ -235,6 +235,9 @@ paths:
                               points_count:
                                 type: integer
                                 description: Nombre de points détaillés attribués
+                              results_count:
+                                type: integer
+                                description: Nombre de résultats distincts (équipages) qui ont marqué des points pour ce club dans cet événement
               example:
                 status: success
                 data:
