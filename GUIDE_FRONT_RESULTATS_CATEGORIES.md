@@ -60,6 +60,8 @@ interface Result {
   position: number | null;        // Position dans la catégorie (1, 2, 3, ...)
   finish_time: string | null;     // Timestamp ISO de l'arrivée
   final_time: string | null;      // Temps en millisecondes (string)
+  time_seconds: string | null;    // Temps en secondes avec décimales (string, ex: "420.000")
+  time_formatted: string | null;  // Temps formaté lisible (ex: "7:00.000" ou "45.500")
   has_timing: boolean;            // Indique si l'équipage a un temps enregistré
 }
 ```
@@ -91,6 +93,8 @@ interface Result {
           "position": 1,
           "finish_time": "2025-01-15T10:30:45.000Z",
           "final_time": "420000",
+          "time_seconds": "420.000",
+          "time_formatted": "7:00.000",
           "has_timing": true
         },
         {
@@ -105,6 +109,8 @@ interface Result {
           "position": 2,
           "finish_time": "2025-01-15T10:31:12.000Z",
           "final_time": "447000",
+          "time_seconds": "447.000",
+          "time_formatted": "7:27.000",
           "has_timing": true
         },
         {
@@ -119,6 +125,8 @@ interface Result {
           "position": 3,
           "finish_time": "2025-01-15T10:31:45.000Z",
           "final_time": "480000",
+          "time_seconds": "480.000",
+          "time_formatted": "8:00.000",
           "has_timing": true
         }
       ]
@@ -144,6 +152,8 @@ interface Result {
           "position": 1,
           "finish_time": "2025-01-15T10:35:20.000Z",
           "final_time": "455000",
+          "time_seconds": "455.000",
+          "time_formatted": "7:35.000",
           "has_timing": true
         },
         {
@@ -158,6 +168,8 @@ interface Result {
           "position": null,
           "finish_time": null,
           "final_time": null,
+          "time_seconds": null,
+          "time_formatted": null,
           "has_timing": false
         }
       ]
@@ -214,6 +226,8 @@ interface Result {
   position: number | null;
   finish_time: string | null;
   final_time: string | null;
+  time_seconds: string | null;
+  time_formatted: string | null;
   has_timing: boolean;
 }
 
@@ -250,7 +264,9 @@ async function getEventResultsByCategory(
 }
 ```
 
-### Helper pour formater le temps
+### Helper pour formater le temps (optionnel)
+
+Le backend fournit déjà le temps formaté dans `time_formatted`, mais vous pouvez utiliser cette fonction si vous avez besoin de formater manuellement :
 
 ```typescript
 /**
@@ -274,9 +290,8 @@ function formatTime(finalTime: string | null): string | null {
   return `${seconds}.${milliseconds.toString().padStart(3, "0")}`;
 }
 
-// Exemple d'utilisation
-const time = formatTime("420000"); // "7:00.000"
-const time2 = formatTime("45500"); // "45.500"
+// Note : Le backend fournit déjà time_formatted, donc vous pouvez utiliser directement :
+// result.time_formatted au lieu de formatTime(result.final_time)
 ```
 
 ### Affichage d'un tableau de résultats par catégorie
@@ -343,8 +358,8 @@ function EventResultsByCategory({ eventId }: { eventId: string }) {
                     {result.phase_name} - Course {result.race_number}
                   </td>
                   <td>
-                    {result.has_timing ? (
-                      formatTime(result.final_time)
+                    {result.has_timing && result.time_formatted ? (
+                      result.time_formatted
                     ) : (
                       <span className="no-time">DNS/DNF</span>
                     )}
@@ -388,21 +403,21 @@ function CategoryPodiums({ eventId }: { eventId: string }) {
                 <div className="podium-second">
                   <div className="medal">🥈</div>
                   <div className="club">{topThree[1].club_name}</div>
-                  <div className="time">{formatTime(topThree[1].final_time)}</div>
+                  <div className="time">{topThree[1].time_formatted || "N/A"}</div>
                 </div>
               )}
               {topThree[0] && (
                 <div className="podium-first">
                   <div className="medal">🥇</div>
                   <div className="club">{topThree[0].club_name}</div>
-                  <div className="time">{formatTime(topThree[0].final_time)}</div>
+                  <div className="time">{topThree[0].time_formatted || "N/A"}</div>
                 </div>
               )}
               {topThree[2] && (
                 <div className="podium-third">
                   <div className="medal">🥉</div>
                   <div className="club">{topThree[2].club_name}</div>
-                  <div className="time">{formatTime(topThree[2].final_time)}</div>
+                  <div className="time">{topThree[2].time_formatted || "N/A"}</div>
                 </div>
               )}
             </div>
@@ -430,10 +445,24 @@ function CategoryStatistics({ eventId }: { eventId: string }) {
         const withTiming = categoryResult.results.filter((r) => r.has_timing);
         const withoutTiming = categoryResult.results.filter((r) => !r.has_timing);
         
-        // Calculer le temps moyen
+        // Calculer le temps moyen (en secondes)
         const averageTime = withTiming.length > 0
-          ? withTiming.reduce((sum, r) => sum + parseInt(r.final_time || "0", 10), 0) / withTiming.length
+          ? withTiming.reduce((sum, r) => {
+              const seconds = parseFloat(r.time_seconds || "0");
+              return sum + seconds;
+            }, 0) / withTiming.length
           : null;
+
+        // Formater le temps moyen
+        const formatAverageTime = (seconds: number): string => {
+          const minutes = Math.floor(seconds / 60);
+          const secs = Math.floor(seconds % 60);
+          const ms = Math.floor((seconds % 1) * 1000);
+          if (minutes > 0) {
+            return `${minutes}:${secs.toString().padStart(2, "0")}.${ms.toString().padStart(3, "0")}`;
+          }
+          return `${secs}.${ms.toString().padStart(3, "0")}`;
+        };
 
         // Temps le plus rapide
         const fastest = withTiming[0] || null;
@@ -447,12 +476,12 @@ function CategoryStatistics({ eventId }: { eventId: string }) {
               <li>Sans temps : {withoutTiming.length}</li>
               {fastest && (
                 <li>
-                  Temps le plus rapide : {formatTime(fastest.final_time)} 
+                  Temps le plus rapide : {fastest.time_formatted || "N/A"} 
                   ({fastest.club_name})
                 </li>
               )}
               {averageTime && (
-                <li>Temps moyen : {formatTime(averageTime.toString())}</li>
+                <li>Temps moyen : {formatAverageTime(averageTime)}</li>
               )}
             </ul>
           </div>
@@ -584,7 +613,9 @@ table td {
 
 ## ⚠️ Points d'attention
 
-1. **Temps en millisecondes** : Le champ `final_time` est une **string** représentant des millisecondes. N'oubliez pas de le convertir en nombre avant les calculs.
+1. **Temps formaté** : Le backend fournit maintenant `time_formatted` qui est déjà formaté et prêt à être affiché. Utilisez ce champ plutôt que de formater manuellement.
+
+2. **Temps en millisecondes** : Le champ `final_time` est une **string** représentant des millisecondes. Utilisez `time_seconds` (string avec décimales) pour les calculs mathématiques.
 
 2. **Équipages sans timing** : Les équipages sans temps (`has_timing = false`) ont `position: null` et `final_time: null`. Pensez à les gérer dans votre UI.
 

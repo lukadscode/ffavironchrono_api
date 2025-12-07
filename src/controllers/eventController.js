@@ -174,6 +174,8 @@ exports.getEventResultsByCategory = async (req, res) => {
 
           let duration_ms = null;
           let finish_time = null;
+          let time_formatted = null;
+          let time_seconds = null;
 
           if (finishTiming?.timing?.timestamp) {
             finish_time = finishTiming.timing.timestamp;
@@ -182,6 +184,21 @@ exports.getEventResultsByCategory = async (req, res) => {
               const start = new Date(startTiming.timing.timestamp);
               const finish = new Date(finishTiming.timing.timestamp);
               duration_ms = finish - start;
+              
+              // Calculer le temps en secondes
+              time_seconds = duration_ms / 1000;
+              
+              // Formater le temps (MM:SS.mmm ou SS.mmm)
+              const totalSeconds = Math.floor(time_seconds);
+              const minutes = Math.floor(totalSeconds / 60);
+              const seconds = totalSeconds % 60;
+              const milliseconds = duration_ms % 1000;
+              
+              if (minutes > 0) {
+                time_formatted = `${minutes}:${seconds.toString().padStart(2, "0")}.${milliseconds.toString().padStart(3, "0")}`;
+              } else {
+                time_formatted = `${seconds}.${milliseconds.toString().padStart(3, "0")}`;
+              }
             }
           }
 
@@ -205,7 +222,10 @@ exports.getEventResultsByCategory = async (req, res) => {
               : null,
             finish_time,
             final_time: duration_ms !== null ? duration_ms.toString() : null,
+            time_seconds: time_seconds !== null ? time_seconds.toFixed(3) : null,
+            time_formatted,
             has_timing: finish_time !== null,
+            position: null, // Sera calculé après le tri par catégorie
           });
         }
       }
