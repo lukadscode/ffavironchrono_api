@@ -136,7 +136,27 @@ async function getRaceResultsWithPositions(raceId) {
 
   const results = [];
 
+  // Catégories exclues des points
+  const excludedCategoryCodes = ['U15', 'U14', 'U13', 'U12', 'U11', 'U10', 'J15', 'J14', 'J13', 'J12', 'J11', 'J10'];
+  const excludedKeywords = ['partagé', 'tronc', 'bras'];
+
   for (const raceCrew of raceCrews) {
+    // Vérifier si la catégorie est exclue
+    const category = raceCrew.crew?.category;
+    if (category) {
+      const categoryCode = category.code || '';
+      const categoryLabel = category.label || '';
+      const isExcludedByCode = excludedCategoryCodes.some(code => categoryCode.includes(code));
+      const isExcludedByKeyword = excludedKeywords.some(keyword => 
+        categoryCode.toLowerCase().includes(keyword.toLowerCase()) || 
+        categoryLabel.toLowerCase().includes(keyword.toLowerCase())
+      );
+      
+      if (isExcludedByCode || isExcludedByKeyword) {
+        continue; // Exclure ce résultat
+      }
+    }
+
     const timingAssignments = await TimingAssignment.findAll({
       where: { crew_id: raceCrew.crew_id },
       include: [
@@ -499,9 +519,18 @@ async function getClubRankingsByEventType(eventType, rankingType = "indoor_point
           );
 
           // Vérifier si la catégorie est exclue des points
+          // Exclure les codes U15, U14, U13, U12, U11, U10, J15, J14, J13, J12, J11, J10
+          // Exclure aussi les catégories contenant "partagé", "tronc", ou "bras"
           const excludedCategoryCodes = ['U15', 'U14', 'U13', 'U12', 'U11', 'U10', 'J15', 'J14', 'J13', 'J12', 'J11', 'J10'];
+          const excludedKeywords = ['partagé', 'tronc', 'bras'];
           const categoryCode = pr.crew?.category?.code || '';
-          const isExcludedCategory = excludedCategoryCodes.some(code => categoryCode.includes(code));
+          const categoryLabel = pr.crew?.category?.label || '';
+          const isExcludedByCode = excludedCategoryCodes.some(code => categoryCode.includes(code));
+          const isExcludedByKeyword = excludedKeywords.some(keyword => 
+            categoryCode.toLowerCase().includes(keyword.toLowerCase()) || 
+            categoryLabel.toLowerCase().includes(keyword.toLowerCase())
+          );
+          const isExcludedCategory = isExcludedByCode || isExcludedByKeyword;
 
           resultsByCategory[categoryKey].push({
             crew_id: pr.crew_id,

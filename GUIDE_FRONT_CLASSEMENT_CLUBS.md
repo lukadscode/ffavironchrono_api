@@ -570,6 +570,10 @@ export const RankingsByType: React.FC<RankingsByTypeProps> = ({
 
 8. **Nombre de résultats** : Le champ `results_count` indique le nombre de résultats distincts (équipages/crews) qui ont marqué des points pour ce club dans cet événement. Par exemple, si un club a 112 résultats qui ont marqué des points, `results_count` sera 112. Ce nombre peut être différent de `points_count` car un même équipage peut marquer des points dans plusieurs catégories.
 
+9. **Catégories exclues** : Les points ne sont pas attribués pour les catégories suivantes :
+   - Codes contenant : U15, U14, U13, U12, U11, U10, J15, J14, J13, J12, J11, J10
+   - Codes ou labels contenant : "partagé", "tronc", "bras"
+
 8. **Authentification** : Cette route nécessite une authentification (Bearer token). Assurez-vous de gérer les erreurs 401 (non authentifié) et 403 (non autorisé).
 
 9. **Performance** : Cette route peut être lourde si beaucoup d'événements sont retournés. Pensez à mettre en cache les résultats côté frontend, surtout si les données ne changent pas fréquemment.

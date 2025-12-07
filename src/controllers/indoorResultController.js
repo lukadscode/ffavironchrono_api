@@ -602,10 +602,19 @@ exports.getEventResultsByCategory = async (req, res) => {
             (distance.is_relay && distance.meters === 250 && distance.relay_count === 8)
           );
 
-          // Vérifier si la catégorie est exclue des points (codes U15, U14, U13, U12, U11, U10, J15, J14, J13, J12, J11, J10)
+          // Vérifier si la catégorie est exclue des points
+          // Exclure les codes U15, U14, U13, U12, U11, U10, J15, J14, J13, J12, J11, J10
+          // Exclure aussi les catégories contenant "partagé", "tronc", ou "bras"
           const excludedCategoryCodes = ['U15', 'U14', 'U13', 'U12', 'U11', 'U10', 'J15', 'J14', 'J13', 'J12', 'J11', 'J10'];
+          const excludedKeywords = ['partagé', 'tronc', 'bras'];
           const categoryCode = pr.crew?.category?.code || '';
-          const isExcludedCategory = excludedCategoryCodes.some(code => categoryCode.includes(code));
+          const categoryLabel = pr.crew?.category?.label || '';
+          const isExcludedByCode = excludedCategoryCodes.some(code => categoryCode.includes(code));
+          const isExcludedByKeyword = excludedKeywords.some(keyword => 
+            categoryCode.toLowerCase().includes(keyword.toLowerCase()) || 
+            categoryLabel.toLowerCase().includes(keyword.toLowerCase())
+          );
+          const isExcludedCategory = isExcludedByCode || isExcludedByKeyword;
 
           // Ajouter le résultat (sans position et points pour l'instant, sera calculé après le tri)
           resultsByCategory[categoryKey].results.push({

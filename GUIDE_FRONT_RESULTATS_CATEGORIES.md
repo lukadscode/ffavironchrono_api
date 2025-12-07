@@ -738,6 +738,7 @@ table td {
    - Les points ne sont attribués que pour les distances éligibles : **2000m**, **500m** ou **relais 8x250m**
    - Les points ne sont pas attribués si `time_ms` est `null` ou `0`
    - Les points ne sont **pas attribués** si le code de la catégorie contient un des codes suivants : **U15, U14, U13, U12, U11, U10, J15, J14, J13, J12, J11, J10**
+   - Les points ne sont **pas attribués** si le code ou le label de la catégorie contient un des mots suivants : **"partagé"**, **"tronc"**, **"bras"**
    - Le champ `is_eligible_for_points` indique si le résultat est éligible pour les points
    - Le champ `points` est `null` si le résultat n'est pas éligible ou si aucun template n'est trouvé
    - Les points diffèrent selon que c'est un relais (`distance_info.is_relay === true`) ou une course individuelle
