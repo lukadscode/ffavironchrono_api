@@ -63,6 +63,7 @@ interface Result {
   time_seconds: string | null;    // Temps en secondes avec décimales (string, ex: "420.000")
   time_formatted: string | null;  // Temps formaté lisible (ex: "7:00.000" ou "45.500")
   has_timing: boolean;            // Indique si l'équipage a un temps enregistré
+  // Note: category n'est PAS inclus dans le résultat individuel car il est déjà au niveau du groupement
 }
 ```
 
@@ -111,22 +112,6 @@ interface Result {
           "final_time": "447000",
           "time_seconds": "447.000",
           "time_formatted": "7:27.000",
-          "has_timing": true
-        },
-        {
-          "race_id": "race-uuid-3",
-          "race_number": 3,
-          "phase_id": "phase-uuid-1",
-          "phase_name": "Série A",
-          "crew_id": "crew-uuid-3",
-          "lane": 3,
-          "club_name": "Club Aviron Marseille",
-          "club_code": "MAR",
-          "position": 3,
-          "finish_time": "2025-01-15T10:31:45.000Z",
-          "final_time": "480000",
-          "time_seconds": "480.000",
-          "time_formatted": "8:00.000",
           "has_timing": true
         }
       ]

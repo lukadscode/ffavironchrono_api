@@ -120,6 +120,7 @@ exports.getEventResultsByCategory = async (req, res) => {
 
     // Collecter tous les résultats
     const allResults = [];
+    const categoriesMap = {}; // Pour stocker les informations de catégorie
 
     for (const phase of phases) {
       const races = await Race.findAll({
@@ -150,7 +151,20 @@ exports.getEventResultsByCategory = async (req, res) => {
             continue;
           }
 
+          // Stocker les informations de catégorie pour le groupement
+          const cat = raceCrew.crew.category;
+          if (!categoriesMap[cat.id]) {
+            categoriesMap[cat.id] = {
+              id: cat.id,
+              code: cat.code,
+              label: cat.label,
+              age_group: cat.age_group,
+              gender: cat.gender,
+            };
+          }
+
           // Récupérer les timings pour cet équipage
+          // Utiliser la même logique que getRaceResults
           const timingAssignments = await TimingAssignment.findAll({
             where: { crew_id: raceCrew.crew_id },
             include: [
@@ -177,9 +191,11 @@ exports.getEventResultsByCategory = async (req, res) => {
           let time_formatted = null;
           let time_seconds = null;
 
+          // Vérifier si on a un finish_time
           if (finishTiming?.timing?.timestamp) {
             finish_time = finishTiming.timing.timestamp;
 
+            // Si on a aussi un start_time, calculer la durée
             if (startTiming?.timing?.timestamp) {
               const start = new Date(startTiming.timing.timestamp);
               const finish = new Date(finishTiming.timing.timestamp);
@@ -200,6 +216,8 @@ exports.getEventResultsByCategory = async (req, res) => {
                 time_formatted = `${seconds}.${milliseconds.toString().padStart(3, "0")}`;
               }
             }
+            // Si on a seulement un finish_time sans start_time, on ne peut pas calculer la durée
+            // mais on marque quand même has_timing = true
           }
 
           allResults.push({
@@ -211,21 +229,15 @@ exports.getEventResultsByCategory = async (req, res) => {
             lane: raceCrew.lane,
             club_name: raceCrew.crew?.club_name || null,
             club_code: raceCrew.crew?.club_code || null,
-            category: raceCrew.crew.category
-              ? {
-                  id: raceCrew.crew.category.id,
-                  code: raceCrew.crew.category.code,
-                  label: raceCrew.crew.category.label,
-                  age_group: raceCrew.crew.category.age_group,
-                  gender: raceCrew.crew.category.gender,
-                }
-              : null,
             finish_time,
             final_time: duration_ms !== null ? duration_ms.toString() : null,
             time_seconds: time_seconds !== null ? time_seconds.toFixed(3) : null,
             time_formatted,
             has_timing: finish_time !== null,
             position: null, // Sera calculé après le tri par catégorie
+            // Note: category_id est utilisé pour le groupement, mais category n'est pas inclus dans le résultat individuel
+            // car il est déjà présent au niveau du groupement
+            category_id: raceCrew.crew?.category?.id || null,
           });
         }
       }
@@ -234,20 +246,23 @@ exports.getEventResultsByCategory = async (req, res) => {
     // Grouper par catégorie
     const resultsByCategory = {};
 
+    // Grouper les résultats par catégorie
     for (const result of allResults) {
-      if (!result.category) {
+      if (!result.category_id) {
         continue;
       }
 
-      const categoryKey = result.category.id;
+      const categoryKey = result.category_id;
       if (!resultsByCategory[categoryKey]) {
         resultsByCategory[categoryKey] = {
-          category: result.category,
+          category: categoriesMap[categoryKey] || null,
           results: [],
         };
       }
 
-      resultsByCategory[categoryKey].results.push(result);
+      // Retirer category_id du résultat avant de l'ajouter (n'est plus nécessaire)
+      const { category_id, ...resultWithoutCategoryId } = result;
+      resultsByCategory[categoryKey].results.push(resultWithoutCategoryId);
     }
 
     // Trier les résultats dans chaque catégorie par temps
