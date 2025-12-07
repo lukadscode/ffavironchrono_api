@@ -58,16 +58,17 @@ interface Result {
   race_id: string;
   race_number: number;
   race_name: string | null;
-  place: number | null;           // Place dans la course (1, 2, 3, ...)
-  time_display: string | null;   // Temps formaté lisible (ex: "7:00.0")
-  time_ms: number | null;         // Temps en millisecondes
+  place_in_race: number | null;   // Place dans la course/série (conservée pour référence)
+  position: number | null;         // Position dans le classement de la catégorie (1, 2, 3, ...)
+  time_display: string | null;     // Temps formaté lisible (ex: "7:00.0")
+  time_ms: number | null;          // Temps en millisecondes
   score: number | null;
-  distance: number | null;        // Distance en mètres
-  avg_pace: string | null;        // Allure moyenne
-  spm: number | null;             // Coups par minute
+  distance: number | null;         // Distance en mètres
+  avg_pace: string | null;         // Allure moyenne
+  spm: number | null;              // Coups par minute
   calories: number | null;
   machine_type: string | null;
-  logged_time: string | null;    // Timestamp ISO
+  logged_time: string | null;     // Timestamp ISO
   crew_id: string | null;
   crew: {
     id: string;
@@ -113,7 +114,8 @@ interface Participant {
           "race_id": "race-uuid-1",
           "race_number": 1,
           "race_name": "Course 1",
-          "place": 1,
+          "place_in_race": 1,
+          "position": 1,
           "time_display": "7:00.0",
           "time_ms": 420000,
           "score": 1000,
@@ -159,7 +161,8 @@ interface Participant {
           "race_id": "race-uuid-2",
           "race_number": 2,
           "race_name": "Course 2",
-          "place": 2,
+          "place_in_race": 1,
+          "position": 2,
           "time_display": "7:27.0",
           "time_ms": 447000,
           "score": 950,
@@ -208,7 +211,8 @@ interface Participant {
           "race_id": "race-uuid-4",
           "race_number": 4,
           "race_name": "Course 4",
-          "place": 1,
+          "place_in_race": 1,
+          "position": 1,
           "time_display": "7:35.0",
           "time_ms": 455000,
           "score": 980,
@@ -241,11 +245,12 @@ interface Participant {
 
 ## 🔍 Comportement de la route
 
-### Tri et places
+### Tri et positions
 
-1. **Tri automatique** : Les résultats sont triés par place (1, 2, 3, ...) **dans chaque catégorie**
-2. **Place** : La place dans la course est fournie directement depuis les résultats indoor (`place`)
-3. **Groupement** : Tous les résultats de toutes les courses sont regroupés par catégorie
+1. **Tri automatique** : Les résultats sont triés par temps (du plus rapide au plus lent) **dans chaque catégorie**
+2. **Position dans la catégorie** : La `position` (1, 2, 3, ...) est calculée automatiquement après le tri par temps dans chaque catégorie
+3. **Place dans la course** : La `place_in_race` est conservée pour référence (place dans la course/série d'origine)
+4. **Groupement** : Tous les résultats de toutes les courses sont regroupés par catégorie, puis triés et classés
 
 ### Groupement par catégorie
 
@@ -257,7 +262,10 @@ interface Participant {
 
 Pour chaque résultat, vous avez accès à :
 - **Informations de course** : `race_id`, `race_number`, `race_name`
-- **Informations de résultat** : `place`, `time_display`, `time_ms`, `score`, `distance`, `avg_pace`, `spm`, `calories`, `machine_type`
+- **Informations de résultat** : 
+  - `place_in_race` : Place dans la course/série d'origine
+  - `position` : Position dans le classement de la catégorie (calculée après tri par temps)
+  - `time_display`, `time_ms`, `score`, `distance`, `avg_pace`, `spm`, `calories`, `machine_type`
 - **Informations d'équipage** : `crew_id`, `club_name`, `club_code`
 - **Informations de catégorie** : Disponible à deux niveaux :
   - Au niveau du groupement : `category` (id, code, label, age_group, gender)
@@ -411,8 +419,8 @@ function EventResultsByCategory({ eventId }: { eventId: string }) {
               {categoryResult.results.map((result) => (
                 <tr key={result.crew_id}>
                   <td>
-                    {result.place !== null ? (
-                      <span className="position">{result.place}</span>
+                    {result.position !== null ? (
+                      <span className="position">{result.position}</span>
                     ) : (
                       <span className="no-position">-</span>
                     )}
@@ -459,7 +467,7 @@ function CategoryPodiums({ eventId }: { eventId: string }) {
     <div className="podiums">
       {results.map((categoryResult) => {
         const topThree = categoryResult.results
-          .filter((r) => r.place !== null)
+          .filter((r) => r.position !== null)
           .slice(0, 3);
 
         if (topThree.length === 0) return null;
@@ -530,8 +538,8 @@ function CategoryStatistics({ eventId }: { eventId: string }) {
           return `${seconds}.${milliseconds}`;
         };
 
-        // Temps le plus rapide (première place)
-        const fastest = categoryResult.results.find((r) => r.place === 1) || null;
+        // Temps le plus rapide (première position dans la catégorie)
+        const fastest = categoryResult.results.find((r) => r.position === 1) || null;
 
         return (
           <div key={categoryResult.category.id} className="category-stats">
@@ -682,9 +690,12 @@ table td {
 
 2. **Temps en millisecondes** : Le champ `time_ms` est un **number** représentant des millisecondes. Utilisez-le pour les calculs mathématiques.
 
-3. **Place** : La `place` est fournie directement depuis les résultats indoor. Elle peut être `null` si l'équipage n'a pas terminé.
+3. **Position vs Place** : 
+   - `position` : Position dans le classement de la catégorie (calculée après tri par temps de toutes les courses)
+   - `place_in_race` : Place dans la course/série d'origine (conservée pour référence)
+   - La `position` peut être `null` si l'équipage n'a pas de temps (`time_ms === null`)
 
-4. **Tri déjà effectué** : Les résultats sont déjà triés par place (1, 2, 3, ...) dans chaque catégorie. Vous n'avez pas besoin de les re-trier.
+4. **Tri déjà effectué** : Les résultats sont déjà triés par temps (du plus rapide au plus lent) dans chaque catégorie, et les positions sont calculées. Vous n'avez pas besoin de les re-trier.
 
 5. **Participants** : Les participants sont triés par `seat_position` (position dans le bateau). Le barreur a `is_coxswain: true` et peut ne pas avoir de `seat_position`.
 

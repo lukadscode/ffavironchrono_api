@@ -402,9 +402,14 @@ paths:
                               race_name:
                                 type: string
                                 nullable: true
-                              place:
+                              place_in_race:
                                 type: integer
                                 nullable: true
+                                description: Place dans la course/série (conservée pour référence)
+                              position:
+                                type: integer
+                                nullable: true
+                                description: Position dans le classement de la catégorie (1, 2, 3, ... calculée après tri par temps)
                               time_display:
                                 type: string
                                 nullable: true

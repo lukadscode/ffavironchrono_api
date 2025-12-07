@@ -583,12 +583,12 @@ exports.getEventResultsByCategory = async (req, res) => {
                 }))
             : [];
 
-          // Ajouter le résultat
+          // Ajouter le résultat (sans position pour l'instant, sera calculée après le tri)
           resultsByCategory[categoryKey].results.push({
             race_id: race.id,
             race_number: race.race_number,
             race_name: race.name || null,
-            place: pr.place,
+            place_in_race: pr.place, // Place dans la course/série (conservée pour référence)
             time_display: pr.time_display,
             time_ms: pr.time_ms,
             score: pr.score,
@@ -616,21 +616,39 @@ exports.getEventResultsByCategory = async (req, res) => {
                   participants: participants,
                 }
               : null,
+            position: null, // Sera calculé après le tri par catégorie
           });
         }
       }
     }
 
-    // Trier les résultats dans chaque catégorie par place (du meilleur au moins bon)
+    // Trier les résultats dans chaque catégorie par temps et calculer les positions
     for (const categoryKey in resultsByCategory) {
       const categoryData = resultsByCategory[categoryKey];
       
-      // Trier par place (1, 2, 3, ...)
-      categoryData.results.sort((a, b) => {
-        const placeA = a.place || 999999;
-        const placeB = b.place || 999999;
-        return placeA - placeB;
+      // Séparer les résultats avec et sans temps
+      const withTime = categoryData.results.filter((r) => r.time_ms !== null);
+      const withoutTime = categoryData.results.filter((r) => r.time_ms === null);
+      
+      // Trier par temps (du plus rapide au plus lent)
+      withTime.sort((a, b) => {
+        const timeA = a.time_ms || 999999999;
+        const timeB = b.time_ms || 999999999;
+        return timeA - timeB;
       });
+      
+      // Calculer les positions dans la catégorie
+      withTime.forEach((r, index) => {
+        r.position = index + 1;
+      });
+      
+      // Ajouter les résultats sans temps à la fin (sans position)
+      withoutTime.forEach((r) => {
+        r.position = null;
+      });
+      
+      // Combiner les résultats triés
+      categoryData.results = [...withTime, ...withoutTime];
     }
 
     // Convertir en tableau
