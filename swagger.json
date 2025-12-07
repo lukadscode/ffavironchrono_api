@@ -678,6 +678,243 @@
         }
       }
     },
+    "/events/{id}/results-by-category": {
+      "get": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Obtenir les résultats d'un événement groupés par catégorie",
+        "description": "Récupère tous les résultats d'un événement, groupés et triés par catégorie.\nLes résultats sont automatiquement triés par temps (du plus rapide au plus lent) \net les positions sont calculées pour chaque catégorie.\n",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "ID de l'événement"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Résultats groupés par catégorie",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "category": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "code": {
+                                "type": "string",
+                                "nullable": true,
+                                "example": "M23"
+                              },
+                              "label": {
+                                "type": "string",
+                                "nullable": true,
+                                "example": "Hommes 23 ans"
+                              },
+                              "age_group": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "gender": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [
+                                  "Homme",
+                                  "Femme",
+                                  "Mixte"
+                                ]
+                              }
+                            }
+                          },
+                          "results": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "race_id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "race_number": {
+                                  "type": "integer"
+                                },
+                                "phase_id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "phase_name": {
+                                  "type": "string"
+                                },
+                                "crew_id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "lane": {
+                                  "type": "integer"
+                                },
+                                "club_name": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "club_code": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "position": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "description": "Position dans le classement de la catégorie (1, 2, 3, ... ou null si pas de timing)"
+                                },
+                                "finish_time": {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "nullable": true,
+                                  "description": "Timestamp ISO de l'arrivée"
+                                },
+                                "final_time": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "description": "Temps en millisecondes (string)",
+                                  "example": "420000"
+                                },
+                                "time_seconds": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "description": "Temps en secondes avec décimales (string)",
+                                  "example": "420.000"
+                                },
+                                "time_formatted": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "description": "Temps formaté lisible",
+                                  "example": "7:00.000"
+                                },
+                                "has_timing": {
+                                  "type": "boolean",
+                                  "description": "Indique si l'équipage a un temps enregistré"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "status": "success",
+                  "data": [
+                    {
+                      "category": {
+                        "id": "cat-uuid-1",
+                        "code": "M23",
+                        "label": "Hommes 23 ans",
+                        "age_group": "23",
+                        "gender": "Homme"
+                      },
+                      "results": [
+                        {
+                          "race_id": "race-uuid-1",
+                          "race_number": 1,
+                          "phase_id": "phase-uuid-1",
+                          "phase_name": "Série A",
+                          "crew_id": "crew-uuid-1",
+                          "lane": 1,
+                          "club_name": "Club Aviron Paris",
+                          "club_code": "PAR",
+                          "position": 1,
+                          "finish_time": "2025-01-15T10:30:45.000Z",
+                          "final_time": "420000",
+                          "time_seconds": "420.000",
+                          "time_formatted": "7:00.000",
+                          "has_timing": true
+                        },
+                        {
+                          "race_id": "race-uuid-2",
+                          "race_number": 2,
+                          "phase_id": "phase-uuid-1",
+                          "phase_name": "Série A",
+                          "crew_id": "crew-uuid-2",
+                          "lane": 2,
+                          "club_name": "Club Aviron Lyon",
+                          "club_code": "LYO",
+                          "position": 2,
+                          "finish_time": "2025-01-15T10:31:12.000Z",
+                          "final_time": "447000",
+                          "time_seconds": "447.000",
+                          "time_formatted": "7:27.000",
+                          "has_timing": true
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Événement non trouvé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "error"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Événement non trouvé"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erreur serveur",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "error"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Erreur lors de la récupération des résultats"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/participants": {
       "get": {
         "tags": [
@@ -966,6 +1203,11 @@
                   },
                   "has_coxswain": {
                     "type": "boolean"
+                  },
+                  "distance_id": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "ID de la distance associée (peut être null)"
                   }
                 }
               }
@@ -1135,6 +1377,11 @@
                   },
                   "has_coxswain": {
                     "type": "boolean"
+                  },
+                  "distance_id": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "ID de la distance associée (peut être null)"
                   }
                 }
               }
@@ -1308,7 +1555,18 @@
                     "type": "string"
                   },
                   "status": {
-                    "type": "integer"
+                    "type": "string",
+                    "enum": [
+                      "registered",
+                      "dns",
+                      "dnf",
+                      "disqualified",
+                      "changed",
+                      "withdrawn",
+                      "scratch"
+                    ],
+                    "default": "registered",
+                    "description": "Statut de l'équipage"
                   },
                   "club_name": {
                     "type": "string"
@@ -1444,7 +1702,18 @@
                     "type": "string"
                   },
                   "status": {
-                    "type": "integer"
+                    "type": "string",
+                    "enum": [
+                      "registered",
+                      "dns",
+                      "dnf",
+                      "disqualified",
+                      "changed",
+                      "withdrawn",
+                      "scratch"
+                    ],
+                    "default": "registered",
+                    "description": "Statut de l'équipage"
                   },
                   "club_name": {
                     "type": "string"
@@ -1646,6 +1915,22 @@
                   },
                   "distance_id": {
                     "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "not_started",
+                      "non_official",
+                      "official",
+                      "in_progress",
+                      "delayed",
+                      "cancelled",
+                      "finished"
+                    ]
+                  },
+                  "start_time": {
+                    "type": "string",
+                    "format": "date-time"
                   }
                 }
               }
@@ -1717,6 +2002,29 @@
                   "lane_count": {
                     "type": "integer",
                     "minimum": 1
+                  },
+                  "start_time": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Heure de départ de la première course"
+                  },
+                  "interval_minutes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Minutes entre chaque course"
+                  },
+                  "category_order": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Ordre personnalisé des catégories (tableau de codes de catégories).\nLes catégories seront traitées dans cet ordre lors de la génération des courses.\nLes catégories non listées seront ajoutées à la fin (triées par code).\nExemple: [\"H4X\", \"H2X\", \"F4X\", \"F2X\", \"H1X\", \"F1X\"]\n",
+                    "example": [
+                      "H4X",
+                      "H2X",
+                      "F4X",
+                      "F2X"
+                    ]
                   }
                 }
               }
@@ -1726,6 +2034,198 @@
         "responses": {
           "200": {
             "description": "Courses générées"
+          }
+        }
+      }
+    },
+    "/races/generate-from-series": {
+      "post": {
+        "tags": [
+          "races"
+        ],
+        "summary": "Génère les courses à partir de séries prédéfinies",
+        "description": "Génère les courses en respectant la structure des séries fournie par le frontend.\nChaque série devient une course avec les équipages assignés selon le nombre spécifié par catégorie.\nLes équipages sont sélectionnés aléatoirement parmi ceux disponibles pour chaque catégorie.\n\n**Mode brouillon** : Utilisez `save_only: true` pour enregistrer uniquement le schéma sans générer les courses.\nVous pourrez ensuite générer les courses via `POST /race-phases/:id/generate-from-schema`.\n",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "phase_id",
+                  "lane_count",
+                  "series"
+                ],
+                "properties": {
+                  "phase_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "lane_count": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "start_time": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Heure de départ de la première course (optionnel)"
+                  },
+                  "interval_minutes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "default": 5,
+                    "description": "Minutes entre chaque course (optionnel)"
+                  },
+                  "series": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "categories"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "Identifiant unique de la série"
+                        },
+                        "categories": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "description": "Objet avec les codes de catégories comme clés et le nombre d'équipages comme valeurs.\nExemple: { \"SF\": 5, \"SH\": 1 } signifie 5 équipages \"Senior Femme\" et 1 \"Senior Homme\"\n"
+                        }
+                      }
+                    },
+                    "example": [
+                      {
+                        "id": "series-1234567890",
+                        "categories": {
+                          "SF": 5,
+                          "SH": 1
+                        }
+                      },
+                      {
+                        "id": "series-1234567891",
+                        "categories": {
+                          "SF": 5,
+                          "SH": 1
+                        }
+                      },
+                      {
+                        "id": "series-1234567892",
+                        "categories": {
+                          "JF": 6
+                        }
+                      }
+                    ]
+                  },
+                  "save_only": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Si true, enregistre uniquement le schéma sans générer les courses (mode brouillon).\nVous pourrez ensuite générer les courses via POST /race-phases/:id/generate-from-schema.\n"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Courses générées avec succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "5 courses générées avec succès"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "races_created": {
+                          "type": "integer",
+                          "description": "Nombre de courses créées"
+                        },
+                        "crews_assigned": {
+                          "type": "integer",
+                          "description": "Nombre total d'équipages assignés"
+                        },
+                        "races": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "race_number": {
+                                "type": "integer"
+                              },
+                              "start_time": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "distance_id": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "crews_count": {
+                                "type": "integer"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Erreurs de validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "error"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Erreurs de validation"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "example": [
+                        "Série 1: Le nombre total de participants (7) dépasse le nombre de lignes d'eau (6)",
+                        "Série 2: Les catégories ont des distances différentes"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -1978,6 +2478,313 @@
         }
       }
     },
+    "/race-phases/{id}/generate-from-schema": {
+      "post": {
+        "tags": [
+          "racephases"
+        ],
+        "summary": "Générer les courses depuis le schéma enregistré",
+        "description": "Génère les courses à partir du schéma de génération enregistré pour cette phase.\nLe schéma doit avoir été préalablement enregistré via POST /races/generate-from-series avec save_only=true\nou lors d'une génération précédente.\n",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "ID de la phase"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Courses générées avec succès depuis le schéma enregistré",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "3 courses générées avec succès depuis le schéma enregistré"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "races_created": {
+                          "type": "integer"
+                        },
+                        "crews_assigned": {
+                          "type": "integer"
+                        },
+                        "races": {
+                          "type": "array",
+                          "items": {
+                            "type": "object"
+                          }
+                        },
+                        "generation_schema": {
+                          "type": "object"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Aucun schéma enregistré ou schéma invalide"
+          },
+          "404": {
+            "description": "Phase introuvable"
+          }
+        }
+      }
+    },
+    "/race-phases/{id}/generation-schema": {
+      "get": {
+        "tags": [
+          "racephases"
+        ],
+        "summary": "Récupérer le schéma de génération des courses d'une phase",
+        "description": "Récupère le schéma JSON utilisé pour générer les courses depuis les séries.\nCe schéma est automatiquement enregistré lors de l'appel à POST /races/generate-from-series.\n",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "ID de la phase"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Schéma de génération récupéré avec succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "phase_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "phase_name": {
+                          "type": "string"
+                        },
+                        "generation_schema": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "lane_count": {
+                              "type": "integer"
+                            },
+                            "start_time": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            },
+                            "interval_minutes": {
+                              "type": "integer"
+                            },
+                            "series": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "categories": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                      "type": "integer"
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            "generated_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "updated_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Phase introuvable"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "racephases"
+        ],
+        "summary": "Mettre à jour le schéma de génération des courses d'une phase",
+        "description": "Met à jour le schéma JSON utilisé pour générer les courses depuis les séries.\nCe schéma peut être utilisé pour pré-remplir le formulaire de génération ou pour réappliquer la même configuration.\n",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "ID de la phase"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "generation_schema"
+                ],
+                "properties": {
+                  "generation_schema": {
+                    "type": "object",
+                    "required": [
+                      "lane_count",
+                      "series"
+                    ],
+                    "properties": {
+                      "lane_count": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "Nombre de lignes d'eau disponibles"
+                      },
+                      "start_time": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true,
+                        "description": "Heure de départ de la première course"
+                      },
+                      "interval_minutes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Minutes entre chaque course"
+                      },
+                      "series": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "categories"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "description": "Identifiant unique de la série"
+                            },
+                            "categories": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              "description": "Objet avec codes de catégories comme clés et nombre d'équipages comme valeurs"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Schéma de génération mis à jour avec succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Schéma de génération mis à jour avec succès"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "phase_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "phase_name": {
+                          "type": "string"
+                        },
+                        "generation_schema": {
+                          "type": "object"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Paramètres invalides"
+          },
+          "404": {
+            "description": "Phase introuvable"
+          }
+        }
+      }
+    },
     "/race-crews": {
       "post": {
         "tags": [
@@ -2109,19 +2916,75 @@
               "schema": {
                 "type": "object",
                 "required": [
-                  "event_id",
-                  "meters"
+                  "event_id"
                 ],
                 "properties": {
                   "event_id": {
                     "type": "string",
-                    "example": "2000m"
+                    "example": "7c38e42f-198a-4bd6-9c59-9854094a1ea0"
                   },
                   "meters": {
                     "type": "integer",
+                    "description": "Distance en mètres (requis si is_time_based = false).\nPour un relais: distance par segment (ex: 250 pour 8x250m).\nPour une course normale: distance totale (ex: 2000 pour 2000m).\n",
+                    "minimum": 100,
                     "example": 2000
+                  },
+                  "is_relay": {
+                    "type": "boolean",
+                    "description": "Indique si c'est une course en relais",
+                    "default": false,
+                    "example": false
+                  },
+                  "relay_count": {
+                    "type": "integer",
+                    "description": "Nombre de relais (requis si is_relay = true). Ex: 8 pour 8x250m, 4 pour 4x500m",
+                    "minimum": 2,
+                    "maximum": 20,
+                    "example": 8
+                  },
+                  "is_time_based": {
+                    "type": "boolean",
+                    "description": "Indique si la course est basée sur le temps plutôt que sur la distance",
+                    "default": false,
+                    "example": false
+                  },
+                  "duration_seconds": {
+                    "type": "integer",
+                    "description": "Durée en secondes (requis si is_time_based = true).\nEx: 120 pour 2 minutes, 300 pour 5 minutes, 60 pour 1 minute.\n",
+                    "minimum": 1,
+                    "example": 120
                   }
-                }
+                },
+                "allOf": [
+                  {
+                    "if": {
+                      "properties": {
+                        "is_time_based": {
+                          "const": false
+                        }
+                      },
+                      "then": {
+                        "required": [
+                          "meters"
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "is_time_based": {
+                          "const": true
+                        }
+                      },
+                      "then": {
+                        "required": [
+                          "duration_seconds"
+                        ]
+                      }
+                    }
+                  }
+                ]
               }
             }
           }
@@ -2190,11 +3053,41 @@
       }
     },
     "/timings": {
+      "get": {
+        "tags": [
+          "timings"
+        ],
+        "summary": "Liste des chronométrages",
+        "responses": {
+          "200": {
+            "description": "Liste des timings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Timing"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "tags": [
           "timings"
         ],
-        "summary": "Enregistrer un temps pour un équipage",
+        "summary": "Créer un timing",
         "security": [
           {
             "bearerAuth": []
@@ -2207,20 +3100,31 @@
               "schema": {
                 "type": "object",
                 "required": [
-                  "race_crew_id",
                   "timing_point_id",
-                  "time"
+                  "timestamp"
                 ],
                 "properties": {
-                  "race_crew_id": {
-                    "type": "string"
-                  },
                   "timing_point_id": {
                     "type": "string"
                   },
-                  "time": {
-                    "type": "number",
-                    "example": 345.21
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "manual_entry": {
+                    "type": "boolean"
+                  },
+                  "entered_by": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "assigned",
+                      "hidden"
+                    ],
+                    "default": "pending"
                   }
                 }
               }
@@ -2229,40 +3133,74 @@
         },
         "responses": {
           "201": {
-            "description": "Temps enregistré"
-          }
-        }
-      }
-    },
-    "/timings/{race_crew_id}": {
-      "get": {
-        "tags": [
-          "timings"
-        ],
-        "summary": "Liste des temps pour un équipage",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "race_crew_id",
-            "required": true,
-            "schema": {
-              "type": "string"
+            "description": "Timing enregistré",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Timing"
+                    }
+                  }
+                }
+              }
             }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Liste des temps triée"
           }
         }
       }
     },
     "/timings/{id}": {
-      "delete": {
+      "get": {
         "tags": [
           "timings"
         ],
-        "summary": "Supprimer un enregistrement de temps",
+        "summary": "Obtenir un timing par ID",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "description": "ID du timing"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Détail du timing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Timing"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Timing non trouvé"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "timings"
+        ],
+        "summary": "Mettre à jour un timing",
         "security": [
           {
             "bearerAuth": []
@@ -2272,15 +3210,165 @@
           {
             "in": "path",
             "name": "id",
-            "required": true,
             "schema": {
               "type": "string"
+            },
+            "required": true,
+            "description": "ID du timing à mettre à jour"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "timing_point_id": {
+                    "type": "string"
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "manual_entry": {
+                    "type": "boolean"
+                  },
+                  "entered_by": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "assigned",
+                      "hidden"
+                    ]
+                  }
+                }
+              }
             }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Mise à jour réussie",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Timing"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Timing non trouvé"
+          },
+          "500": {
+            "description": "Erreur serveur"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "timings"
+        ],
+        "summary": "Supprimer un timing",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "description": "ID du timing à supprimer"
           }
         ],
         "responses": {
           "200": {
-            "description": "Supprimé"
+            "description": "Supprimé avec succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Timing supprimé"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Timing non trouvé"
+          }
+        }
+      }
+    },
+    "/timings/event/{event_id}": {
+      "get": {
+        "tags": [
+          "timings"
+        ],
+        "summary": "Liste des temps d’un événement donné",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "ID de l’événement"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Liste des temps pour l’événement",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Timing"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Événement non trouvé"
           }
         }
       }
@@ -2434,9 +3522,9 @@
     "/timing-assignments": {
       "post": {
         "tags": [
-          "timingassignments"
+          "timing-assignments"
         ],
-        "summary": "Assigner un timing à un équipage",
+        "summary": "Assigner un temps à un équipage",
         "security": [
           {
             "bearerAuth": []
@@ -2471,12 +3559,88 @@
         }
       }
     },
+    "/timing-assignments/{id}": {
+      "put": {
+        "tags": [
+          "timing-assignments"
+        ],
+        "summary": "Mettre à jour une assignation",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "timing_id",
+                  "crew_id"
+                ],
+                "properties": {
+                  "timing_id": {
+                    "type": "string"
+                  },
+                  "crew_id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Assignation mise à jour"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "timing-assignments"
+        ],
+        "summary": "Supprimer une assignation",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Assignation supprimée"
+          }
+        }
+      }
+    },
     "/timing-assignments/crew/{crew_id}": {
       "get": {
         "tags": [
-          "timingassignments"
+          "timing-assignments"
         ],
-        "summary": "Récupérer les timings assignés à un équipage",
+        "summary": "Récupérer les assignations pour un équipage",
         "parameters": [
           {
             "in": "path",
@@ -2494,21 +3658,16 @@
         }
       }
     },
-    "/timing-assignments/{id}": {
-      "delete": {
+    "/timing-assignments/event/{event_id}": {
+      "get": {
         "tags": [
-          "timingassignments"
+          "timing-assignments"
         ],
-        "summary": "Supprimer une assignation",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
+        "summary": "Récupérer toutes les assignations pour un événement",
         "parameters": [
           {
-            "name": "id",
             "in": "path",
+            "name": "event_id",
             "required": true,
             "schema": {
               "type": "string"
@@ -2517,7 +3676,30 @@
         ],
         "responses": {
           "200": {
-            "description": "Supprimée"
+            "description": "Liste complète avec détails"
+          }
+        }
+      }
+    },
+    "/timing-assignments/race/{race_id}": {
+      "get": {
+        "tags": [
+          "timing-assignments"
+        ],
+        "summary": "Récupérer toutes les assignations pour une course",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "race_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Liste complète avec détails"
           }
         }
       }
@@ -2971,6 +4153,7 @@
           "Import"
         ],
         "summary": "Importer un événement avec ses épreuves, participants et bateaux",
+        "description": "Crée un nouvel événement complet avec toutes les catégories, équipages et participants\ndepuis l'API FFAviron. Cette route crée un nouvel événement.\n",
         "security": [
           {
             "bearerAuth": []
@@ -3018,6 +4201,339 @@
         }
       }
     },
+    "/import/manifestation/{id}/update": {
+      "post": {
+        "tags": [
+          "Import"
+        ],
+        "summary": "Mettre à jour un événement existant depuis l'API FFAviron",
+        "description": "Met à jour un événement existant en ajoutant uniquement les nouveaux éléments\n(catégories, participants, équipages) sans toucher à l'existant.\nCette route ne supprime rien et ne duplique pas les données existantes.\nLes courses, phases et autres données déjà créées ne sont pas affectées.\n",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID de la manifestation dans l'API source"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "event_id"
+                ],
+                "properties": {
+                  "event_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "ID de l'événement à mettre à jour"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Événement mis à jour avec succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Événement mis à jour avec succès"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "event_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "new_categories_count": {
+                          "type": "integer",
+                          "description": "Nombre de nouvelles catégories créées"
+                        },
+                        "new_crews_count": {
+                          "type": "integer",
+                          "description": "Nombre de nouveaux équipages créés"
+                        },
+                        "new_participants_count": {
+                          "type": "integer",
+                          "description": "Nombre de nouveaux participants créés"
+                        },
+                        "total_participants_count": {
+                          "type": "integer",
+                          "description": "Nombre total de participants liés aux nouveaux équipages"
+                        },
+                        "new_distances_count": {
+                          "type": "integer",
+                          "description": "Nombre de nouvelles distances créées"
+                        },
+                        "new_categories": {
+                          "type": "array",
+                          "description": "Détails complets des nouvelles catégories créées",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "age_group": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "gender": {
+                                "type": "string"
+                              },
+                              "boat_seats": {
+                                "type": "integer",
+                                "nullable": true
+                              },
+                              "has_coxswain": {
+                                "type": "boolean"
+                              },
+                              "distance_id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "nullable": true
+                              }
+                            }
+                          }
+                        },
+                        "new_distances": {
+                          "type": "array",
+                          "description": "Détails complets des nouvelles distances créées",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "meters": {
+                                "type": "integer"
+                              },
+                              "is_relay": {
+                                "type": "boolean"
+                              },
+                              "relay_count": {
+                                "type": "integer",
+                                "nullable": true
+                              },
+                              "label": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "new_crews": {
+                          "type": "array",
+                          "description": "Détails complets des nouveaux équipages créés",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "category_id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "category_code": {
+                                "type": "string"
+                              },
+                              "category_label": {
+                                "type": "string"
+                              },
+                              "club_name": {
+                                "type": "string"
+                              },
+                              "club_code": {
+                                "type": "string"
+                              },
+                              "status": {
+                                "type": "integer"
+                              }
+                            }
+                          }
+                        },
+                        "new_participants": {
+                          "type": "array",
+                          "description": "Détails complets des nouveaux participants créés",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "first_name": {
+                                "type": "string"
+                              },
+                              "last_name": {
+                                "type": "string"
+                              },
+                              "license_number": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "gender": {
+                                "type": "string"
+                              },
+                              "club_name": {
+                                "type": "string"
+                              },
+                              "crew_id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "crew_club": {
+                                "type": "string"
+                              },
+                              "is_coxswain": {
+                                "type": "boolean"
+                              },
+                              "seat_position": {
+                                "type": "integer",
+                                "nullable": true
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Paramètres invalides (event_id manquant)"
+          },
+          "404": {
+            "description": "Événement introuvable"
+          },
+          "500": {
+            "description": "Erreur lors de la mise à jour"
+          }
+        }
+      }
+    },
+    "/exports/startlist/phase/{phase_id}": {
+      "get": {
+        "tags": [
+          "Exports"
+        ],
+        "summary": "Exporter la start list d'une phase au format PDF",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "phase_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID de la phase"
+          }
+        ],
+        "produces": [
+          "application/pdf"
+        ],
+        "responses": {
+          "200": {
+            "description": "Fichier PDF de la start list",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Phase non trouvée"
+          }
+        }
+      }
+    },
+    "/exports/weighin/phase/{phase_id}": {
+      "get": {
+        "tags": [
+          "Exports"
+        ],
+        "summary": "Exporter la liste de pesée d'une phase au format PDF",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "phase_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID de la phase"
+          }
+        ],
+        "produces": [
+          "application/pdf"
+        ],
+        "responses": {
+          "200": {
+            "description": "Fichier PDF de la pesée",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Phase non trouvée"
+          }
+        }
+      }
+    },
     "/user-events": {
       "post": {
         "tags": [
@@ -3036,13 +4552,15 @@
               "schema": {
                 "type": "object",
                 "required": [
-                  "user_id",
+                  "email",
                   "event_id",
                   "role"
                 ],
                 "properties": {
-                  "user_id": {
-                    "type": "string"
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "Adresse email de l'utilisateur (sera créé si n'existe pas)"
                   },
                   "event_id": {
                     "type": "string"
@@ -3053,8 +4571,13 @@
                       "viewer",
                       "editor",
                       "referee",
+                      "timing",
                       "organiser"
                     ]
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Nom de l'utilisateur (optionnel, extrait de l'email si non fourni)"
                   }
                 }
               }
@@ -3072,6 +4595,51 @@
                     "status": {
                       "type": "string",
                       "example": "success"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "user_event": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "user_id": {
+                              "type": "string"
+                            },
+                            "event_id": {
+                              "type": "string"
+                            },
+                            "role": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "user": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "email": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "user_created": {
+                          "type": "boolean",
+                          "description": "Indique si l'utilisateur a été créé"
+                        },
+                        "temporary_password": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "Mot de passe provisoire (uniquement si user_created = true)"
+                        }
+                      }
                     }
                   }
                 }
@@ -3136,6 +4704,1331 @@
           }
         }
       }
+    },
+    "/server-time": {
+      "get": {
+        "tags": [
+          "misc"
+        ],
+        "summary": "Heure actuelle du serveur",
+        "description": "Renvoie l'heure actuelle du serveur (format ISO 8601)",
+        "responses": {
+          "200": {
+            "description": "Heure du serveur",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "server_time": {
+                      "type": "string",
+                      "format": "date-time",
+                      "example": "2025-06-29T12:00:00.000Z"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/server-time-offset": {
+      "get": {
+        "tags": [
+          "misc"
+        ],
+        "summary": "Heure serveur avec calcul de décalage",
+        "description": "Renvoie l'heure serveur + décalage par rapport à l'heure client.\nLe paramètre `client_time` doit être une date ISO valide.\n",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "client_time",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Heure actuelle du client"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Heure serveur et décalage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "server_time": {
+                      "type": "string",
+                      "format": "date-time",
+                      "example": "2025-06-29T12:00:00.000Z"
+                    },
+                    "offset_ms": {
+                      "type": "integer",
+                      "example": -150,
+                      "description": "Décalage entre client et serveur en millisecondes"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rankings/event/{event_id}/ranking": {
+      "get": {
+        "tags": [
+          "rankings"
+        ],
+        "summary": "Récupère le classement des clubs pour un événement",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ranking_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "indoor_points",
+                "defis_capitaux",
+                "custom"
+              ],
+              "default": "indoor_points"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Classement récupéré",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "event_id": {
+                            "type": "string"
+                          },
+                          "club_name": {
+                            "type": "string"
+                          },
+                          "club_code": {
+                            "type": "string"
+                          },
+                          "total_points": {
+                            "type": "number"
+                          },
+                          "rank": {
+                            "type": "integer"
+                          },
+                          "ranking_type": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rankings/event/{event_id}/club/{club_name}/points": {
+      "get": {
+        "tags": [
+          "rankings"
+        ],
+        "summary": "Récupère les points détaillés d'un club",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "club_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ranking_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "indoor_points",
+                "defis_capitaux",
+                "custom"
+              ],
+              "default": "indoor_points"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Points détaillés récupérés"
+          },
+          "404": {
+            "description": "Classement non trouvé"
+          }
+        }
+      }
+    },
+    "/rankings/event/{event_id}/recalculate": {
+      "post": {
+        "tags": [
+          "rankings"
+        ],
+        "summary": "Recalcule les rangs des clubs pour un événement",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ranking_type": {
+                    "type": "string",
+                    "enum": [
+                      "indoor_points",
+                      "defis_capitaux",
+                      "custom"
+                    ],
+                    "default": "indoor_points"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Rangs recalculés"
+          }
+        }
+      }
+    },
+    "/rankings/race/{race_id}/calculate-points": {
+      "post": {
+        "tags": [
+          "rankings"
+        ],
+        "summary": "Calcule et enregistre les points pour une course",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "race_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ranking_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "indoor_points",
+                "defis_capitaux",
+                "custom"
+              ],
+              "default": "indoor_points"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Points calculés et enregistrés",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        },
+                        "points": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "club_name": {
+                                "type": "string"
+                              },
+                              "place": {
+                                "type": "integer"
+                              },
+                              "points": {
+                                "type": "number"
+                              },
+                              "points_type": {
+                                "type": "string",
+                                "enum": [
+                                  "individuel",
+                                  "relais"
+                                ]
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rankings/templates": {
+      "get": {
+        "tags": [
+          "rankings"
+        ],
+        "summary": "Liste des templates de points",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "indoor_points",
+                "defis_capitaux",
+                "custom"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Liste des templates"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "rankings"
+        ],
+        "summary": "Crée un template de points",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "type",
+                  "config"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "indoor_points",
+                      "defis_capitaux",
+                      "custom"
+                    ]
+                  },
+                  "config": {
+                    "type": "object",
+                    "description": "Configuration JSON des points"
+                  },
+                  "is_default": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Template créé"
+          }
+        }
+      }
+    },
+    "/notifications": {
+      "get": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Liste toutes les notifications (backoffice)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "event_id",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtrer par événement"
+          },
+          {
+            "in": "query",
+            "name": "race_id",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtrer par course"
+          },
+          {
+            "in": "query",
+            "name": "is_active",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Filtrer par statut actif"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Liste des notifications",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Notification"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Créer une nouvelle notification",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "message"
+                ],
+                "properties": {
+                  "event_id": {
+                    "type": "string",
+                    "description": "ID de l'événement (requis si race_id n'est pas fourni)"
+                  },
+                  "race_id": {
+                    "type": "string",
+                    "description": "ID de la course (requis si event_id n'est pas fourni)"
+                  },
+                  "message": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000,
+                    "description": "Message de la notification"
+                  },
+                  "importance": {
+                    "type": "string",
+                    "enum": [
+                      "info",
+                      "warning",
+                      "error",
+                      "success"
+                    ],
+                    "default": "info",
+                    "description": "Niveau d'importance"
+                  },
+                  "is_active": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Si la notification est active"
+                  },
+                  "start_date": {
+                    "type": "string",
+                    "format": "date-time",
+                    "nullable": true,
+                    "description": "Date de début d'affichage (null = immédiat)"
+                  },
+                  "end_date": {
+                    "type": "string",
+                    "format": "date-time",
+                    "nullable": true,
+                    "description": "Date de fin d'affichage (null = pas d'expiration)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Notification créée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Notification"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications/event/{event_id}": {
+      "get": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Récupérer les notifications actives d'un événement",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID de l'événement"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Liste des notifications actives",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Notification"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications/race/{race_id}": {
+      "get": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Récupérer les notifications actives d'une course",
+        "description": "Retourne les notifications spécifiques à la course ET les notifications de l'événement parent\n",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "race_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID de la course"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Liste des notifications actives",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Notification"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications/{id}": {
+      "put": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Mettre à jour une notification",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID de la notification"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "importance": {
+                    "type": "string",
+                    "enum": [
+                      "info",
+                      "warning",
+                      "error",
+                      "success"
+                    ]
+                  },
+                  "is_active": {
+                    "type": "boolean"
+                  },
+                  "start_date": {
+                    "type": "string",
+                    "format": "date-time",
+                    "nullable": true
+                  },
+                  "end_date": {
+                    "type": "string",
+                    "format": "date-time",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Notification mise à jour",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Notification"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Supprimer une notification",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID de la notification"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notification supprimée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/clubs": {
+      "get": {
+        "tags": [
+          "clubs"
+        ],
+        "summary": "Récupérer la liste des clubs",
+        "description": "Récupère la liste des clubs depuis l'API FFA (Fédération Française d'Aviron).\nFiltre uniquement les structures de type \"CLU\" (clubs).\n",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Liste des clubs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Club"
+                      }
+                    },
+                    "count": {
+                      "type": "integer",
+                      "description": "Nombre de clubs retournés",
+                      "example": 150
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erreur lors de la récupération",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "error"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/indoor-results/import": {
+      "post": {
+        "tags": [
+          "indoor-results"
+        ],
+        "summary": "Importer les résultats d'une course depuis ErgRace",
+        "description": "Importe les résultats d'une course depuis le format JSON ErgRace.\nLes résultats sont automatiquement liés aux équipages (crews) si l'ID ErgRace correspond à un crew_id.\nLe JSON complet est conservé dans `raw_data` pour traçabilité.\n\n**Filtrage automatique** : Les lanes vides (sans résultats) sont automatiquement ignorées :\n- Participants avec `participant: \"EMPTY\"` ou `class: \"EMPTY\"`\n- Lanes avec ID au format \"Lane X\" sans temps ou distance valide\n",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "results"
+                ],
+                "properties": {
+                  "results": {
+                    "type": "object",
+                    "required": [
+                      "race_id"
+                    ],
+                    "properties": {
+                      "race_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "ID de la course dans ErgRace (UUID)",
+                        "example": "46916f84-f780-488c-813d-a5475142f86e"
+                      },
+                      "c2_race_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "ID de la course dans notre plateforme (optionnel)",
+                        "example": "abc-123-def-456"
+                      },
+                      "ergrace_version": {
+                        "type": "string",
+                        "example": "03.01.01"
+                      },
+                      "race_start_time": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2025-11-28 18:33:05"
+                      },
+                      "race_end_time": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2025-11-28 18:33:44"
+                      },
+                      "duration": {
+                        "type": "integer",
+                        "description": "Durée en millisecondes",
+                        "example": 100
+                      },
+                      "time_cap": {
+                        "type": "integer",
+                        "example": 0
+                      },
+                      "race_file_name": {
+                        "type": "string",
+                        "example": "Course_test_46916f84-f780-488c-813d-a5475142f86e.rac2"
+                      },
+                      "participants": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "description": "ID du participant (UUID du crew_id ou \"Lane X\")",
+                              "example": "c45d85a1-8493-4e3e-9440-1a7ef4852406"
+                            },
+                            "place": {
+                              "type": "integer",
+                              "example": 1
+                            },
+                            "time": {
+                              "type": "string",
+                              "example": "0:24.1"
+                            },
+                            "score": {
+                              "type": "string",
+                              "example": "0:24.1"
+                            },
+                            "distance": {
+                              "type": "integer",
+                              "example": 100
+                            },
+                            "avg_pace": {
+                              "type": "string",
+                              "example": "2:00.5"
+                            },
+                            "spm": {
+                              "type": "integer",
+                              "description": "Strokes per minute",
+                              "example": 32
+                            },
+                            "calories": {
+                              "type": "integer",
+                              "example": 6
+                            },
+                            "serial_number": {
+                              "type": "integer",
+                              "example": 431859705
+                            },
+                            "machine_type": {
+                              "type": "string",
+                              "example": "row"
+                            },
+                            "logged_time": {
+                              "type": "string",
+                              "example": "28/11/2025 18:32:00"
+                            },
+                            "splits": {
+                              "type": "array",
+                              "description": "Splits détaillés (optionnel)"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Résultats mis à jour avec succès"
+          },
+          "201": {
+            "description": "Résultats importés avec succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Résultats importés avec succès"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "indoor_race_result_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "race_id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "nullable": true
+                        },
+                        "ergrace_race_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "participants_count": {
+                          "type": "integer"
+                        },
+                        "linked_crews_count": {
+                          "type": "integer",
+                          "description": "Nombre d'équipages liés automatiquement"
+                        },
+                        "unlinked_participants_count": {
+                          "type": "integer",
+                          "description": "Nombre de participants non liés (ex: \"Lane X\")"
+                        },
+                        "skipped_empty_lanes": {
+                          "type": "integer",
+                          "description": "Nombre de lanes vides ignorées lors de l'import"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Format JSON invalide"
+          },
+          "404": {
+            "description": "Course introuvable (si c2_race_id fourni)"
+          }
+        }
+      }
+    },
+    "/indoor-results/race/{race_id}": {
+      "get": {
+        "tags": [
+          "indoor-results"
+        ],
+        "summary": "Récupérer les résultats d'une course",
+        "description": "Récupère les résultats d'une course indoor avec les détails des participants,\nincluant les informations des équipages (club, catégorie) si liés.\n\n**Accès public** : Cet endpoint est accessible publiquement (sans authentification) \nsi la course a le statut \"non_official\" ou \"official\". Pour les autres statuts, \nl'authentification est requise.\n\n**Données sensibles** : Le champ `raw_data` n'est retourné que si l'utilisateur est authentifié.\nLe champ `splits_data` est toujours retourné (utile pour l'affichage des splits).\n",
+        "security": [],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "race_id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "ID de la course dans la plateforme"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Résultats récupérés avec succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "race_result": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "race_id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "ergrace_race_id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "race_start_time": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "race_end_time": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "duration": {
+                              "type": "integer"
+                            }
+                          }
+                        },
+                        "participants": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "place": {
+                                "type": "integer"
+                              },
+                              "time_display": {
+                                "type": "string"
+                              },
+                              "time_ms": {
+                                "type": "integer"
+                              },
+                              "score": {
+                                "type": "string"
+                              },
+                              "distance": {
+                                "type": "integer"
+                              },
+                              "avg_pace": {
+                                "type": "string"
+                              },
+                              "spm": {
+                                "type": "integer"
+                              },
+                              "calories": {
+                                "type": "integer"
+                              },
+                              "machine_type": {
+                                "type": "string"
+                              },
+                              "logged_time": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "crew": {
+                                "type": "object",
+                                "nullable": true,
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  "club_name": {
+                                    "type": "string"
+                                  },
+                                  "club_code": {
+                                    "type": "string"
+                                  },
+                                  "category": {
+                                    "type": "object",
+                                    "nullable": true,
+                                    "properties": {
+                                      "id": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                      },
+                                      "code": {
+                                        "type": "string"
+                                      },
+                                      "label": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "ergrace_participant_id": {
+                                "type": "string"
+                              },
+                              "splits_data": {
+                                "type": "object",
+                                "nullable": true
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentification requise (si la course n'est pas publique)"
+          },
+          "404": {
+            "description": "Aucun résultat trouvé pour cette course"
+          }
+        }
+      }
+    },
+    "/indoor-results/event/{event_id}": {
+      "get": {
+        "tags": [
+          "indoor-results"
+        ],
+        "summary": "Récupérer tous les résultats d'un événement",
+        "description": "Récupère tous les résultats des courses indoor d'un événement.\n",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "ID de l'événement"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Liste des résultats récupérée avec succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "race": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "race_number": {
+                                "type": "integer"
+                              }
+                            }
+                          },
+                          "result": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "race_start_time": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "race_end_time": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "duration": {
+                                "type": "integer"
+                              }
+                            }
+                          },
+                          "participants": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "place": {
+                                  "type": "integer"
+                                },
+                                "time_display": {
+                                  "type": "string"
+                                },
+                                "crew": {
+                                  "type": "object",
+                                  "nullable": true,
+                                  "properties": {
+                                    "club_name": {
+                                      "type": "string"
+                                    },
+                                    "category": {
+                                      "type": "string"
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3147,154 +6040,70 @@
       }
     },
     "schemas": {
-      "ClubInfo": {
+      "Club": {
         "type": "object",
+        "description": "Informations d'un club",
         "properties": {
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "slug": {
-            "type": "string"
-          },
-          "city": {
-            "type": "string"
-          },
-          "role": {
-            "type": "string"
-          }
-        }
-      },
-      "GroupInfo": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "club_id": {
-            "type": "string"
-          }
-        }
-      },
-      "User": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "email": {
-            "type": "string"
-          },
-          "num_license": {
-            "type": "string"
-          },
-          "avatar": {
-            "type": "string"
-          },
-          "status": {
+          "nom": {
             "type": "string",
-            "enum": [
-              "active",
-              "inactive"
-            ]
+            "description": "Nom complet du club",
+            "example": "CLUB AVIRON MARSEILLE"
           },
-          "role": {
+          "nom_court": {
             "type": "string",
-            "enum": [
-              "user",
-              "admin",
-              "superadmin"
-            ]
+            "description": "Nom court du club",
+            "example": "CAM"
           },
-          "slug": {
-            "type": "string"
-          }
-        }
-      },
-      "UserDetailResponse": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string"
+          "code": {
+            "type": "string",
+            "description": "Code unique du club",
+            "example": "C130001"
           },
-          "data": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/User"
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "clubs": {
-                    "type": "array",
-                    "items": {
-                      "$ref": "#/components/schemas/ClubInfo"
-                    }
-                  },
-                  "groups": {
-                    "type": "array",
-                    "items": {
-                      "$ref": "#/components/schemas/GroupInfo"
-                    }
-                  }
-                }
-              }
-            ]
-          }
-        }
-      },
-      "UserListResponse": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string"
+          "etat": {
+            "type": "string",
+            "description": "État du club (A = Actif, I = Inactif)",
+            "example": "A"
           },
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/User"
-            }
+          "type": {
+            "type": "string",
+            "description": "Type de structure (toujours \"CLU\" pour les clubs)",
+            "example": "CLU"
           },
-          "pagination": {
-            "type": "object",
-            "properties": {
-              "total": {
-                "type": "integer"
-              },
-              "page": {
-                "type": "integer"
-              },
-              "limit": {
-                "type": "integer"
-              }
-            }
-          }
-        }
-      },
-      "UserCreationResponse": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string"
+          "logo": {
+            "type": "string",
+            "nullable": true,
+            "description": "Chemin relatif du logo",
+            "example": "a7/bc/a7bc4c71-2711-402c-848f-b773d353d187.png"
           },
-          "data": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string"
-              },
-              "email": {
-                "type": "string"
-              }
-            }
+          "logo_url": {
+            "type": "string",
+            "nullable": true,
+            "description": "URL complète du logo",
+            "example": "https://intranet.ffaviron.fr/storage/logos_structures/a7/bc/a7bc4c71-2711-402c-848f-b773d353d187.png"
+          },
+          "code_region": {
+            "type": "string",
+            "nullable": true,
+            "description": "Code de la région",
+            "example": "LR13"
+          },
+          "nom_region": {
+            "type": "string",
+            "nullable": true,
+            "description": "Nom de la région",
+            "example": "LIGUE AVIRON SUD PROVENCE-ALPES-COTE D'AZUR"
+          },
+          "code_departement": {
+            "type": "string",
+            "nullable": true,
+            "description": "Code du département",
+            "example": "CD013"
+          },
+          "nom_departement": {
+            "type": "string",
+            "nullable": true,
+            "description": "Nom du département",
+            "example": "COMITÉ DÉPARTEMENTAL DES BOUCHES DU RHÔNE"
           }
         }
       }
@@ -3347,23 +6156,47 @@
     },
     {
       "name": "timings",
-      "description": "Enregistrements de temps pour un équipage à un point donné"
+      "description": "Gestion des enregistrements de chronométrage"
     },
     {
       "name": "timingpoints",
       "description": "Points de chronométrage dans une course (Départ, Intermédiaire, Arrivée)"
     },
     {
-      "name": "timingassignments",
-      "description": "Assignation différée de temps brut à un équipage"
+      "name": "timing-assignments",
+      "description": "Assignation des temps aux équipages"
     },
     {
       "name": "Import",
       "description": "Importer une manifestation complète depuis l'API fédérale"
     },
     {
+      "name": "Exports",
+      "description": "Génération et téléchargement de documents PDF (start list, pesée, etc.)"
+    },
+    {
       "name": "UserEvents",
       "description": "Gestion des utilisateurs liés à un événement"
+    },
+    {
+      "name": "misc",
+      "description": "Routes utilitaires diverses"
+    },
+    {
+      "name": "rankings",
+      "description": "Gestion des classements des clubs"
+    },
+    {
+      "name": "notifications",
+      "description": "Gestion des notifications pour les événements et les courses"
+    },
+    {
+      "name": "clubs",
+      "description": "Gestion des clubs (récupération depuis l'API FFA)"
+    },
+    {
+      "name": "indoor-results",
+      "description": "Gestion des résultats des courses indoor (ErgRace)"
     }
   ],
   "security": []
