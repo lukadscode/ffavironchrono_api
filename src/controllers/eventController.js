@@ -112,6 +112,9 @@ exports.getEventResultsByCategory = async (req, res) => {
       });
     }
 
+    // Debug: Vérifier que les timing points sont bien récupérés
+    console.log(`[DEBUG] Event ${id} - Start point: ${startPoint.id}, Finish point: ${finishPoint.id}`);
+
     // Récupérer toutes les phases de l'événement
     const phases = await RacePhase.findAll({
       where: { event_id: id },
@@ -171,20 +174,34 @@ exports.getEventResultsByCategory = async (req, res) => {
               {
                 model: Timing,
                 as: "timing",
-                where: {
-                  timing_point_id: [startPoint.id, finishPoint.id],
-                },
                 required: false,
               },
             ],
           });
 
+          // Filtrer les timings pour les points de départ et d'arrivée
           const startTiming = timingAssignments.find(
-            (ta) => ta.timing && ta.timing.timing_point_id === startPoint.id
+            (ta) => 
+              ta.timing && 
+              ta.timing.timing_point_id === startPoint.id &&
+              ta.timing.timestamp !== null
           );
           const finishTiming = timingAssignments.find(
-            (ta) => ta.timing && ta.timing.timing_point_id === finishPoint.id
+            (ta) => 
+              ta.timing && 
+              ta.timing.timing_point_id === finishPoint.id &&
+              ta.timing.timestamp !== null
           );
+
+          // Debug: Log pour voir si les timings sont trouvés
+          if (raceCrew.crew_id && timingAssignments.length > 0) {
+            console.log(`[DEBUG] Crew ${raceCrew.crew_id} - Found ${timingAssignments.length} timing assignments`);
+            timingAssignments.forEach(ta => {
+              if (ta.timing) {
+                console.log(`[DEBUG]   - Timing ${ta.timing.id}: point=${ta.timing.timing_point_id}, timestamp=${ta.timing.timestamp}`);
+              }
+            });
+          }
 
           let duration_ms = null;
           let finish_time = null;
