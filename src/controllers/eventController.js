@@ -112,8 +112,6 @@ exports.getEventResultsByCategory = async (req, res) => {
       });
     }
 
-    // Debug: Vérifier que les timing points sont bien récupérés
-    console.log(`[DEBUG] Event ${id} - Start point: ${startPoint.id}, Finish point: ${finishPoint.id}`);
 
     // Récupérer toutes les phases de l'événement
     const phases = await RacePhase.findAll({
@@ -167,52 +165,37 @@ exports.getEventResultsByCategory = async (req, res) => {
           }
 
           // Récupérer les timings pour cet équipage
-          // Utiliser la même logique que getRaceResults
+          // Utiliser EXACTEMENT la même logique que getRaceResults
           const timingAssignments = await TimingAssignment.findAll({
             where: { crew_id: raceCrew.crew_id },
             include: [
               {
                 model: Timing,
                 as: "timing",
+                where: {
+                  timing_point_id: [startPoint.id, finishPoint.id],
+                },
                 required: false,
               },
             ],
           });
 
-          // Filtrer les timings pour les points de départ et d'arrivée
           const startTiming = timingAssignments.find(
-            (ta) => 
-              ta.timing && 
-              ta.timing.timing_point_id === startPoint.id &&
-              ta.timing.timestamp !== null
+            (ta) => ta.timing && ta.timing.timing_point_id === startPoint.id
           );
           const finishTiming = timingAssignments.find(
-            (ta) => 
-              ta.timing && 
-              ta.timing.timing_point_id === finishPoint.id &&
-              ta.timing.timestamp !== null
+            (ta) => ta.timing && ta.timing.timing_point_id === finishPoint.id
           );
-
-          // Debug: Log pour voir si les timings sont trouvés
-          if (raceCrew.crew_id && timingAssignments.length > 0) {
-            console.log(`[DEBUG] Crew ${raceCrew.crew_id} - Found ${timingAssignments.length} timing assignments`);
-            timingAssignments.forEach(ta => {
-              if (ta.timing) {
-                console.log(`[DEBUG]   - Timing ${ta.timing.id}: point=${ta.timing.timing_point_id}, timestamp=${ta.timing.timestamp}`);
-              }
-            });
-          }
 
           let duration_ms = null;
           let finish_time = null;
           let time_formatted = null;
           let time_seconds = null;
 
-          // Vérifier si on a un finish_time
+          // Utiliser EXACTEMENT la même logique que getRaceResults
           if (finishTiming?.timing?.timestamp) {
             finish_time = finishTiming.timing.timestamp;
 
-            // Si on a aussi un start_time, calculer la durée
             if (startTiming?.timing?.timestamp) {
               const start = new Date(startTiming.timing.timestamp);
               const finish = new Date(finishTiming.timing.timestamp);
@@ -233,8 +216,6 @@ exports.getEventResultsByCategory = async (req, res) => {
                 time_formatted = `${seconds}.${milliseconds.toString().padStart(3, "0")}`;
               }
             }
-            // Si on a seulement un finish_time sans start_time, on ne peut pas calculer la durée
-            // mais on marque quand même has_timing = true
           }
 
           allResults.push({
