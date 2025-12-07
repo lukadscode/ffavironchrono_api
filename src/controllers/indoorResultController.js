@@ -604,6 +604,15 @@ exports.getEventResultsByCategory = async (req, res) => {
                   id: pr.crew.id,
                   club_name: pr.crew.club_name,
                   club_code: pr.crew.club_code,
+                  category: pr.crew.category
+                    ? {
+                        id: pr.crew.category.id,
+                        code: pr.crew.category.code,
+                        label: pr.crew.category.label,
+                        age_group: pr.crew.category.age_group,
+                        gender: pr.crew.category.gender,
+                      }
+                    : null,
                   participants: participants,
                 }
               : null,
