@@ -60,10 +60,19 @@ interface Result {
   race_name: string | null;
   place_in_race: number | null;   // Place dans la course/série (conservée pour référence)
   position: number | null;         // Position dans le classement de la catégorie (1, 2, 3, ...)
+  points: number | null;           // Points attribués selon le classement (basé sur le template "Points Indoor")
+  is_eligible_for_points: boolean; // Indique si le résultat est éligible pour les points
   time_display: string | null;     // Temps formaté lisible (ex: "7:00.0")
   time_ms: number | null;          // Temps en millisecondes
   score: number | null;
   distance: number | null;         // Distance en mètres
+  distance_info: {
+    id: string;
+    meters: number | null;
+    is_relay: boolean;
+    relay_count: number | null;
+    label: string;                  // Label formaté (ex: "2000m", "8x250m")
+  } | null;
   avg_pace: string | null;         // Allure moyenne
   spm: number | null;              // Coups par minute
   calories: number | null;
@@ -116,10 +125,19 @@ interface Participant {
           "race_name": "Course 1",
           "place_in_race": 1,
           "position": 1,
+          "points": 30,
+          "is_eligible_for_points": true,
           "time_display": "7:00.0",
           "time_ms": 420000,
           "score": 1000,
           "distance": 2000,
+          "distance_info": {
+            "id": "distance-uuid-1",
+            "meters": 2000,
+            "is_relay": false,
+            "relay_count": null,
+            "label": "2000m"
+          },
           "avg_pace": "1:45.0",
           "spm": 32,
           "calories": 250,
@@ -163,10 +181,19 @@ interface Participant {
           "race_name": "Course 2",
           "place_in_race": 1,
           "position": 2,
+          "points": 25.5,
+          "is_eligible_for_points": true,
           "time_display": "7:27.0",
           "time_ms": 447000,
           "score": 950,
           "distance": 2000,
+          "distance_info": {
+            "id": "distance-uuid-1",
+            "meters": 2000,
+            "is_relay": false,
+            "relay_count": null,
+            "label": "2000m"
+          },
           "avg_pace": "1:51.8",
           "spm": 30,
           "calories": 240,
@@ -213,10 +240,19 @@ interface Participant {
           "race_name": "Course 4",
           "place_in_race": 1,
           "position": 1,
+          "points": 30,
+          "is_eligible_for_points": true,
           "time_display": "7:35.0",
           "time_ms": 455000,
           "score": 980,
           "distance": 2000,
+          "distance_info": {
+            "id": "distance-uuid-1",
+            "meters": 2000,
+            "is_relay": false,
+            "relay_count": null,
+            "label": "2000m"
+          },
           "avg_pace": "1:53.8",
           "spm": 31,
           "calories": 230,
@@ -697,13 +733,28 @@ table td {
 
 4. **Tri déjà effectué** : Les résultats sont déjà triés par temps (du plus rapide au plus lent) dans chaque catégorie, et les positions sont calculées. Vous n'avez pas besoin de les re-trier.
 
-5. **Participants** : Les participants sont triés par `seat_position` (position dans le bateau). Le barreur a `is_coxswain: true` et peut ne pas avoir de `seat_position`.
+5. **Points** : 
+   - Les points sont calculés automatiquement selon le template "Points Indoor" en fonction de la position dans la catégorie et du nombre de participants
+   - Les points ne sont attribués que pour les distances éligibles : **2000m**, **500m** ou **relais 8x250m**
+   - Les points ne sont pas attribués si `time_ms` est `null` ou `0`
+   - Le champ `is_eligible_for_points` indique si le résultat est éligible pour les points
+   - Le champ `points` est `null` si le résultat n'est pas éligible ou si aucun template n'est trouvé
+   - Les points diffèrent selon que c'est un relais (`distance_info.is_relay === true`) ou une course individuelle
+   - Le nombre de points dépend du nombre total de participants dans la catégorie (1-3, 4-6, 7-12, 13+)
 
-6. **Catégories vides** : Les catégories sans résultats n'apparaissent pas dans la réponse.
+6. **Distance** : 
+   - Le champ `distance_info` contient les informations détaillées sur la distance de la course
+   - `distance_info.label` fournit un label formaté (ex: "2000m", "8x250m") pour l'affichage
+   - `distance_info.is_relay` indique si c'est une course en relais
+   - `distance_info.relay_count` indique le nombre de relais (ex: 8 pour 8x250m)
 
-7. **Authentification** : Cette route nécessite une authentification (Bearer token).
+7. **Participants** : Les participants sont triés par `seat_position` (position dans le bateau). Le barreur a `is_coxswain: true` et peut ne pas avoir de `seat_position`.
 
-8. **Performance** : Cette route peut être lourde si l'événement contient beaucoup de courses. Pensez à mettre en cache les résultats côté frontend.
+8. **Catégories vides** : Les catégories sans résultats n'apparaissent pas dans la réponse.
+
+9. **Authentification** : Cette route nécessite une authentification (Bearer token).
+
+10. **Performance** : Cette route peut être lourde si l'événement contient beaucoup de courses. Pensez à mettre en cache les résultats côté frontend.
 
 ## 🐛 Gestion des erreurs
 

@@ -487,8 +487,15 @@ exports.getEventResultsByCategory = async (req, res) => {
     const { event_id } = req.params;
     const CrewParticipant = require("../models/CrewParticipant");
     const Participant = require("../models/Participant");
+    const ScoringTemplate = require("../models/ScoringTemplate");
+    const Distance = require("../models/Distance");
 
-    // Récupérer toutes les courses de l'événement avec leurs résultats
+    // Récupérer le template de points "Points Indoor"
+    const scoringTemplate = await ScoringTemplate.findOne({
+      where: { name: "Points Indoor" },
+    });
+
+    // Récupérer toutes les courses de l'événement avec leurs résultats et distances
     const races = await Race.findAll({
       include: [
         {
@@ -500,6 +507,10 @@ exports.getEventResultsByCategory = async (req, res) => {
           model: IndoorRaceResult,
           as: "indoor_results",
           required: true,
+        },
+        {
+          model: Distance,
+          required: false,
         },
       ],
     });
@@ -583,7 +594,15 @@ exports.getEventResultsByCategory = async (req, res) => {
                 }))
             : [];
 
-          // Ajouter le résultat (sans position pour l'instant, sera calculée après le tri)
+          // Vérifier si la distance est éligible pour les points (2000m, 500m ou relais 8x250)
+          const distance = race.Distance;
+          const isEligibleDistance = distance && (
+            (distance.meters === 2000 && !distance.is_relay) ||
+            (distance.meters === 500 && !distance.is_relay) ||
+            (distance.is_relay && distance.meters === 250 && distance.relay_count === 8)
+          );
+
+          // Ajouter le résultat (sans position et points pour l'instant, sera calculé après le tri)
           resultsByCategory[categoryKey].results.push({
             race_id: race.id,
             race_number: race.race_number,
@@ -599,6 +618,13 @@ exports.getEventResultsByCategory = async (req, res) => {
             machine_type: pr.machine_type,
             logged_time: pr.logged_time,
             crew_id: pr.crew_id,
+            distance_info: distance ? {
+              id: distance.id,
+              meters: distance.meters,
+              is_relay: distance.is_relay,
+              relay_count: distance.relay_count,
+              label: distance.label,
+            } : null,
             crew: pr.crew
               ? {
                   id: pr.crew.id,
@@ -617,18 +643,65 @@ exports.getEventResultsByCategory = async (req, res) => {
                 }
               : null,
             position: null, // Sera calculé après le tri par catégorie
+            points: null, // Sera calculé après le tri et le calcul des positions
+            is_eligible_for_points: isEligibleDistance && pr.time_ms !== null && pr.time_ms !== 0,
           });
         }
       }
     }
 
-    // Trier les résultats dans chaque catégorie par temps et calculer les positions
+    // Fonction helper pour calculer les points
+    const getPointsRange = (participantCount) => {
+      if (participantCount >= 1 && participantCount <= 3) {
+        return "1_3_participants";
+      } else if (participantCount >= 4 && participantCount <= 6) {
+        return "4_6_participants";
+      } else if (participantCount >= 7 && participantCount <= 12) {
+        return "7_12_participants";
+      } else {
+        return "13_plus_participants";
+      }
+    };
+
+    const calculatePoints = (template, position, participantCount, isRelay) => {
+      if (!template || !template.config || !position) {
+        return null;
+      }
+
+      const config = template.config;
+      const pointsIndoor = config.points_indoor;
+      if (!pointsIndoor) {
+        return null;
+      }
+
+      const range = getPointsRange(participantCount);
+      const rangeConfig = pointsIndoor[range];
+      if (!rangeConfig) {
+        return null;
+      }
+
+      // Pour "13+", on utilise la dernière entrée
+      if (range === "13_plus_participants" && position > 12) {
+        const lastEntry = rangeConfig[rangeConfig.length - 1];
+        return isRelay ? lastEntry.relais : lastEntry.individuel;
+      }
+
+      // Trouver la configuration pour cette position
+      const placeConfig = rangeConfig.find((p) => p.place === position);
+      if (!placeConfig) {
+        return null;
+      }
+
+      return isRelay ? placeConfig.relais : placeConfig.individuel;
+    };
+
+    // Trier les résultats dans chaque catégorie par temps et calculer les positions et points
     for (const categoryKey in resultsByCategory) {
       const categoryData = resultsByCategory[categoryKey];
       
       // Séparer les résultats avec et sans temps
-      const withTime = categoryData.results.filter((r) => r.time_ms !== null);
-      const withoutTime = categoryData.results.filter((r) => r.time_ms === null);
+      const withTime = categoryData.results.filter((r) => r.time_ms !== null && r.time_ms !== 0);
+      const withoutTime = categoryData.results.filter((r) => r.time_ms === null || r.time_ms === 0);
       
       // Trier par temps (du plus rapide au plus lent)
       withTime.sort((a, b) => {
@@ -642,9 +715,22 @@ exports.getEventResultsByCategory = async (req, res) => {
         r.position = index + 1;
       });
       
-      // Ajouter les résultats sans temps à la fin (sans position)
+      // Calculer les points pour chaque résultat éligible
+      const participantCount = withTime.length;
+      withTime.forEach((r) => {
+        if (r.is_eligible_for_points && r.position && scoringTemplate) {
+          // Déterminer si c'est un relais
+          const isRelay = r.distance_info?.is_relay || false;
+          r.points = calculatePoints(scoringTemplate, r.position, participantCount, isRelay);
+        } else {
+          r.points = null;
+        }
+      });
+      
+      // Ajouter les résultats sans temps à la fin (sans position ni points)
       withoutTime.forEach((r) => {
         r.position = null;
+        r.points = null;
       });
       
       // Combiner les résultats triés

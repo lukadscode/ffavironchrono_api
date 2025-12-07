@@ -5890,6 +5890,15 @@
                                   "nullable": true,
                                   "description": "Position dans le classement de la catégorie (1, 2, 3, ... calculée après tri par temps)"
                                 },
+                                "points": {
+                                  "type": "number",
+                                  "nullable": true,
+                                  "description": "Points attribués selon le classement de la catégorie (basé sur le template \"Points Indoor\"). Null si non éligible (temps 0, distance non éligible, etc.)"
+                                },
+                                "is_eligible_for_points": {
+                                  "type": "boolean",
+                                  "description": "Indique si le résultat est éligible pour les points (distance 2000m, 500m ou relais 8x250, et temps non nul)"
+                                },
                                 "time_display": {
                                   "type": "string",
                                   "nullable": true
@@ -5905,6 +5914,32 @@
                                 "distance": {
                                   "type": "integer",
                                   "nullable": true
+                                },
+                                "distance_info": {
+                                  "type": "object",
+                                  "nullable": true,
+                                  "description": "Informations sur la distance de la course",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "format": "uuid"
+                                    },
+                                    "meters": {
+                                      "type": "integer",
+                                      "nullable": true
+                                    },
+                                    "is_relay": {
+                                      "type": "boolean"
+                                    },
+                                    "relay_count": {
+                                      "type": "integer",
+                                      "nullable": true
+                                    },
+                                    "label": {
+                                      "type": "string",
+                                      "description": "Label formaté de la distance (ex: \"2000m\", \"8x250m\")"
+                                    }
+                                  }
                                 },
                                 "avg_pace": {
                                   "type": "string",
@@ -5947,6 +5982,30 @@
                                     "club_code": {
                                       "type": "string",
                                       "nullable": true
+                                    },
+                                    "category": {
+                                      "type": "object",
+                                      "nullable": true,
+                                      "properties": {
+                                        "id": {
+                                          "type": "string",
+                                          "format": "uuid"
+                                        },
+                                        "code": {
+                                          "type": "string"
+                                        },
+                                        "label": {
+                                          "type": "string"
+                                        },
+                                        "age_group": {
+                                          "type": "string",
+                                          "nullable": true
+                                        },
+                                        "gender": {
+                                          "type": "string",
+                                          "nullable": true
+                                        }
+                                      }
                                     },
                                     "participants": {
                                       "type": "array",
