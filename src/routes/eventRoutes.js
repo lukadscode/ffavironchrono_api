@@ -6,6 +6,7 @@ const validate = require("../middlewares/validateSchema");
 const schema = require("../schemas/eventSchema");
 
 router.get("/", eventController.getEvents);
+router.get("/:id/statistics", auth, eventController.getEventStatistics);
 router.get("/:id", eventController.getEvent);
 router.post(
   "/",

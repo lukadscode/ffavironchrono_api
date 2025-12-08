@@ -41,6 +41,72 @@ paths:
         400:
           description: Données invalides
 
+  /events/{id}/statistics:
+    get:
+      tags: [Events]
+      summary: Récupérer les statistiques d'un événement
+      description: |
+        Récupère les statistiques d'un événement :
+        - Nombre total de participants
+        - Nombre de participants hommes
+        - Nombre de participants femmes
+        - Nombre d'équipages
+        - Nombre de clubs présents
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID de l'événement
+      responses:
+        200:
+          description: Statistiques récupérées avec succès
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: object
+                    properties:
+                      event_id:
+                        type: string
+                        format: uuid
+                      total_participants:
+                        type: integer
+                        description: Nombre total de participants uniques
+                      participants_homme:
+                        type: integer
+                        description: Nombre de participants hommes
+                      participants_femme:
+                        type: integer
+                        description: Nombre de participants femmes
+                      total_crews:
+                        type: integer
+                        description: Nombre total d'équipages
+                      total_clubs:
+                        type: integer
+                        description: Nombre de clubs distincts (par club_code)
+              example:
+                status: success
+                data:
+                  event_id: "7c38e42f-198a-4bd6-9c59-9854094a1ea0"
+                  total_participants: 245
+                  participants_homme: 135
+                  participants_femme: 110
+                  total_crews: 48
+                  total_clubs: 12
+        404:
+          description: Événement non trouvé
+        500:
+          description: Erreur serveur
+
   /events/{id}:
     get:
       tags: [Events]
@@ -53,7 +119,7 @@ paths:
             type: string
       responses:
         200:
-          description: Détail de l’événement
+          description: Détail de l'événement
         404:
           description: Événement non trouvé
 

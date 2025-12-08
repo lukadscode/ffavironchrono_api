@@ -51,6 +51,87 @@ exports.updateEvent = async (req, res) => {
   }
 };
 
+// GET STATISTICS
+exports.getEventStatistics = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const Crew = require("../models/Crew");
+    const CrewParticipant = require("../models/CrewParticipant");
+    const Participant = require("../models/Participant");
+
+    // Vérifier que l'événement existe
+    const event = await Event.findByPk(id);
+    if (!event) {
+      return res.status(404).json({ status: "error", message: "Événement non trouvé" });
+    }
+
+    // Récupérer tous les équipages de l'événement avec leurs participants
+    const crews = await Crew.findAll({
+      where: { event_id: id },
+      include: [
+        {
+          model: CrewParticipant,
+          as: "crew_participants",
+          include: [
+            {
+              model: Participant,
+              as: "participant",
+            },
+          ],
+        },
+      ],
+    });
+
+    // Compter les participants uniques
+    const participantIds = new Set();
+    const participantIdsByGender = {
+      homme: new Set(),
+      femme: new Set(),
+    };
+
+    crews.forEach((crew) => {
+      if (crew.crew_participants) {
+        crew.crew_participants.forEach((cp) => {
+          if (cp.participant) {
+            const participantId = cp.participant.id;
+            participantIds.add(participantId);
+
+            // Compter par genre
+            const gender = cp.participant.gender?.toLowerCase();
+            if (gender === "homme" || gender === "h" || gender === "m") {
+              participantIdsByGender.homme.add(participantId);
+            } else if (gender === "femme" || gender === "f") {
+              participantIdsByGender.femme.add(participantId);
+            }
+          }
+        });
+      }
+    });
+
+    // Compter les clubs distincts (par club_code)
+    const clubCodes = new Set();
+    crews.forEach((crew) => {
+      if (crew.club_code) {
+        clubCodes.add(crew.club_code);
+      }
+    });
+
+    const statistics = {
+      event_id: id,
+      total_participants: participantIds.size,
+      participants_homme: participantIdsByGender.homme.size,
+      participants_femme: participantIdsByGender.femme.size,
+      total_crews: crews.length,
+      total_clubs: clubCodes.size,
+    };
+
+    res.json({ status: "success", data: statistics });
+  } catch (err) {
+    console.error("Error fetching event statistics:", err);
+    res.status(500).json({ status: "error", message: err.message });
+  }
+};
+
 // DELETE
 exports.deleteEvent = async (req, res) => {
   try {
