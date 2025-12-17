@@ -14,6 +14,14 @@ router.post(
   controller.importResults
 );
 
+// Création / mise à jour d'un résultat indoor manuel pour une course
+router.post(
+  "/race/:raceId/manual",
+  auth,
+  validate(schema.manualResultSchema),
+  controller.createOrUpdateManualResult
+);
+
 // Récupérer les résultats d'une course (accès public si course "non_official" ou "official")
 router.get("/race/:race_id", optionalAuth, controller.getRaceResults);
 

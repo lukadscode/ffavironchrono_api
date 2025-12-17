@@ -271,6 +271,251 @@ exports.importResults = async (req, res) => {
 };
 
 /**
+ * Crée ou met à jour un résultat indoor manuel pour un équipage
+ * POST /indoor-results/race/:raceId/manual
+ */
+exports.createOrUpdateManualResult = async (req, res) => {
+  try {
+    const paramRaceId = req.params.raceId;
+    const {
+      race_id: bodyRaceId,
+      crew_id,
+      lane,
+      time_display,
+      time_ms,
+      distance,
+      avg_pace,
+      spm,
+      calories,
+      machine_type,
+      logged_time,
+      splits_data,
+    } = req.body;
+
+    const raceId = paramRaceId || bodyRaceId;
+
+    if (!raceId) {
+      return res.status(400).json({
+        status: "error",
+        message: "race_id est requis (dans l'URL ou le body)",
+      });
+    }
+
+    // Vérifier que la course existe et récupérer l'event_id via la phase
+    const race = await Race.findByPk(raceId, {
+      include: [
+        {
+          model: RacePhase,
+          as: "race_phase",
+        },
+      ],
+    });
+
+    if (!race) {
+      return res.status(404).json({
+        status: "error",
+        message: "Course introuvable",
+      });
+    }
+
+    const eventId = race.race_phase?.event_id || race.RacePhase?.event_id || null;
+
+    // Vérifier que l'équipage existe et appartient bien au même événement
+    const crew = await Crew.findByPk(crew_id);
+    if (!crew) {
+      return res.status(404).json({
+        status: "error",
+        message: "Équipage introuvable",
+      });
+    }
+
+    if (eventId && crew.event_id !== eventId) {
+      return res.status(400).json({
+        status: "error",
+        message:
+          "L'équipage ne fait pas partie du même événement que la course",
+      });
+    }
+
+    if (!time_ms || time_ms <= 0 || !distance || distance <= 0) {
+      return res.status(400).json({
+        status: "error",
+        message: "time_ms et distance doivent être strictement positifs",
+      });
+    }
+
+    // Trouver ou créer le IndoorRaceResult pour cette course
+    // Si un résultat existe déjà pour cette course, on le réutilise
+    let indoorRaceResult = await IndoorRaceResult.findOne({
+      where: { race_id: raceId },
+    });
+
+    if (!indoorRaceResult) {
+      // Créer un résultat "manuel" minimal
+      indoorRaceResult = await IndoorRaceResult.create({
+        id: uuidv4(),
+        race_id: raceId,
+        ergrace_race_id: `manual-${raceId}`,
+        ergrace_version: null,
+        race_start_time: null,
+        race_end_time: null,
+        duration: time_ms,
+        time_cap: 0,
+        race_file_name: null,
+        raw_data: null,
+      });
+    }
+
+    // Chercher un résultat existant pour ce couple (indoor_race_result_id, crew_id)
+    let participantResult = await IndoorParticipantResult.findOne({
+      where: {
+        indoor_race_result_id: indoorRaceResult.id,
+        crew_id,
+      },
+    });
+
+    // Calculer avg_pace si non fourni
+    let finalAvgPace = avg_pace;
+    if (!finalAvgPace && distance > 0 && time_ms > 0) {
+      finalAvgPace = formatPaceFromMsAndDistance(time_ms, distance);
+    }
+
+    const loggedTimeValue = logged_time ? new Date(logged_time) : new Date();
+
+    const participantPayload = {
+      indoor_race_result_id: indoorRaceResult.id,
+      crew_id,
+      ergrace_participant_id: crew_id, // pour rester cohérent avec les imports où crew_id peut être un UUID ErgRace
+      time_ms,
+      time_display,
+      score: time_display,
+      distance,
+      avg_pace: finalAvgPace,
+      spm: spm ?? 0,
+      calories: calories ?? 0,
+      machine_type: machine_type || "Rameur",
+      logged_time: loggedTimeValue,
+      splits_data: splits_data || null,
+    };
+
+    if (participantResult) {
+      await participantResult.update(participantPayload);
+    } else {
+      participantResult = await IndoorParticipantResult.create({
+        id: uuidv4(),
+        ...participantPayload,
+      });
+    }
+
+    // Recalculer les places pour tous les participants de cette course
+    const allParticipants = await IndoorParticipantResult.findAll({
+      where: { indoor_race_result_id: indoorRaceResult.id },
+      order: [["time_ms", "ASC"]],
+    });
+
+    let currentPlace = 1;
+    for (const p of allParticipants) {
+      if (p.time_ms && p.time_ms > 0) {
+        await p.update({ place: currentPlace });
+        currentPlace += 1;
+      } else {
+        await p.update({ place: null });
+      }
+    }
+
+    // Mettre à jour la durée globale si besoin
+    await indoorRaceResult.update({
+      duration: Math.max(
+        indoorRaceResult.duration || 0,
+        time_ms
+      ),
+    });
+
+    // Mettre à jour le statut de la course en "finished" si pas déjà
+    if (race.status !== "finished" && race.status !== "official") {
+      await Race.update(
+        { status: "finished" },
+        { where: { id: raceId } }
+      );
+    }
+
+    // Recharger les résultats complets pour renvoyer la même structure que GET /indoor-results/race/:race_id
+    const refreshedIndoorRaceResult = await IndoorRaceResult.findOne({
+      where: { race_id: raceId },
+    });
+
+    const participantResults = await IndoorParticipantResult.findAll({
+      where: { indoor_race_result_id: refreshedIndoorRaceResult.id },
+      include: [
+        {
+          model: Crew,
+          as: "crew",
+          include: [
+            {
+              model: require("../models/Category"),
+              as: "category",
+            },
+          ],
+        },
+      ],
+      order: [["place", "ASC"]],
+    });
+
+    res.status(200).json({
+      status: "success",
+      data: {
+        race_result: {
+          id: refreshedIndoorRaceResult.id,
+          race_id: refreshedIndoorRaceResult.race_id,
+          ergrace_race_id: refreshedIndoorRaceResult.ergrace_race_id,
+          race_start_time: refreshedIndoorRaceResult.race_start_time,
+          race_end_time: refreshedIndoorRaceResult.race_end_time,
+          duration: refreshedIndoorRaceResult.duration,
+          // raw_data non renvoyé ici, inutile pour un résultat manuel
+        },
+        participants: participantResults.map((pr) => ({
+          id: pr.id,
+          place: pr.place,
+          time_display: pr.time_display,
+          time_ms: pr.time_ms,
+          score: pr.score,
+          distance: pr.distance,
+          avg_pace: pr.avg_pace,
+          spm: pr.spm,
+          calories: pr.calories,
+          machine_type: pr.machine_type,
+          logged_time: pr.logged_time,
+          crew_id: pr.crew_id,
+          crew: pr.crew
+            ? {
+                id: pr.crew.id,
+                club_name: pr.crew.club_name,
+                club_code: pr.crew.club_code,
+                category: pr.crew.category
+                  ? {
+                      id: pr.crew.category.id,
+                      code: pr.crew.category.code,
+                      label: pr.crew.category.label,
+                    }
+                  : null,
+              }
+            : null,
+          ergrace_participant_id: pr.ergrace_participant_id,
+          splits_data: pr.splits_data,
+        })),
+      },
+    });
+  } catch (err) {
+    console.error("Error creating/updating manual indoor result:", err);
+    res.status(500).json({
+      status: "error",
+      message:
+        err.message || "Erreur lors de la création/mise à jour du résultat manuel",
+    });
+  }
+};
+
+/**
  * Récupère les résultats d'une course
  * GET /indoor-results/race/:race_id
  * Accessible publiquement si la course a le statut "non_official" ou "official"
@@ -816,5 +1061,30 @@ function parseErgRaceDate(dateString) {
     parseInt(minute, 10),
     parseInt(second, 10)
   );
+}
+
+/**
+ * Fonction utilitaire : calcule une allure moyenne (pace) à partir de time_ms et distance
+ * Format retourné : "M:SS.d" (approximation suffisante pour l'affichage)
+ */
+function formatPaceFromMsAndDistance(timeMs, distanceMeters) {
+  if (!timeMs || !distanceMeters || distanceMeters <= 0) {
+    return null;
+  }
+
+  // Allure pour 500m (classique en indoor)
+  const secondsTotal = timeMs / 1000;
+  const pacePerMeter = secondsTotal / distanceMeters;
+  const pace500 = pacePerMeter * 500;
+
+  const minutes = Math.floor(pace500 / 60);
+  const secondsFloat = pace500 - minutes * 60;
+
+  const seconds = Math.floor(secondsFloat);
+  const tenths = Math.round((secondsFloat - seconds) * 10);
+
+  const paddedSeconds = String(seconds).padStart(2, "0");
+
+  return `${minutes}:${paddedSeconds}.${tenths}`;
 }
 
