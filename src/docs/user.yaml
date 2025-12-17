@@ -20,7 +20,7 @@ paths:
           name: role
           schema:
             type: string
-            enum: [user, admin, superadmin]
+            enum: [user, commission, admin, superadmin]
         - in: query
           name: page
           schema:
@@ -57,7 +57,7 @@ paths:
                   type: string
                 role:
                   type: string
-                  enum: [user, admin, superadmin]
+                  enum: [user, commission, admin, superadmin]
       responses:
         "201":
           description: Utilisateur créé
@@ -117,7 +117,7 @@ paths:
                   enum: [active, inactive]
                 role:
                   type: string
-                  enum: [user, admin, superadmin]
+                  enum: [user, commission, admin, superadmin]
       responses:
         "200":
           description: Utilisateur mis à jour
@@ -306,7 +306,7 @@ components:
           enum: [active, inactive]
         role:
           type: string
-          enum: [user, admin, superadmin]
+          enum: [user, commission, admin, superadmin]
         slug:
           type: string
 
