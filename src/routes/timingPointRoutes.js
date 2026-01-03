@@ -12,6 +12,11 @@ router.post(
   controller.createTimingPoint
 );
 router.get("/event/:event_id", controller.getTimingPointsByEvent);
+router.post(
+  "/resolve-token",
+  validate(schema.resolveTokenSchema),
+  controller.resolveToken
+);
 router.put(
   "/:id",
   auth,

@@ -89,3 +89,48 @@ exports.deleteTimingPoint = async (req, res) => {
     res.status(500).json({ status: "error", message: err.message });
   }
 };
+
+exports.resolveToken = async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    const Event = require("../models/Event");
+
+    // Rechercher le timing point par token avec les informations de l'événement
+    const timingPoint = await TimingPoint.findOne({
+      where: { token },
+      include: [
+        {
+          model: Event,
+          attributes: ["id", "name", "location", "start_date", "end_date"],
+        },
+      ],
+    });
+
+    if (!timingPoint) {
+      return res.status(404).json({
+        status: "error",
+        message: "Token de timing point invalide ou introuvable",
+      });
+    }
+
+    // Retourner les données au format demandé avec les infos de l'événement
+    res.json({
+      status: "success",
+      data: {
+        timing_point_id: timingPoint.id,
+        timing_point_label: timingPoint.label,
+        event_id: timingPoint.event_id,
+        event_name: timingPoint.Event?.name || null,
+        event_location: timingPoint.Event?.location || null,
+        event_start_date: timingPoint.Event?.start_date || null,
+        event_end_date: timingPoint.Event?.end_date || null,
+        order_index: timingPoint.order_index,
+        distance_m: timingPoint.distance_m,
+        token: timingPoint.token,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ status: "error", message: err.message });
+  }
+};

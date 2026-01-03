@@ -59,6 +59,7 @@ app.use("/race-crews", raceCrewRoutes);
 app.use("/distances", distanceRoutes);
 app.use("/timings", timingRoutes);
 app.use("/timing-points", timingPointRoutes);
+app.use("/public/timing-points", timingPointRoutes);
 app.use("/timing-assignments", timingAssignmentRoutes);
 app.use("/import", importRoutes); // Use the new import routes
 app.use("/user-events", userEventRoutes);

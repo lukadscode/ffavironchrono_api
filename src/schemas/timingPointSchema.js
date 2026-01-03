@@ -11,3 +11,8 @@ exports.updateSchema = Joi.object({
   label: Joi.string().optional(),
   order_index: Joi.number().integer().optional(),
 });
+
+exports.resolveTokenSchema = Joi.object({
+  token: Joi.string().required(),
+  device_id: Joi.string().required(),
+});

@@ -34,7 +34,7 @@ paths:
   /timing-points/event/{event_id}:
     get:
       tags: [timingpoints]
-      summary: Récupérer les points d’une course
+      summary: Récupérer les points d'une course
       parameters:
         - in: path
           name: event_id
@@ -44,6 +44,111 @@ paths:
       responses:
         200:
           description: Liste des points
+
+  /public/timing-points/resolve-token:
+    post:
+      tags: [timingpoints]
+      summary: Résoudre un token de timing point (pour application mobile)
+      description: |
+        Endpoint public permettant à un appareil mobile d'authentifier un timing point
+        via son token. Retourne les informations du timing point associé.
+        Aucune authentification utilisateur requise.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, device_id]
+              properties:
+                token:
+                  type: string
+                  description: Le token du timing point
+                  example: "TP-XYZ-001"
+                device_id:
+                  type: string
+                  description: Identifiant unique de l'appareil mobile (UUID)
+                  example: "device-1234567890-abc123"
+      responses:
+        200:
+          description: Token résolu avec succès
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "success"
+                  data:
+                    type: object
+                    properties:
+                      timing_point_id:
+                        type: string
+                        description: ID du timing point
+                      timing_point_label:
+                        type: string
+                        description: Libellé du timing point
+                        example: "Arrivée 2000m"
+                      event_id:
+                        type: string
+                        description: ID de l'événement associé
+                      event_name:
+                        type: string
+                        description: Nom de l'événement
+                        example: "Championnat de France 2024"
+                      event_location:
+                        type: string
+                        description: Lieu de l'événement
+                        example: "Lac d'Aiguebelette"
+                      event_start_date:
+                        type: string
+                        format: date-time
+                        description: Date de début de l'événement
+                        example: "2024-06-15T08:00:00.000Z"
+                      event_end_date:
+                        type: string
+                        format: date-time
+                        description: Date de fin de l'événement
+                        example: "2024-06-17T18:00:00.000Z"
+                      order_index:
+                        type: integer
+                        description: Ordre du timing point
+                        example: 3
+                      distance_m:
+                        type: integer
+                        description: Distance en mètres
+                        example: 2000
+                      token:
+                        type: string
+                        description: Token du timing point
+                        example: "TP-XYZ-001"
+        400:
+          description: Paramètres manquants
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "error"
+                  message:
+                    type: string
+                    example: "Les paramètres 'token' et 'device_id' sont requis"
+        404:
+          description: Token invalide ou introuvable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "error"
+                  message:
+                    type: string
+                    example: "Token de timing point invalide ou introuvable"
 
   /timing-points/{id}:
     put:
