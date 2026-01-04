@@ -1,5 +1,6 @@
-const { verifyAccessToken, verifyTimingPointToken } = require("../services/tokenService");
+const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+require("dotenv").config();
 
 /**
  * Middleware qui accepte soit un token utilisateur, soit un token de timing point
@@ -14,11 +15,21 @@ module.exports = async (req, res, next) => {
 
   const token = auth.split(" ")[1];
   
-  // Essayer d'abord un token utilisateur
+  // Essayer d'abord de décoder le token pour voir son type
+  let decoded;
   try {
-    const decoded = verifyAccessToken(token);
-    const user = await User.findByPk(decoded.userId);
-    if (user) {
+    decoded = jwt.verify(token, process.env.JWT_SECRET);
+  } catch (err) {
+    return res.status(401).json({ status: "error", message: "Invalid token" });
+  }
+
+  // Si le token a un userId, c'est un token utilisateur
+  if (decoded.userId) {
+    try {
+      const user = await User.findByPk(decoded.userId);
+      if (!user) {
+        return res.status(401).json({ status: "error", message: "Utilisateur non trouvé" });
+      }
       req.user = {
         userId: user.id,
         email: user.email,
@@ -26,24 +37,21 @@ module.exports = async (req, res, next) => {
         status: user.status,
       };
       return next();
+    } catch (err) {
+      return res.status(401).json({ status: "error", message: "Erreur d'authentification" });
     }
-  } catch (err) {
-    // Ce n'est pas un token utilisateur, continuer
   }
 
-  // Essayer un token de timing point
-  try {
-    const decoded = verifyTimingPointToken(token);
+  // Si le token a timing_point_id et type: 'timing_point', c'est un token de timing point
+  if (decoded.timing_point_id && decoded.type === "timing_point") {
     req.timingPoint = {
       timing_point_id: decoded.timing_point_id,
       event_id: decoded.event_id,
     };
     return next();
-  } catch (err) {
-    // Ce n'est pas un token de timing point non plus
   }
 
-  // Si on arrive ici, aucun token n'est valide
-  return res.status(401).json({ status: "error", message: "Invalid token" });
+  // Si on arrive ici, le token n'est ni un token utilisateur ni un token de timing point
+  return res.status(401).json({ status: "error", message: "Invalid token type" });
 };
 
