@@ -95,6 +95,7 @@ exports.resolveToken = async (req, res) => {
     const { token } = req.body;
 
     const Event = require("../models/Event");
+    const { generateTimingPointToken } = require("../services/tokenService");
 
     // Rechercher le timing point par token avec les informations de l'événement
     const timingPoint = await TimingPoint.findOne({
@@ -114,7 +115,13 @@ exports.resolveToken = async (req, res) => {
       });
     }
 
-    // Retourner les données au format demandé avec les infos de l'événement
+    // Générer un access token JWT pour ce timing point
+    const accessToken = generateTimingPointToken(
+      timingPoint.id,
+      timingPoint.event_id
+    );
+
+    // Retourner les données au format demandé avec les infos de l'événement et le token
     res.json({
       status: "success",
       data: {
@@ -128,6 +135,7 @@ exports.resolveToken = async (req, res) => {
         order_index: timingPoint.order_index,
         distance_m: timingPoint.distance_m,
         token: timingPoint.token,
+        access_token: accessToken,
       },
     });
   } catch (err) {

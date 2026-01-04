@@ -15,6 +15,14 @@ const {
 
 exports.createTiming = async (req, res) => {
   try {
+    // Vérifier que le timing_point_id correspond au token
+    if (req.timingPoint && req.body.timing_point_id !== req.timingPoint.timing_point_id) {
+      return res.status(403).json({
+        status: "error",
+        message: "Vous ne pouvez créer des timings que pour votre timing point",
+      });
+    }
+
     const timing = await Timing.create({
       id: uuidv4(),
       ...req.body,
@@ -224,6 +232,15 @@ exports.updateTiming = async (req, res) => {
     const timing = await Timing.findByPk(req.params.id);
     if (!timing)
       return res.status(404).json({ status: "error", message: "Non trouvé" });
+
+    // Vérifier que le timing appartient au timing point authentifié (si authentifié via timing point)
+    if (req.timingPoint && timing.timing_point_id !== req.timingPoint.timing_point_id) {
+      return res.status(403).json({
+        status: "error",
+        message: "Vous ne pouvez modifier que les timings de votre timing point",
+      });
+    }
+
     await timing.update(req.body);
     res.json({ status: "success", data: timing });
   } catch (err) {
@@ -299,6 +316,15 @@ exports.deleteTiming = async (req, res) => {
     const timing = await Timing.findByPk(req.params.id);
     if (!timing)
       return res.status(404).json({ status: "error", message: "Non trouvé" });
+
+    // Vérifier que le timing appartient au timing point authentifié (si authentifié via timing point)
+    if (req.timingPoint && timing.timing_point_id !== req.timingPoint.timing_point_id) {
+      return res.status(403).json({
+        status: "error",
+        message: "Vous ne pouvez supprimer que les timings de votre timing point",
+      });
+    }
+
     await timing.destroy();
     res.json({ status: "success", message: "Timing supprimé" });
   } catch (err) {

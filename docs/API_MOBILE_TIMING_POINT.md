@@ -44,7 +44,8 @@ Cette documentation décrit l'intégration de l'application mobile avec le backe
     "event_end_date": "2024-06-17T18:00:00.000Z",
     "order_index": 3,
     "distance_m": 2000,
-    "token": "TP-XYZ-001"
+    "token": "TP-XYZ-001",
+    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
   }
 }
 ```
@@ -60,6 +61,7 @@ Cette documentation décrit l'intégration de l'application mobile avec le backe
 - `order_index` : Ordre du timing point dans la course
 - `distance_m` : Distance en mètres depuis le départ
 - `token` : Token du timing point (confirmé)
+- `access_token` : **Token JWT permettant d'accéder aux routes protégées (création/modification/suppression de timings). Valide 24h.**
 
 #### Réponses d'Erreur
 
@@ -376,6 +378,7 @@ const timingPointData = await resolveTimingPointToken(token, deviceId);
 await AsyncStorage.setItem('timingPoint', JSON.stringify(timingPointData));
 await AsyncStorage.setItem('eventId', timingPointData.event_id);
 await AsyncStorage.setItem('timingPointId', timingPointData.timing_point_id);
+await AsyncStorage.setItem('accessToken', timingPointData.access_token); // ← IMPORTANT : Stocker le token d'accès
 ```
 
 ### Étape 2 : Connexion WebSocket
@@ -427,16 +430,26 @@ const setupSocketListeners = (socket) => {
 };
 ```
 
-### Étape 4 : Créer un timing
+### Étape 4 : Stocker le token d'accès
 
-Lorsque l'appareil mobile crée un nouveau timing :
+Après résolution du token, stocker l'access_token :
 
 ```typescript
-const createTiming = async (timingPointId: string) => {
+// Stocker le token d'accès
+await AsyncStorage.setItem('accessToken', result.data.access_token);
+```
+
+### Étape 5 : Créer un timing
+
+Lorsque l'appareil mobile crée un nouveau timing, **utiliser l'access_token** dans le header Authorization :
+
+```typescript
+const createTiming = async (timingPointId: string, accessToken: string) => {
   const response = await fetch(`${API_BASE_URL}/timings`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'Authorization': `Bearer ${accessToken}`,
     },
     body: JSON.stringify({
       timing_point_id: timingPointId,
@@ -445,12 +458,19 @@ const createTiming = async (timingPointId: string) => {
     }),
   });
 
+  if (!response.ok) {
+    throw new Error('Erreur lors de la création du timing');
+  }
+
   const result = await response.json();
   return result.data;
 };
 ```
 
-**Note :** Ce timing sera automatiquement diffusé via WebSocket à tous les clients qui écoutent le timing point.
+**Note :** 
+- L'access_token est **obligatoire** pour créer, modifier ou supprimer des timings
+- Ce timing sera automatiquement diffusé via WebSocket à tous les clients qui écoutent le timing point
+- L'appareil ne peut créer des timings que pour son propre timing point (celui associé au token)
 
 ---
 
@@ -458,13 +478,19 @@ const createTiming = async (timingPointId: string) => {
 
 | Endpoint | Méthode | Auth | Description |
 |----------|---------|------|-------------|
-| `/public/timing-points/resolve-token` | POST | ❌ | Résoudre un token de timing point |
-| `/timings` | POST | ❌ | Créer un nouveau timing |
+| `/public/timing-points/resolve-token` | POST | ❌ | Résoudre un token de timing point et obtenir un access_token |
+| `/timings` | POST | ✅ | Créer un nouveau timing (nécessite access_token) |
+| `/timings/:id` | PUT | ✅ | Modifier un timing (nécessite access_token) |
+| `/timings/:id` | DELETE | ✅ | Supprimer un timing (nécessite access_token) |
 | `/timings/event/:eventId` | GET | ❌ | Récupérer les timings d'un événement |
+| `/timings/race/:raceId` | GET | ❌ | Récupérer les timings d'une course |
 | `/races/event/:eventId` | GET | ❌ | Récupérer les courses d'un événement |
 | `/timing-points/event/:eventId` | GET | ❌ | Récupérer les timing points d'un événement |
 
-**Note :** Tous ces endpoints sont publics (pas d'authentification JWT requise). L'authentification se fait via le token du timing point.
+**Note :** 
+- Les routes de lecture (GET) sont publiques
+- Les routes de création/modification/suppression (POST, PUT, DELETE) nécessitent un `access_token` obtenu via `/public/timing-points/resolve-token`
+- L'access_token est valide 24h et permet uniquement de créer/modifier/supprimer des timings pour le timing point associé
 
 ---
 
@@ -610,15 +636,25 @@ class TimingPointService {
   async createTiming() {
     if (!this.timingPointId) throw new Error('Timing point non initialisé');
 
+    const accessToken = await AsyncStorage.getItem('accessToken');
+    if (!accessToken) throw new Error('Access token non disponible');
+
     const response = await fetch(`${API_BASE_URL}/timings`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      },
       body: JSON.stringify({
         timing_point_id: this.timingPointId,
         timestamp: new Date().toISOString(),
         manual_entry: false,
       }),
     });
+
+    if (!response.ok) {
+      throw new Error('Erreur lors de la création du timing');
+    }
 
     return response.json();
   }
@@ -652,7 +688,8 @@ export default new TimingPointService();
 - [ ] Configurer la connexion WebSocket
 - [ ] Rejoindre les rooms (`joinPublicEvent`, `watchTimingPoint`)
 - [ ] Écouter les événements WebSocket
-- [ ] Implémenter la création de timings
+- [ ] Stocker l'access_token après résolution du token
+- [ ] Implémenter la création de timings avec l'access_token
 - [ ] Gérer les erreurs et les reconnexions
 - [ ] Tester avec des tokens valides et invalides
 - [ ] Tester la reconnexion WebSocket
