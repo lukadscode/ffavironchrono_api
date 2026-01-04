@@ -325,6 +325,17 @@ exports.deleteTiming = async (req, res) => {
       });
     }
 
+    // Supprimer d'abord l'assignation si elle existe (pour éviter les erreurs de contrainte)
+    const TimingAssignment = require("../models/TimingAssignment");
+    const assignment = await TimingAssignment.findOne({
+      where: { timing_id: timing.id },
+    });
+
+    if (assignment) {
+      await assignment.destroy();
+    }
+
+    // Ensuite supprimer le timing
     await timing.destroy();
     res.json({ status: "success", message: "Timing supprimé" });
   } catch (err) {
