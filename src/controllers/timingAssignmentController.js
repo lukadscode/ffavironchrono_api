@@ -19,14 +19,29 @@ exports.assignTiming = async (req, res) => {
   try {
     const { timing_id, crew_id } = req.body;
 
+    const timing = await Timing.findByPk(timing_id, {
+      include: [TimingPoint],
+    });
+
+    if (!timing) {
+      return res.status(404).json({
+        status: "error",
+        message: "Timing non trouvé",
+      });
+    }
+
+    // Si authentifié via timing point, vérifier que le timing appartient à ce timing point
+    if (req.timingPoint && timing.timing_point_id !== req.timingPoint.timing_point_id) {
+      return res.status(403).json({
+        status: "error",
+        message: "Vous ne pouvez assigner que les timings de votre timing point",
+      });
+    }
+
     const assignment = await TimingAssignment.create({
       id: uuidv4(),
       timing_id,
       crew_id,
-    });
-
-    const timing = await Timing.findByPk(timing_id, {
-      include: [TimingPoint],
     });
 
     const raceCrew = await RaceCrew.findOne({
@@ -95,9 +110,28 @@ exports.updateAssignment = async (req, res) => {
     const { id } = req.params;
     const { timing_id, crew_id } = req.body;
 
-    const assignment = await TimingAssignment.findByPk(id);
+    const assignment = await TimingAssignment.findByPk(id, {
+      include: [
+        {
+          model: Timing,
+          as: "timing",
+          include: [TimingPoint],
+        },
+      ],
+    });
     if (!assignment)
       return res.status(404).json({ status: "error", message: "Non trouvé" });
+
+    // Si authentifié via timing point, vérifier que le timing appartient à ce timing point
+    if (req.timingPoint) {
+      const newTiming = await Timing.findByPk(timing_id || assignment.timing_id);
+      if (newTiming && newTiming.timing_point_id !== req.timingPoint.timing_point_id) {
+        return res.status(403).json({
+          status: "error",
+          message: "Vous ne pouvez assigner que les timings de votre timing point",
+        });
+      }
+    }
 
     await assignment.update({ timing_id, crew_id });
     res.json({ status: "success", data: assignment });
@@ -146,9 +180,24 @@ exports.getAssignmentsByCrew = async (req, res) => {
 exports.deleteAssignment = async (req, res) => {
   try {
     const { id } = req.params;
-    const assignment = await TimingAssignment.findByPk(id);
+    const assignment = await TimingAssignment.findByPk(id, {
+      include: [
+        {
+          model: Timing,
+          as: "timing",
+        },
+      ],
+    });
     if (!assignment)
       return res.status(404).json({ status: "error", message: "Non trouvé" });
+
+    // Si authentifié via timing point, vérifier que le timing appartient à ce timing point
+    if (req.timingPoint && assignment.timing && assignment.timing.timing_point_id !== req.timingPoint.timing_point_id) {
+      return res.status(403).json({
+        status: "error",
+        message: "Vous ne pouvez supprimer que les assignations de vos timings",
+      });
+    }
 
     await assignment.destroy();
     res.json({ status: "success", message: "Assignation supprimée" });
