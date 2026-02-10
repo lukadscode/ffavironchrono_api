@@ -179,9 +179,6 @@ exports.getCrewsWithParticipantsByEvent = async (req, res) => {
         // Sur l'équipage
         { club_name: { [Op.like]: term } },
         { club_code: { [Op.like]: term } },
-        // Sur la catégorie
-        { "$category.code$": { [Op.like]: term } },
-        { "$category.label$": { [Op.like]: term } },
         // Sur les participants
         { "$crew_participants.participant.first_name$": { [Op.like]: term } },
         { "$crew_participants.participant.last_name$": { [Op.like]: term } },
