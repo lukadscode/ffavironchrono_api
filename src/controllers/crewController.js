@@ -175,18 +175,11 @@ exports.getCrewsWithParticipantsByEvent = async (req, res) => {
     // Conditions de recherche
     if (search && typeof search === "string") {
       const term = `%${search.trim()}%`;
+      // Pour éviter les problèmes de colonnes inconnues dans WHERE avec MariaDB,
+      // on limite pour l'instant la recherche aux champs de la table crews.
       where[Op.or] = [
-        // Sur l'équipage
         { club_name: { [Op.like]: term } },
         { club_code: { [Op.like]: term } },
-        // Sur les participants
-        { "$crew_participants.participant.first_name$": { [Op.like]: term } },
-        { "$crew_participants.participant.last_name$": { [Op.like]: term } },
-        {
-          "$crew_participants.participant.license_number$": {
-            [Op.like]: term,
-          },
-        },
       ];
     }
 
