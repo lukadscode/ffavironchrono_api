@@ -1,4 +1,5 @@
 const { v4: uuidv4 } = require("uuid");
+const { Op } = require("sequelize");
 const Participant = require("../models/Participant");
 const CrewParticipant = require("../models/CrewParticipant");
 const Crew = require("../models/Crew");
@@ -186,6 +187,62 @@ exports.searchLicencie = async (req, res) => {
     res.status(500).json({
       status: "error",
       message: err.message || "Erreur lors de la recherche du licencié",
+    });
+  }
+};
+
+/**
+ * Récupérer les équipages d'un participant
+ *
+ * GET /participants/:participant_id/crews
+ */
+exports.getCrewsByParticipant = async (req, res) => {
+  try {
+    const { participant_id } = req.params;
+
+    const crews = await Crew.findAll({
+      include: [
+        {
+          model: Category,
+          as: "category",
+          attributes: ["id", "code", "label", "age_group", "gender"],
+          required: false,
+        },
+        {
+          model: CrewParticipant,
+          as: "crew_participants",
+          required: true,
+          where: { participant_id },
+          include: [
+            {
+              model: Participant,
+              as: "participant",
+              attributes: [
+                "id",
+                "first_name",
+                "last_name",
+                "license_number",
+                "club_name",
+                "gender",
+              ],
+            },
+          ],
+        },
+      ],
+      order: [
+        ["club_name", "ASC"],
+        ["id", "ASC"],
+      ],
+    });
+
+    res.json({ status: "success", data: crews });
+  } catch (err) {
+    console.error("Erreur dans getCrewsByParticipant:", err);
+    res.status(500).json({
+      status: "error",
+      message:
+        err.message ||
+        "Erreur lors de la récupération des équipages du participant",
     });
   }
 };

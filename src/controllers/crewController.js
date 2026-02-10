@@ -1,4 +1,5 @@
 const { v4: uuidv4 } = require("uuid");
+const { Op } = require("sequelize");
 const Crew = require("../models/Crew");
 const Event = require("../models/Event");
 const Category = require("../models/Category");
@@ -145,5 +146,114 @@ exports.getCrewsByEvent = async (req, res) => {
     res.json({ status: "success", data: crews });
   } catch (err) {
     res.status(500).json({ status: "error", message: err.message });
+  }
+};
+
+/**
+ * Liste des équipages d'un événement avec participants, recherche et pagination
+ *
+ * GET /crews/event/:event_id/with-participants
+ *
+ * Query params :
+ * - search (optionnel) : filtre sur club, catégorie, participants
+ * - page (optionnel, défaut 1)
+ * - pageSize (optionnel, défaut 50, max 200)
+ */
+exports.getCrewsWithParticipantsByEvent = async (req, res) => {
+  try {
+    const { event_id } = req.params;
+    let { search, page = 1, pageSize = 50 } = req.query;
+
+    page = parseInt(page, 10) || 1;
+    pageSize = parseInt(pageSize, 10) || 50;
+    // Limiter la taille de page pour éviter les abus
+    const limit = Math.min(Math.max(pageSize, 1), 200);
+    const offset = (page - 1) * limit;
+
+    const where = { event_id };
+
+    // Conditions de recherche
+    if (search && typeof search === "string") {
+      const term = `%${search.trim()}%`;
+      where[Op.or] = [
+        // Sur l'équipage
+        { club_name: { [Op.like]: term } },
+        { club_code: { [Op.like]: term } },
+        // Sur la catégorie
+        { "$category.code$": { [Op.like]: term } },
+        { "$category.label$": { [Op.like]: term } },
+        // Sur les participants
+        { "$crew_participants.participant.first_name$": { [Op.like]: term } },
+        { "$crew_participants.participant.last_name$": { [Op.like]: term } },
+        {
+          "$crew_participants.participant.license_number$": {
+            [Op.like]: term,
+          },
+        },
+      ];
+    }
+
+    const include = [
+      {
+        model: Category,
+        as: "category",
+        attributes: ["id", "code", "label", "age_group", "gender"],
+        required: false,
+      },
+      {
+        model: CrewParticipant,
+        as: "crew_participants",
+        required: false,
+        include: [
+          {
+            model: Participant,
+            as: "participant",
+            attributes: [
+              "id",
+              "first_name",
+              "last_name",
+              "license_number",
+              "club_name",
+              "gender",
+            ],
+          },
+        ],
+      },
+    ];
+
+    // Compter le total (distinct sur l'id d'équipage)
+    const total = await Crew.count({
+      where,
+      include,
+      distinct: true,
+      col: "id",
+    });
+
+    const crews = await Crew.findAll({
+      where,
+      include,
+      order: [
+        ["status", "ASC"],
+        ["club_name", "ASC"],
+      ],
+      limit,
+      offset,
+    });
+
+    res.json({
+      status: "success",
+      data: crews,
+      pagination: {
+        page,
+        pageSize: limit,
+        total,
+      },
+    });
+  } catch (err) {
+    console.error("Erreur dans getCrewsWithParticipantsByEvent:", err);
+    res.status(500).json({
+      status: "error",
+      message: err.message || "Erreur lors de la récupération des équipages",
+    });
   }
 };

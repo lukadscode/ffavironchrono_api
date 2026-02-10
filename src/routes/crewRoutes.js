@@ -8,6 +8,10 @@ const schema = require("../schemas/crewSchema");
 router.get("/", controller.getCrews);
 router.get("/:id", controller.getCrew);
 router.get("/event/:event_id", controller.getCrewsByEvent);
+router.get(
+  "/event/:event_id/with-participants",
+  controller.getCrewsWithParticipantsByEvent
+);
 router.post("/", auth, validate(schema.createSchema), controller.createCrew);
 router.put("/:id", auth, validate(schema.updateSchema), controller.updateCrew);
 router.delete("/:id", auth, controller.deleteCrew);

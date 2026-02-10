@@ -7,6 +7,7 @@ const schema = require("../schemas/participantSchema");
 
 router.get("/", controller.getParticipants);
 router.get("/licencie/:numeroLicence", controller.searchLicencie);
+router.get("/:participant_id/crews", controller.getCrewsByParticipant);
 router.get("/:id", controller.getParticipant);
 router.post(
   "/",
