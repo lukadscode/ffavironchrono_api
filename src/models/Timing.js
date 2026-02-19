@@ -13,8 +13,10 @@ const Timing = sequelize.define(
       allowNull: true,
     },
     timestamp: {
-      type: DataTypes.DATE(3), // Précision millisecondes pour chronométrage professionnel
+      type: DataTypes.DATE,
       allowNull: true,
+      // Note: La précision millisecondes est gérée au niveau SQL via DATETIME(3)
+      // La migration SQL doit être exécutée pour activer les millisecondes
     },
     manual_entry: {
       type: DataTypes.BOOLEAN,
