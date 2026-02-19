@@ -13,7 +13,7 @@ const Timing = sequelize.define(
       allowNull: true,
     },
     timestamp: {
-      type: DataTypes.DATE,
+      type: DataTypes.DATE(3), // Précision millisecondes pour chronométrage professionnel
       allowNull: true,
     },
     manual_entry: {
