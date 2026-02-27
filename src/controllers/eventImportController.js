@@ -15,6 +15,25 @@ function normalizeString(value) {
   return String(value).trim();
 }
 
+/**
+ * Récupère une colonne en étant tolérant sur les espaces et la casse
+ * Exemple : "category_name " (avec espace insécable) sera vu comme "category_name"
+ */
+function getField(row, candidateNames) {
+  if (!row || typeof row !== "object") return null;
+
+  const entries = Object.entries(row);
+  for (const [key, value] of entries) {
+    const normalizedKey = String(key).trim().toLowerCase();
+    for (const name of candidateNames) {
+      if (normalizedKey === String(name).trim().toLowerCase()) {
+        return value;
+      }
+    }
+  }
+  return null;
+}
+
 function parseBoolean(value) {
   if (value === null || value === undefined) return false;
   const v = String(value).trim().toLowerCase();
@@ -77,14 +96,14 @@ function getSheetRowsFromBuffer(buffer, originalName) {
   return rows;
 }
 
-async function resolveClub({ club_code, club_name }) {
+async function resolveClub({ club_code, club_name, participant_club_name }) {
   const result = { club_code: null, club_name: null, error: null };
 
   const code = normalizeString(club_code);
   const name = normalizeString(club_name);
+  const participantName = normalizeString(participant_club_name);
 
-  result.club_name = name || null;
-
+  // 1. Priorité au club_code s'il est fourni
   if (code) {
     const club = await Club.findOne({ where: { code: code } });
     if (!club) {
@@ -92,16 +111,28 @@ async function resolveClub({ club_code, club_name }) {
       return result;
     }
     result.club_code = code;
-    if (!name) {
-      result.club_name = club.nom || club.nom_court || null;
-    }
-  } else if (name) {
-    // On ne crée pas de club, on stocke juste le nom
-    result.club_code = null;
-  } else {
-    result.error = "club_name manquant";
+    result.club_name = name || club.nom || club.nom_court || null;
+    return result;
   }
 
+  // 2. Sinon, utiliser club_name si présent (nom texte libre)
+  if (name) {
+    result.club_name = name;
+    result.club_code = null;
+    return result;
+  }
+
+  // 3. Sinon, utiliser participant_club_name si présent
+  if (participantName) {
+    result.club_name = participantName;
+    result.club_code = null;
+    return result;
+  }
+
+  // 4. Aucune information club : ne pas bloquer l'import
+  result.club_name = null;
+  result.club_code = null;
+  result.error = null;
   return result;
 }
 
@@ -270,32 +301,27 @@ exports.importParticipantsFromFile = async (req, res) => {
     rows.forEach((row, index) => {
       const rowNumber = index + 2; // 1 pour header + 1 pour index 0
 
-      const crew_external_id = normalizeString(row["crew_external_id"]);
-      // Accepter soit category_code soit category_name
-      const rawCategory = row["category_code"] ?? row["category_name"];
+      const crew_external_id = normalizeString(
+        getField(row, ["crew_external_id"])
+      );
+      // Accepter soit category_code soit category_name (tolérant aux espaces)
+      const rawCategory = getField(row, ["category_code", "category_name"]);
       const category_code = normalizeString(rawCategory);
-      const club_name = normalizeString(row["club_name"]);
-      const club_code = normalizeString(row["club_code"]);
-      const seat_position = parseSeatPosition(row["seat_position"]);
-      const is_coxswain = parseBoolean(row["is_coxswain"]);
+      const club_name = normalizeString(getField(row, ["club_name"]));
+      const club_code = normalizeString(getField(row, ["club_code"]));
+      const seat_position = parseSeatPosition(getField(row, ["seat_position"]));
+      const is_coxswain = parseBoolean(getField(row, ["is_coxswain"]));
       const participant_first_name = normalizeString(
-        row["participant_first_name"]
+        getField(row, ["participant_first_name"])
       );
       const participant_last_name = normalizeString(
-        row["participant_last_name"]
+        getField(row, ["participant_last_name"])
       );
 
       if (!category_code) {
         errors.push({
           row: rowNumber,
           message: "champ 'category_code' manquant",
-        });
-        return;
-      }
-      if (!club_name && !club_code) {
-        errors.push({
-          row: rowNumber,
-          message: "champ 'club_name' ou 'club_code' requis",
         });
         return;
       }
@@ -381,7 +407,12 @@ exports.importParticipantsFromFile = async (req, res) => {
 
       // 2) Résolution club
       // eslint-disable-next-line no-await-in-loop
-      const clubInfo = await resolveClub({ club_code, club_name });
+      const firstRowRaw = group.rows[0]?.row || {};
+      const clubInfo = await resolveClub({
+        club_code,
+        club_name,
+        participant_club_name: getField(firstRowRaw, ["participant_club_name"]),
+      });
       if (clubInfo.error) {
         errors.push({
           row: group.rows[0].rowNumber,
