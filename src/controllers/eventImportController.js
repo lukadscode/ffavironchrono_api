@@ -438,6 +438,7 @@ exports.importParticipantsFromFile = async (req, res) => {
             include: [
               {
                 model: CrewParticipant,
+                as: "crew_participants", // alias défini dans relations.js
                 required: true,
                 where: { participant_id: firstParticipant.id },
               },
