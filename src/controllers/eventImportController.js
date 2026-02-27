@@ -400,13 +400,6 @@ exports.importParticipantsFromFile = async (req, res) => {
         });
         return;
       }
-      if (!club_name && !club_code) {
-        errors.push({
-          row: rowNumber,
-          message: "champ 'club_name' ou 'club_code' requis",
-        });
-        return;
-      }
       if (!seat_position && !is_coxswain) {
         errors.push({
           row: rowNumber,
