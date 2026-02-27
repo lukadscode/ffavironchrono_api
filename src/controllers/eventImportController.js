@@ -285,13 +285,6 @@ exports.importParticipantsFromFile = async (req, res) => {
         row["participant_last_name"]
       );
 
-      if (!crew_external_id) {
-        errors.push({
-          row: rowNumber,
-          message: "champ 'crew_external_id' manquant",
-        });
-        return;
-      }
       if (!category_code) {
         errors.push({
           row: rowNumber,
@@ -323,8 +316,14 @@ exports.importParticipantsFromFile = async (req, res) => {
         return;
       }
 
+      // Si crew_external_id est absent, on génère un identifiant auto par ligne
+      const effectiveCrewId =
+        crew_external_id && crew_external_id.trim() !== ""
+          ? crew_external_id
+          : `AUTO_ROW_${rowNumber}`;
+
       const key = [
-        crew_external_id,
+        effectiveCrewId,
         category_code.toLowerCase(),
         (club_code || "").toLowerCase(),
         (club_name || "").toLowerCase(),
@@ -332,7 +331,7 @@ exports.importParticipantsFromFile = async (req, res) => {
 
       if (!groups.has(key)) {
         groups.set(key, {
-          crew_external_id,
+          crew_external_id: effectiveCrewId,
           category_code,
           club_name,
           club_code,
