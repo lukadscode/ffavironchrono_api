@@ -60,112 +60,6 @@ function parseTempsPronostique(value) {
   return null;
 }
 
-/**
- * Génère un ID automatique pour un équipage
- * Format: AUTO-{category_code}-{index}
- */
-function generateAutoCrewId(categoryCode, index) {
-  const safeCategoryCode = (categoryCode || "UNKNOWN").replace(/[^A-Z0-9]/g, "");
-  const paddedIndex = String(index).padStart(3, "0");
-  return `AUTO-${safeCategoryCode}-${paddedIndex}`;
-}
-
-/**
- * Regroupe les lignes en équipages automatiquement selon seat_position séquentiel
- * Règle: Un nouvel équipage commence quand seat_position === 1 ou quand category_code change
- */
-function groupRowsIntoCrewsAuto(rows) {
-  const crews = [];
-  let currentCrew = null;
-  let currentCategory = null;
-  const categoryCounters = {}; // Compteur par catégorie pour garantir l'unicité
-
-  for (const rowData of rows) {
-    const { row, rowNumber, seat_position, is_coxswain } = rowData;
-    const category_code = normalizeString(row["category_code"]);
-
-    // Nouvel équipage si:
-    // - seat_position === 1 (début d'un équipage)
-    // - OU changement de category_code
-    // - OU pas d'équipage courant
-    const isNewCrew =
-      (seat_position === 1 && !is_coxswain) ||
-      currentCategory !== category_code ||
-      !currentCrew;
-
-    if (isNewCrew) {
-      // Initialiser le compteur pour cette catégorie si nécessaire
-      if (!categoryCounters[category_code]) {
-        categoryCounters[category_code] = 0;
-      }
-      categoryCounters[category_code]++;
-
-      // Créer un nouvel équipage
-      currentCrew = {
-        crew_external_id: null, // Sera généré automatiquement
-        category_code,
-        club_name: normalizeString(row["club_name"]),
-        club_code: normalizeString(row["club_code"]),
-        temps_pronostique: parseTempsPronostique(row["temps_pronostique"]),
-        rows: [],
-        autoIndex: categoryCounters[category_code],
-      };
-      currentCategory = category_code;
-      crews.push(currentCrew);
-    }
-
-    // Ajouter la ligne à l'équipage courant
-    currentCrew.rows.push(rowData);
-  }
-
-  // Générer les IDs automatiques
-  crews.forEach((crew) => {
-    crew.crew_external_id = generateAutoCrewId(crew.category_code, crew.autoIndex);
-  });
-
-  return crews;
-}
-
-/**
- * Valide la séquence des seat_position dans un équipage
- * Retourne un tableau d'erreurs si des problèmes sont détectés
- */
-function validateSeatPositions(crewRows) {
-  const errors = [];
-  const seatPositions = crewRows
-    .filter((r) => !r.is_coxswain && r.seat_position !== null)
-    .map((r) => r.seat_position)
-    .sort((a, b) => a - b);
-
-  if (seatPositions.length === 0) {
-    return errors; // Pas de validation si pas de seat_position
-  }
-
-  // Vérifier qu'il n'y a pas de trous trop importants
-  for (let i = 1; i < seatPositions.length; i++) {
-    const prev = seatPositions[i - 1];
-    const curr = seatPositions[i];
-    if (curr - prev > 2) {
-      // Trou de plus de 1 position
-      errors.push({
-        row: crewRows[0].rowNumber,
-        message: `Seat positions invalides : trou détecté dans la séquence (${seatPositions.join(", ")}). Vérifiez l'ordre des lignes.`,
-      });
-      break;
-    }
-  }
-
-  // Vérifier que le premier seat_position est 1
-  if (seatPositions[0] !== 1) {
-    errors.push({
-      row: crewRows[0].rowNumber,
-      message: `Le premier seat_position d'un équipage doit être 1, trouvé: ${seatPositions[0]}`,
-    });
-  }
-
-  return errors;
-}
-
 function getSheetRowsFromBuffer(buffer, originalName) {
   const workbook = XLSX.read(buffer, { type: "buffer" });
   let sheetName = "Participants";
@@ -183,14 +77,14 @@ function getSheetRowsFromBuffer(buffer, originalName) {
   return rows;
 }
 
-async function resolveClub({ club_code, club_name, participant_club_name }) {
+async function resolveClub({ club_code, club_name }) {
   const result = { club_code: null, club_name: null, error: null };
 
   const code = normalizeString(club_code);
   const name = normalizeString(club_name);
-  const participantName = normalizeString(participant_club_name);
 
-  // 1. Priorité au club_code s'il est fourni
+  result.club_name = name || null;
+
   if (code) {
     const club = await Club.findOne({ where: { code: code } });
     if (!club) {
@@ -198,43 +92,42 @@ async function resolveClub({ club_code, club_name, participant_club_name }) {
       return result;
     }
     result.club_code = code;
-    result.club_name = name || club.nom || club.nom_court || null;
-    return result;
+    if (!name) {
+      result.club_name = club.nom || club.nom_court || null;
+    }
+  } else if (name) {
+    // On ne crée pas de club, on stocke juste le nom
+    result.club_code = null;
+  } else {
+    result.error = "club_name manquant";
   }
 
-  // 2. Sinon, utiliser club_name si présent
-  if (name) {
-    result.club_name = name;
-    // Politique actuelle : on ne bloque pas si le club n'existe pas en base,
-    // on stocke simplement le nom texte.
-    return result;
-  }
-
-  // 3. Sinon, utiliser participant_club_name si présent
-  if (participantName) {
-    result.club_name = participantName;
-    return result;
-  }
-
-  // 4. Aucune information club : ne pas bloquer l'import
-  // On autorise un équipage sans club (club_name/club_code NULL)
-  result.club_name = null;
-  result.club_code = null;
-  result.error = null;
   return result;
 }
 
-async function resolveCategoryForEvent(event_id, category_code) {
-  const code = normalizeString(category_code);
-  if (!code) {
-    return { category: null, error: "category_code manquant" };
+async function resolveCategoryForEvent(event_id, category_code_or_name) {
+  const value = normalizeString(category_code_or_name);
+  if (!value) {
+    return {
+      category: null,
+      error: "category_code ou category_name manquant",
+    };
   }
 
-  const category = await Category.findOne({
-    where: { code: { [Op.eq]: code } },
+  // 1) D'abord par code exact
+  let category = await Category.findOne({
+    where: { code: { [Op.eq]: value } },
   });
+
+  // 2) Si non trouvé, tenter par label (nom de catégorie)
   if (!category) {
-    return { category: null, error: `Catégorie "${code}" introuvable` };
+    category = await Category.findOne({
+      where: { label: { [Op.eq]: value } },
+    });
+  }
+
+  if (!category) {
+    return { category: null, error: `Catégorie "${value}" introuvable` };
   }
 
   const ec = await EventCategory.findOne({
@@ -243,7 +136,7 @@ async function resolveCategoryForEvent(event_id, category_code) {
   if (!ec) {
     return {
       category: null,
-      error: `La catégorie "${code}" n'est pas liée à cet événement`,
+      error: `La catégorie "${value}" n'est pas liée à cet événement`,
     };
   }
 
@@ -372,15 +265,15 @@ exports.importParticipantsFromFile = async (req, res) => {
 
     const errors = [];
     const groups = new Map();
-    const rowsWithExternalId = [];
-    const rowsWithoutExternalId = [];
 
-    // Pré-validation et séparation des lignes avec/sans crew_external_id
+    // Pré-validation et grouping par équipage
     rows.forEach((row, index) => {
       const rowNumber = index + 2; // 1 pour header + 1 pour index 0
 
       const crew_external_id = normalizeString(row["crew_external_id"]);
-      const category_code = normalizeString(row["category_code"]);
+      // Accepter soit category_code soit category_name
+      const rawCategory = row["category_code"] ?? row["category_name"];
+      const category_code = normalizeString(rawCategory);
       const club_name = normalizeString(row["club_name"]);
       const club_code = normalizeString(row["club_code"]);
       const seat_position = parseSeatPosition(row["seat_position"]);
@@ -392,11 +285,24 @@ exports.importParticipantsFromFile = async (req, res) => {
         row["participant_last_name"]
       );
 
-      // Validation des champs requis (crew_external_id est maintenant optionnel)
+      if (!crew_external_id) {
+        errors.push({
+          row: rowNumber,
+          message: "champ 'crew_external_id' manquant",
+        });
+        return;
+      }
       if (!category_code) {
         errors.push({
           row: rowNumber,
           message: "champ 'category_code' manquant",
+        });
+        return;
+      }
+      if (!club_name && !club_code) {
+        errors.push({
+          row: rowNumber,
+          message: "champ 'club_name' ou 'club_code' requis",
         });
         return;
       }
@@ -417,63 +323,31 @@ exports.importParticipantsFromFile = async (req, res) => {
         return;
       }
 
-      const rowData = {
+      const key = [
+        crew_external_id,
+        category_code.toLowerCase(),
+        (club_code || "").toLowerCase(),
+        (club_name || "").toLowerCase(),
+      ].join("||");
+
+      if (!groups.has(key)) {
+        groups.set(key, {
+          crew_external_id,
+          category_code,
+          club_name,
+          club_code,
+          temps_pronostique: parseTempsPronostique(row["temps_pronostique"]),
+          rows: [],
+        });
+      }
+
+      groups.get(key).rows.push({
         row,
         rowNumber,
         seat_position,
         is_coxswain,
-      };
-
-      // Séparer les lignes avec et sans crew_external_id
-      if (crew_external_id && crew_external_id.trim() !== "") {
-        // Ligne avec crew_external_id : utiliser le regroupement manuel
-        const key = [
-          crew_external_id,
-          category_code.toLowerCase(),
-          (club_code || "").toLowerCase(),
-          (club_name || "").toLowerCase(),
-        ].join("||");
-
-        if (!groups.has(key)) {
-          groups.set(key, {
-            crew_external_id,
-            category_code,
-            club_name,
-            club_code,
-            temps_pronostique: parseTempsPronostique(row["temps_pronostique"]),
-            rows: [],
-          });
-        }
-
-        groups.get(key).rows.push(rowData);
-      } else {
-        // Ligne sans crew_external_id : sera regroupée automatiquement
-        rowsWithoutExternalId.push(rowData);
-      }
+      });
     });
-
-    // Regroupement automatique pour les lignes sans crew_external_id
-    if (rowsWithoutExternalId.length > 0) {
-      const autoCrews = groupRowsIntoCrewsAuto(rowsWithoutExternalId);
-
-      // Valider les seat_position de chaque équipage auto-généré
-      for (const autoCrew of autoCrews) {
-        const validationErrors = validateSeatPositions(autoCrew.rows);
-        errors.push(...validationErrors);
-      }
-
-      // Ajouter les équipages auto-générés aux groups
-      for (const autoCrew of autoCrews) {
-        const key = [
-          autoCrew.crew_external_id,
-          autoCrew.category_code.toLowerCase(),
-          (autoCrew.club_code || "").toLowerCase(),
-          (autoCrew.club_name || "").toLowerCase(),
-        ].join("||");
-
-        groups.set(key, autoCrew);
-      }
-    }
 
     if (groups.size === 0) {
       return res.status(400).json({
@@ -508,12 +382,7 @@ exports.importParticipantsFromFile = async (req, res) => {
 
       // 2) Résolution club
       // eslint-disable-next-line no-await-in-loop
-      const firstRowRaw = group.rows[0]?.row || {};
-      const clubInfo = await resolveClub({
-        club_code,
-        club_name,
-        participant_club_name: firstRowRaw["participant_club_name"],
-      });
+      const clubInfo = await resolveClub({ club_code, club_name });
       if (clubInfo.error) {
         errors.push({
           row: group.rows[0].rowNumber,
