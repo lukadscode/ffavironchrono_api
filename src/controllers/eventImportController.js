@@ -60,6 +60,112 @@ function parseTempsPronostique(value) {
   return null;
 }
 
+/**
+ * Génère un ID automatique pour un équipage
+ * Format: AUTO-{category_code}-{index}
+ */
+function generateAutoCrewId(categoryCode, index) {
+  const safeCategoryCode = (categoryCode || "UNKNOWN").replace(/[^A-Z0-9]/g, "");
+  const paddedIndex = String(index).padStart(3, "0");
+  return `AUTO-${safeCategoryCode}-${paddedIndex}`;
+}
+
+/**
+ * Regroupe les lignes en équipages automatiquement selon seat_position séquentiel
+ * Règle: Un nouvel équipage commence quand seat_position === 1 ou quand category_code change
+ */
+function groupRowsIntoCrewsAuto(rows) {
+  const crews = [];
+  let currentCrew = null;
+  let currentCategory = null;
+  const categoryCounters = {}; // Compteur par catégorie pour garantir l'unicité
+
+  for (const rowData of rows) {
+    const { row, rowNumber, seat_position, is_coxswain } = rowData;
+    const category_code = normalizeString(row["category_code"]);
+
+    // Nouvel équipage si:
+    // - seat_position === 1 (début d'un équipage)
+    // - OU changement de category_code
+    // - OU pas d'équipage courant
+    const isNewCrew =
+      (seat_position === 1 && !is_coxswain) ||
+      currentCategory !== category_code ||
+      !currentCrew;
+
+    if (isNewCrew) {
+      // Initialiser le compteur pour cette catégorie si nécessaire
+      if (!categoryCounters[category_code]) {
+        categoryCounters[category_code] = 0;
+      }
+      categoryCounters[category_code]++;
+
+      // Créer un nouvel équipage
+      currentCrew = {
+        crew_external_id: null, // Sera généré automatiquement
+        category_code,
+        club_name: normalizeString(row["club_name"]),
+        club_code: normalizeString(row["club_code"]),
+        temps_pronostique: parseTempsPronostique(row["temps_pronostique"]),
+        rows: [],
+        autoIndex: categoryCounters[category_code],
+      };
+      currentCategory = category_code;
+      crews.push(currentCrew);
+    }
+
+    // Ajouter la ligne à l'équipage courant
+    currentCrew.rows.push(rowData);
+  }
+
+  // Générer les IDs automatiques
+  crews.forEach((crew) => {
+    crew.crew_external_id = generateAutoCrewId(crew.category_code, crew.autoIndex);
+  });
+
+  return crews;
+}
+
+/**
+ * Valide la séquence des seat_position dans un équipage
+ * Retourne un tableau d'erreurs si des problèmes sont détectés
+ */
+function validateSeatPositions(crewRows) {
+  const errors = [];
+  const seatPositions = crewRows
+    .filter((r) => !r.is_coxswain && r.seat_position !== null)
+    .map((r) => r.seat_position)
+    .sort((a, b) => a - b);
+
+  if (seatPositions.length === 0) {
+    return errors; // Pas de validation si pas de seat_position
+  }
+
+  // Vérifier qu'il n'y a pas de trous trop importants
+  for (let i = 1; i < seatPositions.length; i++) {
+    const prev = seatPositions[i - 1];
+    const curr = seatPositions[i];
+    if (curr - prev > 2) {
+      // Trou de plus de 1 position
+      errors.push({
+        row: crewRows[0].rowNumber,
+        message: `Seat positions invalides : trou détecté dans la séquence (${seatPositions.join(", ")}). Vérifiez l'ordre des lignes.`,
+      });
+      break;
+    }
+  }
+
+  // Vérifier que le premier seat_position est 1
+  if (seatPositions[0] !== 1) {
+    errors.push({
+      row: crewRows[0].rowNumber,
+      message: `Le premier seat_position d'un équipage doit être 1, trouvé: ${seatPositions[0]}`,
+    });
+  }
+
+  return errors;
+}
+
 function getSheetRowsFromBuffer(buffer, originalName) {
   const workbook = XLSX.read(buffer, { type: "buffer" });
   let sheetName = "Participants";
@@ -253,8 +359,10 @@ exports.importParticipantsFromFile = async (req, res) => {
 
     const errors = [];
     const groups = new Map();
+    const rowsWithExternalId = [];
+    const rowsWithoutExternalId = [];
 
-    // Pré-validation et grouping par équipage
+    // Pré-validation et séparation des lignes avec/sans crew_external_id
     rows.forEach((row, index) => {
       const rowNumber = index + 2; // 1 pour header + 1 pour index 0
 
@@ -271,13 +379,7 @@ exports.importParticipantsFromFile = async (req, res) => {
         row["participant_last_name"]
       );
 
-      if (!crew_external_id) {
-        errors.push({
-          row: rowNumber,
-          message: "champ 'crew_external_id' manquant",
-        });
-        return;
-      }
+      // Validation des champs requis (crew_external_id est maintenant optionnel)
       if (!category_code) {
         errors.push({
           row: rowNumber,
@@ -309,31 +411,63 @@ exports.importParticipantsFromFile = async (req, res) => {
         return;
       }
 
-      const key = [
-        crew_external_id,
-        category_code.toLowerCase(),
-        (club_code || "").toLowerCase(),
-        (club_name || "").toLowerCase(),
-      ].join("||");
-
-      if (!groups.has(key)) {
-        groups.set(key, {
-          crew_external_id,
-          category_code,
-          club_name,
-          club_code,
-          temps_pronostique: parseTempsPronostique(row["temps_pronostique"]),
-          rows: [],
-        });
-      }
-
-      groups.get(key).rows.push({
+      const rowData = {
         row,
         rowNumber,
         seat_position,
         is_coxswain,
-      });
+      };
+
+      // Séparer les lignes avec et sans crew_external_id
+      if (crew_external_id && crew_external_id.trim() !== "") {
+        // Ligne avec crew_external_id : utiliser le regroupement manuel
+        const key = [
+          crew_external_id,
+          category_code.toLowerCase(),
+          (club_code || "").toLowerCase(),
+          (club_name || "").toLowerCase(),
+        ].join("||");
+
+        if (!groups.has(key)) {
+          groups.set(key, {
+            crew_external_id,
+            category_code,
+            club_name,
+            club_code,
+            temps_pronostique: parseTempsPronostique(row["temps_pronostique"]),
+            rows: [],
+          });
+        }
+
+        groups.get(key).rows.push(rowData);
+      } else {
+        // Ligne sans crew_external_id : sera regroupée automatiquement
+        rowsWithoutExternalId.push(rowData);
+      }
     });
+
+    // Regroupement automatique pour les lignes sans crew_external_id
+    if (rowsWithoutExternalId.length > 0) {
+      const autoCrews = groupRowsIntoCrewsAuto(rowsWithoutExternalId);
+
+      // Valider les seat_position de chaque équipage auto-généré
+      for (const autoCrew of autoCrews) {
+        const validationErrors = validateSeatPositions(autoCrew.rows);
+        errors.push(...validationErrors);
+      }
+
+      // Ajouter les équipages auto-générés aux groups
+      for (const autoCrew of autoCrews) {
+        const key = [
+          autoCrew.crew_external_id,
+          autoCrew.category_code.toLowerCase(),
+          (autoCrew.club_code || "").toLowerCase(),
+          (autoCrew.club_name || "").toLowerCase(),
+        ].join("||");
+
+        groups.set(key, autoCrew);
+      }
+    }
 
     if (groups.size === 0) {
       return res.status(400).json({
