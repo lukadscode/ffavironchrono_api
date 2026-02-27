@@ -7,6 +7,7 @@ exports.createSchema = Joi.object({
   gender: Joi.string().valid("Homme", "Femme").required(),
   email: Joi.string().email().optional(),
   club_name: Joi.string().optional(),
+  nationality: Joi.string().length(3).uppercase().optional(),
 });
 
 exports.updateSchema = Joi.object({
@@ -16,4 +17,5 @@ exports.updateSchema = Joi.object({
   gender: Joi.string().valid("Homme", "Femme").optional(),
   email: Joi.string().email().optional(),
   club_name: Joi.string().optional(),
+  nationality: Joi.string().length(3).uppercase().optional(),
 });

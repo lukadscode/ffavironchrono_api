@@ -41,6 +41,11 @@ paths:
                   format: email
                 club_name:
                   type: string
+                nationality:
+                  type: string
+                  minLength: 3
+                  maxLength: 3
+                  description: "Code pays ISO 3166-1 alpha-3 (ex: FRA, USA, GBR)"
       responses:
         201:
           description: Participant créé
@@ -121,6 +126,11 @@ paths:
                   format: email
                 club_name:
                   type: string
+                nationality:
+                  type: string
+                  minLength: 3
+                  maxLength: 3
+                  description: "Code pays ISO 3166-1 alpha-3 (ex: FRA, USA, GBR)"
       responses:
         200:
           description: Participant mis à jour
@@ -163,3 +173,6 @@ components:
           type: string
         club_name:
           type: string
+        nationality:
+          type: string
+          description: "Code pays ISO 3166-1 alpha-3 (ex: FRA, USA, GBR)"

@@ -224,6 +224,7 @@ exports.getCrewsByParticipant = async (req, res) => {
                 "license_number",
                 "club_name",
                 "gender",
+                "nationality",
               ],
             },
           ],

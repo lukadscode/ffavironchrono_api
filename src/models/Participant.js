@@ -33,6 +33,11 @@ const Participant = sequelize.define(
       type: DataTypes.STRING,
       allowNull: true,
     },
+    nationality: {
+      type: DataTypes.STRING(3),
+      allowNull: true,
+      comment: "Code pays ISO 3166-1 alpha-3 (ex: FRA, USA, GBR)",
+    },
   },
   {
     tableName: "participants",
