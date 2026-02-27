@@ -415,26 +415,61 @@ exports.importParticipantsFromFile = async (req, res) => {
       const resolvedClubName = clubInfo.club_name;
       const resolvedClubCode = clubInfo.club_code;
 
-      // 3) Recherche d'un équipage existant (par event + catégorie + club)
-      // eslint-disable-next-line no-await-in-loop
-      let crew = await Crew.findOne({
-        where: {
-          event_id,
-          category_id: category.id,
-          club_name: resolvedClubName,
-          ...(resolvedClubCode ? { club_code: resolvedClubCode } : {}),
-        },
-      });
+      // 3) Déduplication : si un équipage avec les mêmes participants existe déjà,
+      // on ne crée rien de nouveau (quelle que soit la valeur de "mode")
+      let crew = null;
+      if (!dryRun && group.rows.length === 1) {
+        const firstEntry = group.rows[0];
+        const { row: firstRowForDedup, rowNumber: firstRowNumber } = firstEntry;
 
-      const isExisting = !!crew;
+        // eslint-disable-next-line no-await-in-loop
+        const { participant: firstParticipant, error: firstPError } =
+          await resolveParticipant(firstRowForDedup, event_id);
+        if (!firstPError && firstParticipant) {
+          // Chercher un équipage existant pour cet event + catégorie + club + participant
+          // eslint-disable-next-line no-await-in-loop
+          const existingCrewWithSameParticipant = await Crew.findOne({
+            where: {
+              event_id,
+              category_id: category.id,
+              club_name: resolvedClubName,
+              ...(resolvedClubCode ? { club_code: resolvedClubCode } : {}),
+            },
+            include: [
+              {
+                model: CrewParticipant,
+                required: true,
+                where: { participant_id: firstParticipant.id },
+              },
+            ],
+          });
 
-      if (isExisting && mode === "create_only") {
-        // On signale mais on ne modifie rien
-        errors.push({
-          row: group.rows[0].rowNumber,
-          message: `Équipage déjà existant pour category="${category_code}", club="${resolvedClubName}" (mode=create_only)`,
+          if (existingCrewWithSameParticipant) {
+            // On considère que l'équipage existe déjà avec ce participant : on ne recrée pas
+            participantsMatched += 1;
+            continue;
+          }
+        } else if (firstPError) {
+          errors.push({
+            row: firstRowNumber,
+            message: firstPError,
+          });
+          continue;
+        }
+      }
+
+      // 4) Recherche d'un équipage existant (par event + catégorie + club) uniquement
+      // en mode update_or_create
+      if (mode === "update_or_create") {
+        // eslint-disable-next-line no-await-in-loop
+        crew = await Crew.findOne({
+          where: {
+            event_id,
+            category_id: category.id,
+            club_name: resolvedClubName,
+            ...(resolvedClubCode ? { club_code: resolvedClubCode } : {}),
+          },
         });
-        continue;
       }
 
       if (!dryRun) {
@@ -451,8 +486,8 @@ exports.importParticipantsFromFile = async (req, res) => {
             temps_pronostique: group.temps_pronostique,
           });
           crewsCreated++;
-        } else {
-          // Mise à jour simple
+        } else if (mode === "update_or_create") {
+          // Mise à jour simple uniquement en mode update_or_create
           // eslint-disable-next-line no-await-in-loop
           await crew.update({
             club_name: resolvedClubName,
@@ -462,10 +497,8 @@ exports.importParticipantsFromFile = async (req, res) => {
           crewsUpdated++;
 
           // On remet à zéro les participants si on est en mode update_or_create
-          if (mode === "update_or_create") {
-            // eslint-disable-next-line no-await-in-loop
-            await CrewParticipant.destroy({ where: { crew_id: crew.id } });
-          }
+          // eslint-disable-next-line no-await-in-loop
+          await CrewParticipant.destroy({ where: { crew_id: crew.id } });
         }
       }
 
