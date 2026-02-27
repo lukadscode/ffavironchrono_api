@@ -262,21 +262,14 @@ async function findOrCreateParticipant({
     }
   }
 
-  // 3. Créer un nouveau participant avec un numéro temporaire basé sur nom + prénom + club
-  // (sans crew.id pour éviter les doublons)
-  const clubPart = club_name ? club_name.replace(/\s+/g, "_") : "UNKNOWN";
-  const tempLicenseNumber = `TEMP_${nom}_${prenom}_${clubPart}`.toUpperCase();
-
-  const [participant] = await Participant.findOrCreate({
-    where: { license_number: tempLicenseNumber },
-    defaults: {
-      id: uuidv4(),
-      first_name: prenom,
-      last_name: nom,
-      license_number: tempLicenseNumber,
-      gender: gender,
-      club_name: club_name,
-    },
+  // 3. Créer un nouveau participant SANS licence (license_number = null)
+  const participant = await Participant.create({
+    id: uuidv4(),
+    first_name: prenom,
+    last_name: nom,
+    license_number: null,
+    gender: gender,
+    club_name: club_name,
   });
 
   return participant;

@@ -189,7 +189,7 @@ async function resolveParticipant(row, event_id) {
     return { participant: null, created: false, error: "Prénom/nom manquant" };
   }
 
-  // 1) Par numéro de licence
+  // 1) Par numéro de licence (identifiant fort)
   if (license_number) {
     const [participant, created] = await Participant.findOrCreate({
       where: { license_number },
@@ -206,7 +206,7 @@ async function resolveParticipant(row, event_id) {
     return { participant, created, error: null };
   }
 
-  // 2) Optionnel : par nom/prénom/club
+  // 2) Optionnel : par nom/prénom/club (sans licence)
   const existing = await Participant.findOne({
     where: {
       first_name,
@@ -218,27 +218,18 @@ async function resolveParticipant(row, event_id) {
     return { participant: existing, created: false, error: null };
   }
 
-  // 3) Création sans licence
-  const tempLicense = `TEMP_${last_name}_${first_name}_${(
-    participant_club_name || "UNKNOWN"
-  )
-    .replace(/\s+/g, "_")
-    .toUpperCase()}`;
-
-  const [participant, created] = await Participant.findOrCreate({
-    where: { license_number: tempLicense },
-    defaults: {
-      id: uuidv4(),
-      first_name,
-      last_name,
-      license_number: tempLicense,
-      gender: gender || "Homme",
-      email: email || null,
-      club_name: participant_club_name,
-    },
+  // 3) Création sans licence (license_number = null)
+  const participant = await Participant.create({
+    id: uuidv4(),
+    first_name,
+    last_name,
+    license_number: null,
+    gender: gender || "Homme",
+    email: email || null,
+    club_name: participant_club_name,
   });
 
-  return { participant, created, error: null };
+  return { participant, created: true, error: null };
 }
 
 /**

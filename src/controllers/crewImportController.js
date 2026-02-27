@@ -118,7 +118,7 @@ async function findOrCreateParticipant(participantData, event_id) {
   const { prenom, nom, numero_licence, sexe, club_name, email } =
     participantData;
 
-  // Si un numéro de licence existe, l'utiliser
+  // 1) Si un numéro de licence existe, l'utiliser (identifiant fort)
   if (numero_licence) {
     const [participant] = await Participant.findOrCreate({
       where: { license_number: numero_licence },
@@ -135,21 +135,27 @@ async function findOrCreateParticipant(participantData, event_id) {
     return participant;
   }
 
-  // Sinon, créer un numéro temporaire
-  const clubPart = club_name ? club_name.replace(/\s+/g, "_") : "UNKNOWN";
-  const tempLicenseNumber = `TEMP_${nom}_${prenom}_${clubPart}`.toUpperCase();
-
-  const [participant] = await Participant.findOrCreate({
-    where: { license_number: tempLicenseNumber },
-    defaults: {
-      id: uuidv4(),
+  // 2) Sinon, tenter de retrouver un participant par nom/prénom/club
+  const existing = await Participant.findOne({
+    where: {
       first_name: prenom,
       last_name: nom,
-      license_number: tempLicenseNumber,
-      gender: mapGender(sexe),
-      club_name: club_name || null,
-      email: email || null,
+      ...(club_name ? { club_name } : {}),
     },
+  });
+  if (existing) {
+    return existing;
+  }
+
+  // 3) Création sans licence (license_number = null)
+  const participant = await Participant.create({
+    id: uuidv4(),
+    first_name: prenom,
+    last_name: nom,
+    license_number: null,
+    gender: mapGender(sexe),
+    club_name: club_name || null,
+    email: email || null,
   });
 
   return participant;

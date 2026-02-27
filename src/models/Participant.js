@@ -18,7 +18,7 @@ const Participant = sequelize.define(
     },
     license_number: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true, // Peut être null si le participant n'a pas de licence
       unique: true,
     },
     gender: {
