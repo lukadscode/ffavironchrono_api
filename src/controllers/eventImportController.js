@@ -183,14 +183,14 @@ function getSheetRowsFromBuffer(buffer, originalName) {
   return rows;
 }
 
-async function resolveClub({ club_code, club_name }) {
+async function resolveClub({ club_code, club_name, participant_club_name }) {
   const result = { club_code: null, club_name: null, error: null };
 
   const code = normalizeString(club_code);
   const name = normalizeString(club_name);
+  const participantName = normalizeString(participant_club_name);
 
-  result.club_name = name || null;
-
+  // 1. Priorité au club_code s'il est fourni
   if (code) {
     const club = await Club.findOne({ where: { code: code } });
     if (!club) {
@@ -198,16 +198,29 @@ async function resolveClub({ club_code, club_name }) {
       return result;
     }
     result.club_code = code;
-    if (!name) {
-      result.club_name = club.nom || club.nom_court || null;
-    }
-  } else if (name) {
-    // On ne crée pas de club, on stocke juste le nom
-    result.club_code = null;
-  } else {
-    result.error = "club_name manquant";
+    result.club_name = name || club.nom || club.nom_court || null;
+    return result;
   }
 
+  // 2. Sinon, utiliser club_name si présent
+  if (name) {
+    result.club_name = name;
+    // Politique actuelle : on ne bloque pas si le club n'existe pas en base,
+    // on stocke simplement le nom texte.
+    return result;
+  }
+
+  // 3. Sinon, utiliser participant_club_name si présent
+  if (participantName) {
+    result.club_name = participantName;
+    return result;
+  }
+
+  // 4. Aucune information club : ne pas bloquer l'import
+  // On autorise un équipage sans club (club_name/club_code NULL)
+  result.club_name = null;
+  result.club_code = null;
+  result.error = null;
   return result;
 }
 
@@ -502,7 +515,12 @@ exports.importParticipantsFromFile = async (req, res) => {
 
       // 2) Résolution club
       // eslint-disable-next-line no-await-in-loop
-      const clubInfo = await resolveClub({ club_code, club_name });
+      const firstRowRaw = group.rows[0]?.row || {};
+      const clubInfo = await resolveClub({
+        club_code,
+        club_name,
+        participant_club_name: firstRowRaw["participant_club_name"],
+      });
       if (clubInfo.error) {
         errors.push({
           row: group.rows[0].rowNumber,
