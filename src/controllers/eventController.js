@@ -149,7 +149,7 @@ exports.deleteEvent = async (req, res) => {
     const RacePhase = require("../models/RacePhase");
     const CrewParticipant = require("../models/CrewParticipant");
     const Crew = require("../models/Crew");
-    const Distance = require("../models/Distance");
+    const EventDistance = require("../models/EventDistance");
     const EventCategory = require("../models/EventCategory");
     const UserEvent = require("../models/UserEvent");
 
@@ -219,10 +219,10 @@ exports.deleteEvent = async (req, res) => {
     await TimingPoint.destroy({ where: { event_id: id } });
     console.log(`  ✅ ${timingPoints.length} TimingPoint supprimés`);
 
-    // 9. Supprimer les Distance
-    const distances = await Distance.findAll({ where: { event_id: id } });
-    await Distance.destroy({ where: { event_id: id } });
-    console.log(`  ✅ ${distances.length} Distance supprimées`);
+    // 9. Supprimer les liaisons EventDistance (distances liées à cet événement)
+    const eventDistances = await EventDistance.findAll({ where: { event_id: id } });
+    await EventDistance.destroy({ where: { event_id: id } });
+    console.log(`  ✅ ${eventDistances.length} EventDistance supprimés`);
 
     // 10. Supprimer les EventCategory (table de liaison)
     await EventCategory.destroy({ where: { event_id: id } });
