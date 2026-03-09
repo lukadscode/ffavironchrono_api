@@ -24,6 +24,15 @@ router.post(
   validate(require("../schemas/generateRacesSchema").generateRacesFromSeriesSchema),
   importController.generateRacesFromSeries
 );
+
+router.post(
+  "/generate-time-trial",
+  auth,
+  validate(
+    require("../schemas/generateRacesSchema").generateTimeTrialRacesSchema
+  ),
+  importController.generateTimeTrialRaces
+);
 // Routes génériques après les routes spécifiques
 router.get("/:id", controller.getRace);
 router.put("/:id", auth, validate(schema.updateSchema), controller.updateRace);

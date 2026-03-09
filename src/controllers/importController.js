@@ -562,6 +562,232 @@ exports.generateRacesFromSeries = async (req, res) => {
   }
 };
 
+// Génération de courses en mode "parcours contre la montre"
+// Une course (ou créneau) par équipage, départs espacés dans le temps
+exports.generateTimeTrialRaces = async (req, res) => {
+  try {
+    const { phase_id, start_time, interval_seconds, categories } = req.body;
+
+    if (!phase_id) {
+      return res.status(400).json({
+        status: "error",
+        message: "phase_id est requis",
+      });
+    }
+
+    const phase = await RacePhase.findByPk(phase_id);
+    if (!phase) {
+      return res
+        .status(404)
+        .json({ status: "error", message: "Phase introuvable" });
+    }
+
+    const event_id = phase.event_id;
+
+    // Récupérer les courses existantes pour cette phase pour éviter de réutiliser des équipages déjà affectés
+    const existingRaces = await Race.findAll({
+      where: { phase_id },
+      include: [
+        {
+          model: RaceCrew,
+          attributes: ["crew_id"],
+        },
+      ],
+    });
+
+    const alreadyAssignedCrewIds = new Set();
+    existingRaces.forEach((race) => {
+      race.RaceCrews?.forEach((rc) => {
+        alreadyAssignedCrewIds.add(rc.crew_id);
+      });
+    });
+
+    if (!Array.isArray(categories) || categories.length === 0) {
+      return res.status(400).json({
+        status: "error",
+        message:
+          "categories est requis et doit être un tableau non vide de { category_id, order }",
+      });
+    }
+
+    // Trier les catégories selon leur ordre de passage
+    const sortedCategoryConfigs = [...categories].sort((a, b) => {
+      if (a.order === b.order) return 0;
+      return a.order < b.order ? -1 : 1;
+    });
+
+    const categoryIds = sortedCategoryConfigs.map((c) => c.category_id);
+
+    // Charger les catégories avec leurs équipages pour cet événement
+    const allCategories = await Category.findAll({
+      where: { id: { [Op.in]: categoryIds } },
+      include: [
+        {
+          model: Crew,
+          where: { event_id },
+          required: false,
+        },
+        {
+          model: Distance,
+          as: "distance",
+          required: false,
+        },
+      ],
+    });
+
+    const categoryById = new Map();
+    allCategories.forEach((cat) => {
+      categoryById.set(cat.id, cat);
+    });
+
+    const validationErrors = [];
+    const orderedCrewSlots = []; // { crew, category, globalIndex }
+    let globalIndex = 0;
+
+    for (const cfg of sortedCategoryConfigs) {
+      const category = categoryById.get(cfg.category_id);
+      if (!category) {
+        validationErrors.push(
+          `Catégorie introuvable pour category_id="${cfg.category_id}"`
+        );
+        continue;
+      }
+
+      const availableCrews = (category.Crews || []).filter(
+        (crew) => !alreadyAssignedCrewIds.has(crew.id)
+      );
+
+      if (availableCrews.length === 0) {
+        validationErrors.push(
+          `La catégorie "${category.code}" n'a aucun équipage disponible pour cet événement`
+        );
+        continue;
+      }
+
+      // Trier les équipages par temps pronostique (du plus rapide au plus lent), comme pour generateRacesFromSeries
+      const sortedCrews = [...availableCrews].sort((a, b) => {
+        const timeA = a.temps_pronostique;
+        const timeB = b.temps_pronostique;
+
+        if (
+          timeA !== null &&
+          timeA !== undefined &&
+          timeB !== null &&
+          timeB !== undefined
+        ) {
+          return timeA - timeB;
+        }
+
+        if (timeA !== null && timeA !== undefined) {
+          return -1;
+        }
+
+        if (timeB !== null && timeB !== undefined) {
+          return 1;
+        }
+
+        return 0;
+      });
+
+      for (const crew of sortedCrews) {
+        orderedCrewSlots.push({
+          crew,
+          category,
+          globalIndex,
+        });
+        globalIndex += 1;
+      }
+    }
+
+    if (validationErrors.length > 0) {
+      return res.status(400).json({
+        status: "error",
+        message: "Erreurs de validation",
+        errors: validationErrors,
+      });
+    }
+
+    if (orderedCrewSlots.length === 0) {
+      return res.status(400).json({
+        status: "error",
+        message: "Aucun équipage disponible pour générer des départs",
+      });
+    }
+
+    const firstStartTime = new Date(start_time);
+    if (Number.isNaN(firstStartTime.getTime())) {
+      return res.status(400).json({
+        status: "error",
+        message: "start_time doit être une date ISO 8601 valide",
+      });
+    }
+
+    const intervalMs = interval_seconds * 1000;
+
+    // Déterminer le prochain numéro de course
+    const maxRaceNumber = existingRaces.reduce((max, race) => {
+      if (typeof race.race_number === "number") {
+        return Math.max(max, race.race_number);
+      }
+      return max;
+    }, 0);
+
+    let nextRaceNumber = maxRaceNumber + 1 || 1;
+    const createdRaces = [];
+
+    for (const slot of orderedCrewSlots) {
+      const { crew, category, globalIndex: idx } = slot;
+      const raceStartTime = new Date(firstStartTime.getTime() + idx * intervalMs);
+
+      const raceName = `TT – ${category.code} – #${idx + 1}`;
+
+      const race = await Race.create({
+        id: uuidv4(),
+        name: raceName,
+        race_type: "time_trial",
+        race_number: nextRaceNumber,
+        phase_id,
+        lane_count: 1,
+        start_time: raceStartTime,
+        distance_id: category.distance_id || null,
+      });
+
+      await RaceCrew.create({
+        id: uuidv4(),
+        race_id: race.id,
+        crew_id: crew.id,
+        lane: 1,
+      });
+
+      createdRaces.push({
+        id: race.id,
+        race_number: race.race_number,
+        name: race.name,
+        start_time: race.start_time,
+        distance_id: race.distance_id,
+        crews_count: 1,
+      });
+
+      nextRaceNumber += 1;
+    }
+
+    return res.json({
+      status: "success",
+      message: `${createdRaces.length} courses contre la montre générées avec succès`,
+      data: {
+        races_created: createdRaces.length,
+        crews_assigned: createdRaces.length,
+        races: createdRaces,
+      },
+    });
+  } catch (err) {
+    console.error("Error in generateTimeTrialRaces:", err);
+    return res
+      .status(500)
+      .json({ status: "error", message: err.message || "Erreur serveur" });
+  }
+};
+
 exports.updateEventFromManifestation = async (req, res) => {
   const startTime = Date.now();
   let event_id = null;

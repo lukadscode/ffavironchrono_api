@@ -23,10 +23,7 @@ exports.generateRacesFromSeriesSchema = Joi.object({
       Joi.object({
         id: Joi.string().required(),
         categories: Joi.object()
-          .pattern(
-            Joi.string(),
-            Joi.number().integer().min(1)
-          )
+          .pattern(Joi.string(), Joi.number().integer().min(1))
           .required()
           .description(
             "Objet avec les codes de catégories comme clés et le nombre d'équipages comme valeurs"
@@ -36,8 +33,46 @@ exports.generateRacesFromSeriesSchema = Joi.object({
     .min(1)
     .required()
     .description("Tableau des séries à générer"),
-  save_only: Joi.boolean().optional().default(false)
-    .description("Si true, enregistre uniquement le schéma sans générer les courses (mode brouillon)"),
+  save_only: Joi.boolean()
+    .optional()
+    .default(false)
+    .description(
+      "Si true, enregistre uniquement le schéma sans générer les courses (mode brouillon)"
+    ),
+});
+
+// Parcours contre la montre : une course (ou créneau) par équipage, départs espacés
+exports.generateTimeTrialRacesSchema = Joi.object({
+  phase_id: Joi.string().required(),
+  start_time: Joi.date()
+    .iso()
+    .required()
+    .description("Heure de départ de la première course (ISO 8601)"),
+  interval_seconds: Joi.number()
+    .integer()
+    .min(1)
+    .required()
+    .description("Intervalle en secondes entre deux départs"),
+  categories: Joi.array()
+    .items(
+      Joi.object({
+        category_id: Joi.string()
+          .required()
+          .description("ID de la catégorie"),
+        order: Joi.number()
+          .integer()
+          .min(1)
+          .required()
+          .description(
+            "Ordre de passage de la catégorie (1 = en premier, 2 = ensuite, etc.)"
+          ),
+      })
+    )
+    .min(1)
+    .required()
+    .description(
+      "Liste ordonnée des catégories pour lesquelles générer les départs contre la montre"
+    ),
 });
 
 exports.updateGenerationSchemaSchema = Joi.object({

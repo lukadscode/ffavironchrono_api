@@ -242,6 +242,131 @@ paths:
                       - "Série 1: Le nombre total de participants (7) dépasse le nombre de lignes d'eau (6)"
                       - "Série 2: Les catégories ont des distances différentes"
 
+  /races/generate-time-trial:
+    post:
+      tags: [races]
+      summary: Génère des courses en mode parcours contre la montre
+      description: |
+        Génère une course (ou créneau) par équipage, avec des départs décalés dans le temps.
+
+        Les catégories sont parcourues dans l'ordre fourni. Pour chaque catégorie, tous les équipages
+        éligibles sont listés, puis une course est créée pour chaque équipage avec un horaire de départ
+        calculé à partir de `start_time + (index_global * interval_seconds)`.
+
+        Une course générée en mode parcours contre la montre aura `race_type = "time_trial"` et `lane_count = 1`.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phase_id, start_time, interval_seconds, categories]
+              properties:
+                phase_id:
+                  type: string
+                  format: uuid
+                  description: ID de la phase pour laquelle générer les courses
+                start_time:
+                  type: string
+                  format: date-time
+                  description: Heure de départ de la première course (ISO 8601)
+                interval_seconds:
+                  type: integer
+                  minimum: 1
+                  description: Intervalle en secondes entre deux départs
+                categories:
+                  type: array
+                  minItems: 1
+                  description: Liste ordonnée des catégories à traiter
+                  items:
+                    type: object
+                    required: [category_id, order]
+                    properties:
+                      category_id:
+                        type: string
+                        format: uuid
+                        description: ID de la catégorie
+                      order:
+                        type: integer
+                        minimum: 1
+                        description: Ordre de passage de la catégorie (1 = en premier, 2 = ensuite, etc.)
+            examples:
+              basic:
+                summary: Exemple simple de génération contre la montre
+                value:
+                  phase_id: "uuid-phase-123"
+                  start_time: "2026-03-09T08:00:00.000Z"
+                  interval_seconds: 75
+                  categories:
+                    - category_id: "uuid-cat-1"
+                      order: 1
+                    - category_id: "uuid-cat-2"
+                      order: 2
+      responses:
+        200:
+          description: Courses contre la montre générées avec succès
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: "32 courses contre la montre générées avec succès"
+                  data:
+                    type: object
+                    properties:
+                      races_created:
+                        type: integer
+                        description: Nombre de courses créées
+                      crews_assigned:
+                        type: integer
+                        description: Nombre total d'équipages assignés
+                      races:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            race_number:
+                              type: integer
+                            name:
+                              type: string
+                            start_time:
+                              type: string
+                              format: date-time
+                            distance_id:
+                              type: string
+                              nullable: true
+                            crews_count:
+                              type: integer
+                              example: 1
+        400:
+          description: Erreurs de validation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: error
+                  message:
+                    type: string
+                    example: "Erreurs de validation"
+                  errors:
+                    type: array
+                    items:
+                      type: string
+                    example:
+                      - 'Catégorie introuvable pour category_id="uuid-invalide"'
+                      - 'La catégorie "J16H1x" n''a aucun équipage disponible pour cet événement'
+
   /races/{id}:
     get:
       tags: [races]
