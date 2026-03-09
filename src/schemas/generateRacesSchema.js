@@ -4,7 +4,19 @@ exports.generateInitialRacesSchema = Joi.object({
   phase_id: Joi.string().required(),
   lane_count: Joi.number().integer().min(1).required(),
   start_time: Joi.date().iso().optional(),
-  interval_minutes: Joi.number().integer().min(0).optional(),
+  interval_minutes: Joi.number()
+    .min(0)
+    .optional()
+    .description(
+      "Minutes (flottant) entre chaque course. Utilisé uniquement si interval_seconds n'est pas fourni."
+    ),
+  interval_seconds: Joi.number()
+    .integer()
+    .min(1)
+    .optional()
+    .description(
+      "Intervalle en secondes entre deux courses. Prioritaire sur interval_minutes si présent."
+    ),
   category_order: Joi.array()
     .items(Joi.string())
     .optional()
@@ -17,7 +29,19 @@ exports.generateRacesFromSeriesSchema = Joi.object({
   phase_id: Joi.string().required(),
   lane_count: Joi.number().integer().min(1).required(),
   start_time: Joi.date().iso().optional(),
-  interval_minutes: Joi.number().integer().min(0).optional(),
+  interval_minutes: Joi.number()
+    .min(0)
+    .optional()
+    .description(
+      "Minutes (flottant) entre chaque course. Utilisé uniquement si interval_seconds n'est pas fourni."
+    ),
+  interval_seconds: Joi.number()
+    .integer()
+    .min(1)
+    .optional()
+    .description(
+      "Intervalle en secondes entre deux courses. Prioritaire sur interval_minutes si présent."
+    ),
   series: Joi.array()
     .items(
       Joi.object({
@@ -79,7 +103,8 @@ exports.updateGenerationSchemaSchema = Joi.object({
   generation_schema: Joi.object({
     lane_count: Joi.number().integer().min(1).required(),
     start_time: Joi.date().iso().allow(null).optional(),
-    interval_minutes: Joi.number().integer().min(0).optional(),
+    interval_minutes: Joi.number().min(0).optional(),
+    interval_seconds: Joi.number().integer().min(1).optional(),
     series: Joi.array()
       .items(
         Joi.object({

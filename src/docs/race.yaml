@@ -93,9 +93,15 @@ paths:
                   format: date-time
                   description: Heure de départ de la première course
                 interval_minutes:
-                  type: integer
+                  type: number
                   minimum: 0
-                  description: Minutes entre chaque course
+                  description: |
+                    Minutes (flottant) entre chaque course. Utilisé uniquement si interval_seconds n'est pas fourni.
+                interval_seconds:
+                  type: integer
+                  minimum: 1
+                  description: |
+                    Intervalle en secondes entre deux courses. Prioritaire sur interval_minutes si présent.
                 category_order:
                   type: array
                   items:
@@ -141,10 +147,18 @@ paths:
                   format: date-time
                   description: Heure de départ de la première course (optionnel)
                 interval_minutes:
-                  type: integer
+                  type: number
                   minimum: 0
                   default: 5
-                  description: Minutes entre chaque course (optionnel)
+                  description: |
+                    Minutes (flottant) entre chaque course (optionnel).
+                    Utilisé uniquement si interval_seconds n'est pas fourni.
+                interval_seconds:
+                  type: integer
+                  minimum: 1
+                  description: |
+                    Intervalle en secondes entre deux courses (optionnel).
+                    Prioritaire sur interval_minutes si présent.
                 series:
                   type: array
                   minItems: 1

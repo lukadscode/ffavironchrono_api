@@ -27,7 +27,8 @@ Cette route génère les courses en respectant la structure des séries fournie 
 | `phase_id` | string (UUID) | ✅ Oui | ID de la phase pour laquelle générer les courses |
 | `lane_count` | integer (≥ 1) | ✅ Oui | Nombre de lignes d'eau disponibles |
 | `start_time` | string (ISO 8601) | ❌ Non | Heure de départ de la première course (ex: `"2024-01-15T09:00:00.000Z"`) |
-| `interval_minutes` | integer (≥ 0) | ❌ Non | Minutes entre chaque course (défaut: `5`) |
+| `interval_minutes` | number (≥ 0) | ❌ Non | Minutes **décimales** entre chaque course (défaut: `5`). Utilisé si `interval_seconds` n'est pas fourni. |
+| `interval_seconds` | integer (≥ 1) | ❌ Non | Intervalle en secondes entre deux courses. **Prioritaire** sur `interval_minutes` si présent. |
 | `series` | array | ✅ Oui | Tableau des séries à générer (voir structure ci-dessous) |
 | `save_only` | boolean | ❌ Non | Si `true`, enregistre uniquement le schéma sans générer les courses (mode brouillon). Défaut: `false` |
 
@@ -53,7 +54,7 @@ const response = await axios.post('/races/generate-from-series', {
   phase_id: 'abc-123-def-456',
   lane_count: 6,
   start_time: '2024-01-15T09:00:00.000Z',
-  interval_minutes: 5,
+  interval_minutes: 5, // ou une valeur décimale (ex: 1.5 pour 1min30)
   series: [
     {
       id: 'series-1234567890',
@@ -266,8 +267,12 @@ Le backend valide automatiquement les séries avant de générer les courses :
 
 ### Calcul des heures de départ
 - Si `start_time` est fourni, la première course commence à cette heure
-- Les courses suivantes sont espacées de `interval_minutes` (défaut: 5 minutes)
-- Exemple : `start_time = "09:00"`, `interval_minutes = 5` → Course 1 à 09:00, Course 2 à 09:05, Course 3 à 09:10, etc.
+- L'intervalle utilisé est :
+  - soit `interval_seconds` (s'il est présent),
+  - soit `interval_minutes * 60` (fallback, minutes pouvant être décimales).
+- Exemple :  
+  - `start_time = "09:00"`, `interval_seconds = 90` → Course 1 à 09:00, Course 2 à 09:01:30, Course 3 à 09:03:00, etc.  
+  - `start_time = "09:00"`, `interval_minutes = 1.5` → **équivalent** à `interval_seconds = 90`.
 
 ### Distance de la course
 - La distance de la course est déterminée par la distance commune des catégories de la série
@@ -286,7 +291,16 @@ interface GenerateRacesFromSeriesParams {
   phase_id: string;
   lane_count: number;
   start_time?: string; // ISO 8601
+  /**
+   * Minutes décimales entre chaque course (fallback si interval_seconds n'est pas fourni).
+   * Exemple: 1.5 = 1 minute 30 secondes.
+   */
   interval_minutes?: number; // default: 5
+  /**
+   * Intervalle en secondes entre deux courses.
+   * Si présent, c'est lui qui est utilisé par le backend.
+   */
+  interval_seconds?: number;
   series: Series[];
 }
 
@@ -325,7 +339,8 @@ async function generateRacesFromSeries(
         phase_id: params.phase_id,
         lane_count: params.lane_count,
         start_time: params.start_time,
-        interval_minutes: params.interval_minutes || 5,
+        interval_minutes: params.interval_minutes ?? 5,
+        interval_seconds: params.interval_seconds,
         series: params.series,
       },
       {

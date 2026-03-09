@@ -65,6 +65,7 @@ exports.generateInitialRaces = async (req, res) => {
       lane_count,
       start_time,
       interval_minutes,
+      interval_seconds,
       category_order,
     } = req.body;
 
@@ -127,7 +128,13 @@ exports.generateInitialRaces = async (req, res) => {
     let raceNumber = 1;
     const createdRaces = [];
     let currentStartTime = start_time ? new Date(start_time) : null;
-    const intervalMs = (interval_minutes || 0) * 60 * 1000;
+    const effectiveIntervalSeconds =
+      typeof interval_seconds === "number" && interval_seconds > 0
+        ? interval_seconds
+        : ((typeof interval_minutes === "number" ? interval_minutes : 0) || 0) *
+          60;
+    const intervalMs =
+      effectiveIntervalSeconds > 0 ? effectiveIntervalSeconds * 1000 : 0;
 
     for (const category of categories) {
       const crews = category.Crews;
@@ -257,6 +264,7 @@ exports.generateRacesFromSeries = async (req, res) => {
       lane_count,
       start_time,
       interval_minutes,
+      interval_seconds,
       series,
       save_only,
     } = req.body;
@@ -392,10 +400,18 @@ exports.generateRacesFromSeries = async (req, res) => {
     }
 
     // Enregistrer le schéma de génération dans la phase
+    const effectiveIntervalSeconds =
+      typeof interval_seconds === "number" && interval_seconds > 0
+        ? interval_seconds
+        : ((typeof interval_minutes === "number" ? interval_minutes : 5) || 5) *
+          60;
+    const effectiveIntervalMinutes = effectiveIntervalSeconds / 60;
+
     const generationSchema = {
       lane_count,
       start_time: start_time || null,
-      interval_minutes: interval_minutes || 5,
+      interval_minutes: effectiveIntervalMinutes,
+      interval_seconds: effectiveIntervalSeconds,
       series: series.map((s) => ({
         id: s.id,
         categories: s.categories,
@@ -424,7 +440,7 @@ exports.generateRacesFromSeries = async (req, res) => {
     let raceNumber = 1;
     const createdRaces = [];
     let currentStartTime = start_time ? new Date(start_time) : null;
-    const intervalMs = (interval_minutes || 5) * 60 * 1000;
+    const intervalMs = effectiveIntervalSeconds * 1000;
     let totalCrewsAssigned = 0;
 
     // Map pour tracker les équipages déjà assignés par catégorie
