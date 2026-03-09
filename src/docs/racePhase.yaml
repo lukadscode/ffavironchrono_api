@@ -281,6 +281,117 @@ paths:
         404:
           description: Phase introuvable
 
+  /race-phases/{id}/races-with-crews:
+    get:
+      tags: [racephases]
+      summary: Récupérer toutes les courses d'une phase avec équipages et participants
+      description: |
+        Retourne, en un seul appel, toutes les courses d'une phase donnée, avec :
+
+        - les métadonnées de la course (heure de départ, type, distance, lanes, etc.),
+        - les `race_crews` associés,
+        - l'équipage (`crew`) de chaque lane (club, catégorie, temps pronostique, ...),
+        - les participants de chaque équipage (`crew_participants` + `participant`).
+
+        Cet endpoint est optimisé pour éviter des centaines d'appels individuels
+        (GET /races/event/:eventId + GET /race-crews/:raceId + GET /crews/:id).
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID de la phase
+      responses:
+        200:
+          description: Liste des courses de la phase avec équipages et participants
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        race_type:
+                          type: string
+                        race_number:
+                          type: integer
+                        start_time:
+                          type: string
+                          format: date-time
+                          nullable: true
+                        lane_count:
+                          type: integer
+                          nullable: true
+                        distance:
+                          type: object
+                          nullable: true
+                        race_crews:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              id:
+                                type: string
+                              lane:
+                                type: integer
+                              status:
+                                type: string
+                                nullable: true
+                              crew:
+                                type: object
+                                properties:
+                                  id:
+                                    type: string
+                                  club_name:
+                                    type: string
+                                  club_code:
+                                    type: string
+                                  temps_pronostique:
+                                    type: integer
+                                    nullable: true
+                                  category:
+                                    type: object
+                                    nullable: true
+                                  crew_participants:
+                                    type: array
+                                    items:
+                                      type: object
+                                      properties:
+                                        id:
+                                          type: string
+                                        participant:
+                                          type: object
+                                          properties:
+                                            id:
+                                              type: string
+                                            first_name:
+                                              type: string
+                                            last_name:
+                                              type: string
+                                            license_number:
+                                              type: string
+                                              nullable: true
+                                            gender:
+                                              type: string
+                                              nullable: true
+                                            club_name:
+                                              type: string
+                                              nullable: true
+        404:
+          description: Phase introuvable
+
 components:
   securitySchemes:
     bearerAuth:
