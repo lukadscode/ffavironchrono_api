@@ -13,6 +13,7 @@ router.post(
 );
 router.get("/:event_id", controller.getRacePhasesByEvent);
 router.get("/:id/results", controller.getPhaseResults);
+router.get("/:id/races-with-crews", controller.getRacesWithCrewsByPhase);
 router.get(
   "/:id/generation-schema",
   auth,

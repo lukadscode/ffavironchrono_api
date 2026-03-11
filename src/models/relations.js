@@ -17,6 +17,7 @@ const TimingAssignment = require("./TimingAssignment");
 const IndoorRaceResult = require("./IndoorRaceResult");
 const IndoorParticipantResult = require("./IndoorParticipantResult");
 const EventDistance = require("./EventDistance");
+const Club = require("./Club");
 
 // Relations User
 User.hasMany(UserSession, { foreignKey: "user_id" });
@@ -36,6 +37,18 @@ Event.belongsToMany(Category, {
 });
 
 Crew.belongsTo(Event, { foreignKey: "event_id" });
+
+// Relation Crew / Club via le code club (Crew.club_code -> Club.code)
+Crew.belongsTo(Club, {
+  foreignKey: "club_code",
+  targetKey: "code",
+  as: "club",
+});
+Club.hasMany(Crew, {
+  foreignKey: "club_code",
+  sourceKey: "code",
+  as: "crews",
+});
 
 // Relations Crew / Participant
 Crew.hasMany(CrewParticipant, {

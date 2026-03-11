@@ -37,6 +37,12 @@ const Crew = sequelize.define(
       type: DataTypes.STRING,
       allowNull: true,
     },
+    // Nom complet d'équipage tel que fourni par l'intranet FFAVIRON
+    // ex: "NANTES CAN 5" (nom abrégé du club + numéro d'équipage)
+    crew_name: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
     coach_name: {
       type: DataTypes.STRING,
       allowNull: true,

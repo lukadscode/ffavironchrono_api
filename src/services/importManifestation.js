@@ -618,8 +618,9 @@ module.exports = async (manifestationId, req) => {
       }
 
       // Extraire le nom du club depuis nom_abrege_club_numero_equipage
-      // Format: "LE ROBERT ACR 1" => club_name = "LE ROBERT ACR", numéro = "1"
-      const clubInfo = ins.nom_abrege_club_numero_equipage || "";
+      // Format: "LE ROBERT ACR 1" => crew_name = "LE ROBERT ACR 1", club_name = "LE ROBERT ACR", numéro = "1"
+      const fullCrewName = ins.nom_abrege_club_numero_equipage || "";
+      const clubInfo = fullCrewName;
       const clubParts = clubInfo.trim().split(/\s+/);
       const lastPart = clubParts[clubParts.length - 1];
       const isNumber = /^\d+$/.test(lastPart);
@@ -641,6 +642,7 @@ module.exports = async (manifestationId, req) => {
           id: uuidv4(),
           event_id,
           category_id,
+          crew_name: fullCrewName || null,
           club_name: club_name || "Non spécifié",
           club_code: club_code,
           status: REGISTERED, // Statut par défaut : inscrit
@@ -1178,8 +1180,9 @@ module.exports.updateEventFromManifestation = async (
         continue;
       }
 
-      // Extraire le nom du club
-      const clubInfo = ins.nom_abrege_club_numero_equipage || "";
+      // Extraire le nom complet d'équipage et le nom du club
+      const fullCrewName = ins.nom_abrege_club_numero_equipage || "";
+      const clubInfo = fullCrewName;
       const clubParts = clubInfo.trim().split(/\s+/);
       const lastPart = clubParts[clubParts.length - 1];
       const isNumber = /^\d+$/.test(lastPart);
@@ -1235,6 +1238,7 @@ module.exports.updateEventFromManifestation = async (
           id: uuidv4(),
           event_id,
           category_id,
+          crew_name: fullCrewName || null,
           club_name: club_name || "Non spécifié",
           club_code: club_code,
           status: REGISTERED, // Statut par défaut : inscrit

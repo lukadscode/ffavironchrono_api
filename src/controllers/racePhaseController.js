@@ -227,6 +227,10 @@ exports.getPhaseResults = async (req, res) => {
               as: "crew",
               include: [
                 {
+                  model: require("../models/Club"),
+                  as: "club",
+                },
+                {
                   model: Category,
                   as: "category",
                 },
@@ -316,6 +320,7 @@ exports.getPhaseResults = async (req, res) => {
             id: raceCrew.crew.id,
             club_name: raceCrew.crew.club_name,
             club_code: raceCrew.crew.club_code,
+            club_short_code: raceCrew.crew.club?.code_court || null,
             category_id: raceCrew.crew.category_id,
             category_label: raceCrew.crew.category?.label || null,
           },
@@ -407,5 +412,81 @@ exports.getPhaseResults = async (req, res) => {
   } catch (error) {
     console.error("Error fetching phase results:", error);
     res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// Endpoint agrégé : toutes les courses d'une phase avec les équipages et leurs participants
+// GET /race-phases/:id/races-with-crews
+exports.getRacesWithCrewsByPhase = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const phase = await RacePhase.findByPk(id);
+    if (!phase) {
+      return res
+        .status(404)
+        .json({ status: "error", message: "Phase introuvable" });
+    }
+
+    const races = await Race.findAll({
+      where: { phase_id: id },
+      include: [
+        {
+          model: require("../models/Distance"),
+        },
+        {
+          model: RaceCrew,
+          as: "race_crews",
+          include: [
+            {
+              model: Crew,
+              as: "crew",
+              include: [
+                {
+                  model: require("../models/Club"),
+                  as: "club",
+                },
+                {
+                  model: Category,
+                  as: "category",
+                },
+                {
+                  model: require("../models/CrewParticipant"),
+                  as: "crew_participants",
+                  include: [
+                    {
+                      model: require("../models/Participant"),
+                      as: "participant",
+                      attributes: [
+                        "id",
+                        "first_name",
+                        "last_name",
+                        "license_number",
+                        "gender",
+                        "club_name",
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      order: [
+        ["race_number", "ASC"],
+        [{ model: RaceCrew, as: "race_crews" }, "lane", "ASC"],
+      ],
+    });
+
+    return res.json({
+      status: "success",
+      data: races,
+    });
+  } catch (err) {
+    console.error("Error in getRacesWithCrewsByPhase:", err);
+    return res
+      .status(500)
+      .json({ status: "error", message: err.message || "Erreur serveur" });
   }
 };

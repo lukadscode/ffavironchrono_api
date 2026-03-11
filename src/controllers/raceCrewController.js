@@ -4,6 +4,7 @@ const Crew = require("../models/Crew");
 const Category = require("../models/Category");
 const CrewParticipant = require("../models/CrewParticipant");
 const Participant = require("../models/Participant");
+const Club = require("../models/Club");
 
 exports.assignCrewToRace = async (req, res) => {
   try {
@@ -37,6 +38,10 @@ exports.getRaceCrews = async (req, res) => {
           model: Crew,
           as: "crew",
           include: [
+            {
+              model: Club,
+              as: "club",
+            },
             {
               model: Category,
               as: "category",

@@ -58,10 +58,18 @@ exports.importManifestation = async (externalId, bearerToken) => {
   for (const inscription of data.inscriptions) {
     const categoryId = createdCategories[inscription.code_epreuve];
 
+    const fullCrewName = inscription.nom_abrege_club_numero_equipage || "";
+
+    const clubParts = fullCrewName.trim().split(/\s+/);
+    const lastPart = clubParts[clubParts.length - 1];
+    const isNumber = /^\d+$/.test(lastPart);
+    const club_name = isNumber ? clubParts.slice(0, -1).join(" ") : fullCrewName;
+
     const crew = await Crew.create({
       event_id: eventId,
       category_id: categoryId,
-      club_name: inscription.nom_abrege_club_numero_equipage,
+      crew_name: fullCrewName || null,
+      club_name: club_name || fullCrewName || null,
       club_code: inscription.num_club_rameur_1,
     });
 

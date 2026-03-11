@@ -7,6 +7,7 @@ const CrewParticipant = require("../models/CrewParticipant");
 const Participant = require("../models/Participant");
 const RaceCrew = require("../models/RaceCrew");
 const CREW_STATUS = require("../constants/crewStatus");
+const Club = require("../models/Club");
 
 exports.createCrew = async (req, res) => {
   try {
@@ -65,6 +66,7 @@ exports.getCrew = async (req, res) => {
     const crew = await Crew.findByPk(req.params.id, {
       include: [
         Event,
+        { model: Club, as: "club" },
         { model: Category, as: "category" },
         {
           model: CrewParticipant,
@@ -139,7 +141,7 @@ exports.getCrewsByEvent = async (req, res) => {
 
     const crews = await Crew.findAll({
       where: { event_id },
-      include: [Event, { model: Category, as: "category" }],
+      include: [Event, { model: Category, as: "category" }, { model: Club, as: "club" }],
       order: [["club_name", "ASC"]],
     });
 
@@ -188,6 +190,12 @@ exports.getCrewsWithParticipantsByEvent = async (req, res) => {
         model: Category,
         as: "category",
         attributes: ["id", "code", "label", "age_group", "gender"],
+        required: false,
+      },
+      {
+        model: Club,
+        as: "club",
+        attributes: ["id", "code", "code_court", "nom", "nom_court"],
         required: false,
       },
       {
