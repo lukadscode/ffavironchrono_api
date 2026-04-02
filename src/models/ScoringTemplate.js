@@ -13,13 +13,13 @@ const ScoringTemplate = sequelize.define(
       allowNull: false,
     },
     type: {
-      type: DataTypes.ENUM("indoor_points", "defis_capitaux", "custom"),
+      type: DataTypes.ENUM("indoor_points", "defis_capitaux", "custom", "endurance_mer"),
       allowNull: false,
     },
     config: {
       type: DataTypes.JSON,
       allowNull: false,
-      comment: "Configuration JSON des points (points_indoor, classement_defis_capitaux, etc.)",
+      comment: "Configuration JSON des points (points_indoor, classement_defis_capitaux, endurance_mer, etc.)",
     },
     is_default: {
       type: DataTypes.BOOLEAN,
@@ -35,6 +35,3 @@ const ScoringTemplate = sequelize.define(
 );
 
 module.exports = ScoringTemplate;
-
-
-

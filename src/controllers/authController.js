@@ -324,7 +324,6 @@ exports.getProfile = async (req, res) => {
       include: [
         {
           model: Event,
-          as: "Event", // 👈 important !
           attributes: ["id", "name", "start_date", "end_date", "location"],
         },
       ],
@@ -335,7 +334,13 @@ exports.getProfile = async (req, res) => {
       status: "success",
       data: {
         user,
-        events: events.map((e) => ({ ...e.Event.dataValues, role: e.role })),
+        events: events
+          .filter((e) => !!e.Event)
+          .map((e) => ({
+            ...e.Event.dataValues,
+            role: e.role || "viewer",
+            linked_at: e.created_at || null,
+          })),
       },
     });
   } catch (err) {

@@ -152,25 +152,17 @@ exports.getCrewsByEvent = async (req, res) => {
 };
 
 /**
- * Liste des équipages d'un événement avec participants, recherche et pagination
+ * Liste des équipages d'un événement avec participants et recherche
  *
  * GET /crews/event/:event_id/with-participants
  *
  * Query params :
- * - search (optionnel) : filtre sur club, catégorie, participants
- * - page (optionnel, défaut 1)
- * - pageSize (optionnel, défaut 50, max 200)
+ * - search (optionnel) : filtre sur club
  */
 exports.getCrewsWithParticipantsByEvent = async (req, res) => {
   try {
     const { event_id } = req.params;
-    let { search, page = 1, pageSize = 50 } = req.query;
-
-    page = parseInt(page, 10) || 1;
-    pageSize = parseInt(pageSize, 10) || 50;
-    // Limiter la taille de page pour éviter les abus
-    const limit = Math.min(Math.max(pageSize, 1), 200);
-    const offset = (page - 1) * limit;
+    const { search } = req.query;
 
     const where = { event_id };
 
@@ -219,14 +211,6 @@ exports.getCrewsWithParticipantsByEvent = async (req, res) => {
       },
     ];
 
-    // Compter le total (distinct sur l'id d'équipage)
-    const total = await Crew.count({
-      where,
-      include,
-      distinct: true,
-      col: "id",
-    });
-
     const crews = await Crew.findAll({
       where,
       include,
@@ -234,18 +218,11 @@ exports.getCrewsWithParticipantsByEvent = async (req, res) => {
         ["status", "ASC"],
         ["club_name", "ASC"],
       ],
-      limit,
-      offset,
     });
 
     res.json({
       status: "success",
       data: crews,
-      pagination: {
-        page,
-        pageSize: limit,
-        total,
-      },
     });
   } catch (err) {
     console.error("Erreur dans getCrewsWithParticipantsByEvent:", err);
