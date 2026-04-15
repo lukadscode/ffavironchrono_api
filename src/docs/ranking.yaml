@@ -3,6 +3,91 @@ tags:
     description: Gestion des classements des clubs
 
 paths:
+  /rankings/indoor/season/{season}:
+    get:
+      tags: [rankings]
+      summary: Classement indoor des clubs agrégé par saison
+      description: |
+        Total par club = meilleur meeting `standard` (barème Points Indoor) + somme des événements
+        `championnat_france_indoor` + somme des N meilleurs scores `defi_capitaux` (template BDD).
+        Prérequis : champs `season` et `indoor_ranking_scope` sur les événements ; migration `012_add_event_season_indoor_ranking_scope.sql`.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: season
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Identifiant de saison (ex. 2025-2026)
+      responses:
+        200:
+          description: Classement saison avec breakdown par club
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: object
+                    properties:
+                      season:
+                        type: string
+                      defis_capitaux_template:
+                        type: object
+                        nullable: true
+                      rules_summary:
+                        type: object
+                      rankings:
+                        type: array
+                        items:
+                          type: object
+        400:
+          description: Paramètre season manquant
+        500:
+          description: Erreur serveur
+
+  /rankings/clubs/dashboard:
+    get:
+      tags: [rankings]
+      summary: Dashboard clubs (byEvent + global, un seul appel)
+      description: |
+        Agrège pour la saison : liste des compétitions avec classement clubs, plus le classement général
+        avec détail des points (contributions par compétition / règle).
+        - `type=mer` : règlement mer (4 meilleurs enduro territoriaux + 1 BRS territorial + somme CF enduro + somme CF BRS + bonus).
+        - `type=indoor` : règlement indoor saison (meilleur standard + CF indoor + défis capitaux).
+        - `type=riviere` : réservé (réponse vide / message) jusqu'à spécification.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [indoor, mer, riviere]
+        - name: season
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Année calendaire mer (ex. 2026) ou identifiant saison indoor (ex. 2025-2026)
+        - name: include_territorial_bonus
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: true
+          description: Mer uniquement — inclure les bonus territoriaux actifs
+      responses:
+        200:
+          description: Payload dashboard
+        400:
+          description: type manquant ou invalide
+        500:
+          description: Erreur serveur
+
   /rankings/event/{event_id}/ranking:
     get:
       tags: [rankings]

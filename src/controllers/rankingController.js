@@ -1,4 +1,5 @@
 const rankingService = require("../services/rankingService");
+const clubsDashboardService = require("../services/clubsDashboardService");
 const ScoringTemplate = require("../models/ScoringTemplate");
 const ClubRanking = require("../models/ClubRanking");
 const RankingPoint = require("../models/RankingPoint");
@@ -159,6 +160,67 @@ exports.getClubRankingsByEventType = async (req, res) => {
   } catch (err) {
     console.error("Error fetching club rankings by event type:", err);
     res.status(500).json({ status: "error", message: err.message });
+  }
+};
+
+/**
+ * Classement indoor agrégé par saison (règles FF : max meeting standard + CF + défis)
+ */
+exports.getSeasonIndoorClubRanking = async (req, res) => {
+  try {
+    const { season } = req.params;
+    const data = await rankingService.getSeasonIndoorClubRanking(season);
+    res.json({ status: "success", data });
+  } catch (err) {
+    console.error("Error fetching season indoor ranking:", err);
+    const status = err.message && err.message.includes("requis") ? 400 : 500;
+    res.status(status).json({ status: "error", message: err.message });
+  }
+};
+
+/**
+ * Dashboard clubs : byEvent + global en un appel (indoor | mer | riviere).
+ * Query: type, season?, include_territorial_bonus? (mer uniquement, défaut true)
+ */
+exports.getClubsDashboard = async (req, res) => {
+  try {
+    const type = String(req.query.type || "")
+      .toLowerCase()
+      .trim();
+    if (!type || !["indoor", "mer", "riviere"].includes(type)) {
+      return res.status(400).json({
+        status: "error",
+        message: "Query obligatoire : type=indoor|mer|riviere",
+      });
+    }
+    const season = String(
+      req.query.season != null
+        ? req.query.season
+        : new Date().getUTCFullYear(),
+    );
+    const includeTerritorialBonus =
+      String(req.query.include_territorial_bonus ?? "true").toLowerCase() !==
+      "false";
+
+    const data = await clubsDashboardService.getClubsDashboard({
+      type,
+      season,
+      includeTerritorialBonus,
+    });
+
+    return res.json({
+      status: "success",
+      data,
+      meta: {
+        type,
+        season,
+        include_territorial_bonus: includeTerritorialBonus,
+      },
+    });
+  } catch (err) {
+    console.error("Error clubs dashboard:", err);
+    const status = err.message && err.message.includes("invalide") ? 400 : 500;
+    res.status(status).json({ status: "error", message: err.message });
   }
 };
 

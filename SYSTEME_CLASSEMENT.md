@@ -88,6 +88,17 @@ Retourne le classement complet avec :
 - Le total des points
 - Les points détaillés par course
 
+### 2 bis. Classement indoor agrégé par saison
+
+```bash
+GET /rankings/indoor/season/{season}
+```
+
+- Agrège les événements ayant le même `season` (colonne `events.season`, migration `docs/migrations/012_add_event_season_indoor_ranking_scope.sql`).
+- Périmètre par événement : `indoor_ranking_scope` = `standard` (meilleur total saison), `championnat_france_indoor` (somme), `defi_capitaux` (points C7DC via template `defis_capitaux`, puis N meilleurs sur la saison).
+- Le calcul des points indoor par événement utilise le **sous-groupe avec club** (lignes avec `club_code` ou `club_name`) : le 1er de ce sous-groupe prend le barème rang 1, etc., avec un effectif = taille du sous-groupe (identique à `GET /indoor-results/event/:id/bycategorie` pour le champ `points`).
+- Guide front : `GUIDE_FRONT_CLASSEMENT_INDOOR_SAISON.md`.
+
 ### 3. Récupérer les points détaillés d'un club
 
 ```bash

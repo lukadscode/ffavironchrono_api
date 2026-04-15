@@ -5,6 +5,12 @@ const auth = require("../middlewares/authMiddleware");
 const validate = require("../middlewares/validateSchema");
 
 // Routes pour les classements
+router.get("/clubs/dashboard", auth, controller.getClubsDashboard);
+router.get(
+  "/indoor/season/:season",
+  auth,
+  controller.getSeasonIndoorClubRanking
+);
 router.get(
   "/event/:event_id/ranking",
   auth,

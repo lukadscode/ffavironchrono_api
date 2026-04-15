@@ -5,6 +5,10 @@ const Race = require("../models/Race");
 const RacePhase = require("../models/RacePhase");
 const Crew = require("../models/Crew");
 const Category = require("../models/Category");
+const {
+  isCategoryExcludedFromIndoorClubRanking,
+  assignIndoorByCategoryResultsPositionsAndClubPoints,
+} = require("../services/rankingService");
 
 /**
  * Importe les résultats d'une course depuis ErgRace
@@ -850,16 +854,12 @@ exports.getEventResultsByCategory = async (req, res) => {
           // Vérifier si la catégorie est exclue des points
           // Exclure les codes U15, U14, U13, U12, U11, U10, J15, J14, J13, J12, J11, J10
           // Exclure aussi les catégories contenant "partagé", "tronc", ou "bras"
-          const excludedCategoryCodes = ['U15', 'U14', 'U13', 'U12', 'U11', 'U10', 'J15', 'J14', 'J13', 'J12', 'J11', 'J10'];
-          const excludedKeywords = ['partagé', 'tronc', 'bras'];
           const categoryCode = pr.crew?.category?.code || '';
           const categoryLabel = pr.crew?.category?.label || '';
-          const isExcludedByCode = excludedCategoryCodes.some(code => categoryCode.includes(code));
-          const isExcludedByKeyword = excludedKeywords.some(keyword => 
-            categoryCode.toLowerCase().includes(keyword.toLowerCase()) || 
-            categoryLabel.toLowerCase().includes(keyword.toLowerCase())
+          const isExcludedCategory = isCategoryExcludedFromIndoorClubRanking(
+            categoryCode,
+            categoryLabel
           );
-          const isExcludedCategory = isExcludedByCode || isExcludedByKeyword;
 
           // Ajouter le résultat (sans position et points pour l'instant, sera calculé après le tri)
           resultsByCategory[categoryKey].results.push({
@@ -909,91 +909,13 @@ exports.getEventResultsByCategory = async (req, res) => {
       }
     }
 
-    // Fonction helper pour calculer les points
-    const getPointsRange = (participantCount) => {
-      if (participantCount >= 1 && participantCount <= 3) {
-        return "1_3_participants";
-      } else if (participantCount >= 4 && participantCount <= 6) {
-        return "4_6_participants";
-      } else if (participantCount >= 7 && participantCount <= 12) {
-        return "7_12_participants";
-      } else {
-        return "13_plus_participants";
-      }
-    };
-
-    const calculatePoints = (template, position, participantCount, isRelay) => {
-      if (!template || !template.config || !position) {
-        return null;
-      }
-
-      const config = template.config;
-      const pointsIndoor = config.points_indoor;
-      if (!pointsIndoor) {
-        return null;
-      }
-
-      const range = getPointsRange(participantCount);
-      const rangeConfig = pointsIndoor[range];
-      if (!rangeConfig) {
-        return null;
-      }
-
-      // Pour "13+", on utilise la dernière entrée
-      if (range === "13_plus_participants" && position > 12) {
-        const lastEntry = rangeConfig[rangeConfig.length - 1];
-        return isRelay ? lastEntry.relais : lastEntry.individuel;
-      }
-
-      // Trouver la configuration pour cette position
-      const placeConfig = rangeConfig.find((p) => p.place === position);
-      if (!placeConfig) {
-        return null;
-      }
-
-      return isRelay ? placeConfig.relais : placeConfig.individuel;
-    };
-
-    // Trier les résultats dans chaque catégorie par temps et calculer les positions et points
+    // Positions = classement catégorie complet ; points = barème classement club (avec club uniquement)
     for (const categoryKey in resultsByCategory) {
       const categoryData = resultsByCategory[categoryKey];
-      
-      // Séparer les résultats avec et sans temps
-      const withTime = categoryData.results.filter((r) => r.time_ms !== null && r.time_ms !== 0);
-      const withoutTime = categoryData.results.filter((r) => r.time_ms === null || r.time_ms === 0);
-      
-      // Trier par temps (du plus rapide au plus lent)
-      withTime.sort((a, b) => {
-        const timeA = a.time_ms || 999999999;
-        const timeB = b.time_ms || 999999999;
-        return timeA - timeB;
-      });
-      
-      // Calculer les positions dans la catégorie
-      withTime.forEach((r, index) => {
-        r.position = index + 1;
-      });
-      
-      // Calculer les points pour chaque résultat éligible
-      const participantCount = withTime.length;
-      withTime.forEach((r) => {
-        if (r.is_eligible_for_points && r.position && scoringTemplate) {
-          // Déterminer si c'est un relais
-          const isRelay = r.distance_info?.is_relay || false;
-          r.points = calculatePoints(scoringTemplate, r.position, participantCount, isRelay);
-        } else {
-          r.points = null;
-        }
-      });
-      
-      // Ajouter les résultats sans temps à la fin (sans position ni points)
-      withoutTime.forEach((r) => {
-        r.position = null;
-        r.points = null;
-      });
-      
-      // Combiner les résultats triés
-      categoryData.results = [...withTime, ...withoutTime];
+      categoryData.results = assignIndoorByCategoryResultsPositionsAndClubPoints(
+        categoryData.results,
+        scoringTemplate
+      );
     }
 
     // Convertir en tableau

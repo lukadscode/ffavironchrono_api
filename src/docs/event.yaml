@@ -35,6 +35,15 @@ paths:
                 is_visible: { type: boolean }
                 is_finished: { type: boolean }
                 progression_template_id: { type: string }
+                season:
+                  type: string
+                  nullable: true
+                  description: Saison sportive pour classement indoor agrégé (ex. 2025-2026)
+                indoor_ranking_scope:
+                  type: string
+                  nullable: true
+                  enum: [standard, championnat_france_indoor, defi_capitaux]
+                  description: Périmètre pour GET /rankings/indoor/season/:season (null = standard)
       responses:
         201:
           description: Événement créé
@@ -152,6 +161,14 @@ paths:
                 is_visible: { type: boolean }
                 is_finished: { type: boolean }
                 progression_template_id: { type: string }
+                season:
+                  type: string
+                  nullable: true
+                  description: Saison sportive pour classement indoor agrégé
+                indoor_ranking_scope:
+                  type: string
+                  nullable: true
+                  enum: [standard, championnat_france_indoor, defi_capitaux]
       responses:
         200:
           description: Événement mis à jour

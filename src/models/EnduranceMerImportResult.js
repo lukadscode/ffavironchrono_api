@@ -29,7 +29,7 @@ const EnduranceMerImportResult = sequelize.define(
       allowNull: true,
     },
     club_name: {
-      type: DataTypes.STRING(150),
+      type: DataTypes.STRING(255),
       allowNull: true,
     },
     crew_name: {

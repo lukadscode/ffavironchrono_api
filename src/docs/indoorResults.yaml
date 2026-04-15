@@ -345,6 +345,8 @@ paths:
       description: |
         Récupère tous les résultats des courses indoor d'un événement, groupés et triés par catégorie.
         Inclut les informations détaillées sur les équipages (code club et participants).
+        Pour chaque catégorie : `position` = rang officiel (tous les temps) ; `points` = barème **classement club**
+        (uniquement lignes avec `club_code` ou `club_name`, rangs 1…n et effectif sur ce sous-groupe — sans club ne consomme pas de place au barème).
       security: [{ bearerAuth: [] }]
       parameters:
         - in: path
@@ -413,10 +415,15 @@ paths:
                               points:
                                 type: number
                                 nullable: true
-                                description: Points attribués selon le classement de la catégorie (basé sur le template "Points Indoor"). Null si non éligible (temps 0, distance non éligible, catégorie exclue, etc.)
+                                description: |
+                                  Points barème **classement club** (template « Points Indoor ») : sous-groupe des lignes
+                                  éligibles **avec** club uniquement ; 1er de ce sous-groupe = rang 1 du barème, etc.
+                                  Null si sans club, non éligible, ou points nuls.
                               is_eligible_for_points:
                                 type: boolean
-                                description: Indique si le résultat est éligible pour les points (distance 2000m, 500m ou relais 8x250, temps non nul, et catégorie non exclue). Les catégories avec codes U15, U14, U13, U12, U11, U10, J15, J14, J13, J12, J11, J10 sont exclues. Les catégories contenant "partagé", "tronc" ou "bras" dans leur code ou label sont également exclues.
+                                description: |
+                                  Éligible au barème (distance 2000m, 500m ou relais 8x250, temps non nul, catégorie non exclue).
+                                  Exclusions jeunes U10–U15 / J10–J15, partagé, tronc, bras, handisport/para (aligné règlement indoor clubs).
                               time_display:
                                 type: string
                                 nullable: true

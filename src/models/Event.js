@@ -65,6 +65,17 @@ const Event = sequelize.define(
       type: DataTypes.CHAR(36),
       allowNull: true,
     },
+    season: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+      comment: "Saison sportive (ex. 2025-2026) pour classements agrégés indoor",
+    },
+    indoor_ranking_scope: {
+      type: DataTypes.STRING(40),
+      allowNull: true,
+      comment:
+        "standard | championnat_france_indoor | defi_capitaux — pour agrégation saison",
+    },
   },
   {
     tableName: "events",

@@ -13,6 +13,11 @@ exports.eventCreateSchema = Joi.object({
   is_visible: Joi.boolean().optional(),
   is_finished: Joi.boolean().optional(),
   progression_template_id: Joi.string().optional(),
+  season: Joi.string().max(20).optional().allow(null, ""),
+  indoor_ranking_scope: Joi.string()
+    .valid("standard", "championnat_france_indoor", "defi_capitaux")
+    .optional()
+    .allow(null, ""),
 });
 
 exports.eventUpdateSchema = Joi.object({
@@ -28,4 +33,9 @@ exports.eventUpdateSchema = Joi.object({
   is_visible: Joi.boolean().optional(),
   is_finished: Joi.boolean().optional(),
   progression_template_id: Joi.string().optional(),
+  season: Joi.string().max(20).optional().allow(null, ""),
+  indoor_ranking_scope: Joi.string()
+    .valid("standard", "championnat_france_indoor", "defi_capitaux")
+    .optional()
+    .allow(null, ""),
 });
