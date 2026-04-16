@@ -13,7 +13,8 @@ const {
 
 const SHEET_ORGANISATEUR = "Organisateur";
 const DATA_START_ROW_SIMPLE = 5;
-const DATA_START_ROW_U17 = 6;
+/** Même offset que les feuilles « simples » : en-têtes (3), ligne Ex. (4), données (5). */
+const DATA_START_ROW_U17 = 5;
 const U17_SHEETS = new Set([
   "U17F4X+",
   "U17H4X+",
@@ -24,8 +25,16 @@ const U17_SHEETS = new Set([
 ]);
 
 function isU17Sheet(sheetName) {
-  const n = String(sheetName || "").toUpperCase();
+  const n = String(sheetName || "")
+    .replace(/^\uFEFF/, "")
+    .trim()
+    .toUpperCase();
   return U17_SHEETS.has(n) || n.startsWith("U17");
+}
+
+/** Nom de feuille stocké en `epreuve_code` (BOM / espaces retirés pour matcher le front et les barèmes). */
+function normalizeMerSheetLabel(sheetName) {
+  return String(sheetName || "").replace(/^\uFEFF/, "").trim();
 }
 
 /** Valeur affichée d'une cellule Excel (évite objets SheetJS, espaces insécables). */
@@ -128,6 +137,7 @@ function getDataRowsSimple(rows) {
       });
       continue;
     }
+    if (!clubCode && !clubName) continue;
     out.push({
       place,
       club_code: clubCode || null,
@@ -172,6 +182,7 @@ function getDataRowsU17(rows) {
       });
       continue;
     }
+    if (!clubCode && !clubName) continue;
     const isMixte =
       (clubCode && String(clubCode).toUpperCase() === "MIXTE") ||
       (clubCode2 && String(clubCode2).trim() !== "");
@@ -278,14 +289,17 @@ async function importEnduranceMerExcel(eventId, fileBuffer, options = {}) {
 
   for (const sheetName of sheetNames) {
     const rows = getSheetRows(workbook, sheetName);
-    if (rows.length < DATA_START_ROW_SIMPLE + 1) continue;
-
+    const epreuveLabel = normalizeMerSheetLabel(sheetName);
     const u17 = isU17Sheet(sheetName);
+    // Première ligne de données à l’index 5 → au moins 6 lignes (indices 0..5).
+    const minRows = Math.max(DATA_START_ROW_SIMPLE, DATA_START_ROW_U17) + 1;
+    if (rows.length < minRows) continue;
+
     const dataRows = u17 ? getDataRowsU17(rows) : getDataRowsSimple(rows);
     const partantsCount = dataRows.length;
     if (partantsCount === 0) continue;
 
-    epreuves.push(sheetName);
+    epreuves.push(epreuveLabel);
 
     dataRows.sort((a, b) => a.place - b.place);
     const clubsCrewCount = Object.create(null);
@@ -295,7 +309,7 @@ async function importEnduranceMerExcel(eventId, fileBuffer, options = {}) {
         if (row.inline_mixed) {
           await insertRow({
             eventId,
-            sheetName,
+            sheetName: epreuveLabel,
             place: row.place,
             clubCode: "MIXTE",
             clubName: row.club_name || row.inline_mixed_sheet_label,
@@ -316,7 +330,7 @@ async function importEnduranceMerExcel(eventId, fileBuffer, options = {}) {
           config: scoringConfig,
           eventFormat,
           eventLevel,
-          epreuveCode: sheetName,
+          epreuveCode: epreuveLabel,
           place: row.place,
           partantsCount,
         });
@@ -336,7 +350,7 @@ async function importEnduranceMerExcel(eventId, fileBuffer, options = {}) {
           if (!u17 || !isTwoClubs || basePoints == null) {
             await insertRow({
               eventId,
-              sheetName,
+              sheetName: epreuveLabel,
               place: row.place,
               clubCode: code1,
               clubName: name1,
@@ -370,7 +384,7 @@ async function importEnduranceMerExcel(eventId, fileBuffer, options = {}) {
 
           await insertRow({
             eventId,
-            sheetName,
+            sheetName: epreuveLabel,
             place: row.place,
             clubCode: code1,
             clubName: name1,
@@ -384,7 +398,7 @@ async function importEnduranceMerExcel(eventId, fileBuffer, options = {}) {
           });
           await insertRow({
             eventId,
-            sheetName,
+            sheetName: epreuveLabel,
             place: row.place,
             clubCode: code2,
             clubName: name2,
@@ -415,7 +429,7 @@ async function importEnduranceMerExcel(eventId, fileBuffer, options = {}) {
 
         await insertRow({
           eventId,
-          sheetName,
+          sheetName: epreuveLabel,
           place: row.place,
           clubCode: row.club_code,
           clubName: row.club_name,
@@ -437,7 +451,7 @@ async function importEnduranceMerExcel(eventId, fileBuffer, options = {}) {
           e.sqlMessage ||
           null;
         const msg = sqlMsg || e.message || String(e);
-        errors.push(`Feuille ${sheetName} place ${row.place}: ${msg}`);
+        errors.push(`Feuille ${epreuveLabel} place ${row.place}: ${msg}`);
       }
     }
   }

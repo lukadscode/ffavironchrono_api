@@ -8,7 +8,7 @@ const categoryDoc = YAML.load(path.join(__dirname, "category.yaml"));
 const eventCategoryDoc = YAML.load(path.join(__dirname, "eventCategory.yaml"));
 const crewDoc = YAML.load(path.join(__dirname, "crew.yaml"));
 const crewParticipantDoc = YAML.load(
-  path.join(__dirname, "crewParticipant.yaml")
+  path.join(__dirname, "crewParticipant.yaml"),
 );
 const raceDoc = YAML.load(path.join(__dirname, "race.yaml"));
 const racePhaseDoc = YAML.load(path.join(__dirname, "racePhase.yaml"));
@@ -17,7 +17,7 @@ const distanceDoc = YAML.load(path.join(__dirname, "distance.yaml"));
 const timingDoc = YAML.load(path.join(__dirname, "timing.yaml"));
 const timingPointDoc = YAML.load(path.join(__dirname, "timingPoint.yaml"));
 const timingAssignmentDoc = YAML.load(
-  path.join(__dirname, "timingAssignment.yaml")
+  path.join(__dirname, "timingAssignment.yaml"),
 );
 const userDoc = YAML.load(path.join(__dirname, "user.yaml"));
 const importDoc = YAML.load(path.join(__dirname, "import.yaml"));
