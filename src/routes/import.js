@@ -4,6 +4,11 @@ const importController = require("../controllers/importController");
 const crewImportController = require("../controllers/crewImportController");
 const auth = require("../middlewares/authMiddleware");
 
+router.get(
+  "/manifestations",
+  auth,
+  importController.listManifestations,
+);
 router.post("/manifestation/:id", auth, importController.importManifestation);
 router.post(
   "/manifestation/:id/update",

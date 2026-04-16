@@ -59,7 +59,7 @@ paths:
         - `type=mer` : règlement mer (4 meilleurs enduro territoriaux + 1 BRS territorial + somme CF enduro + somme CF BRS + bonus).
         - `type=indoor` : règlement indoor saison (meilleur standard + CF indoor + défis capitaux).
         - `type=riviere` : réservé (réponse vide / message) jusqu'à spécification.
-      security: [{ bearerAuth: [] }]
+      security: []
       parameters:
         - name: type
           in: query

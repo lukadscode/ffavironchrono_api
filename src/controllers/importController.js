@@ -1,5 +1,6 @@
 const { v4: uuidv4 } = require("uuid");
 const importManifestation = require("../services/importManifestation");
+const { listFfManifestations } = require("../services/listFfManifestations");
 const Race = require("../models/Race");
 const RacePhase = require("../models/RacePhase");
 const RaceCrew = require("../models/RaceCrew");
@@ -8,6 +9,49 @@ const Category = require("../models/Category");
 const Distance = require("../models/Distance");
 const Event = require("../models/Event");
 const { Op } = require("sequelize");
+
+/**
+ * GET /import/manifestations — liste proxy depuis l’intranet FFA (sélection import).
+ * Query : par_page (défaut 200, max 500), page, fetch_all ; filtres FFA : date_debut, date_fin
+ * (yyyy-mm-dd), modele_id, structure_id, discipline_code, tour_id, include.
+ */
+exports.listManifestations = async (req, res) => {
+  try {
+    if (!process.env.EXTERNAL_API_TOKEN) {
+      return res.status(503).json({
+        status: "error",
+        message: "EXTERNAL_API_TOKEN non configuré",
+      });
+    }
+
+    const result = await listFfManifestations(req.query);
+
+    return res.json({
+      status: "success",
+      data: result.data,
+      meta: result.meta,
+    });
+  } catch (err) {
+    if (err.code === "NO_TOKEN") {
+      return res.status(503).json({ status: "error", message: err.message });
+    }
+
+    console.error(
+      "Erreur liste manifestations FFA:",
+      err.response?.data || err.message,
+    );
+
+    const upstreamStatus = err.response?.status;
+    const status =
+      upstreamStatus >= 400 && upstreamStatus < 600 ? upstreamStatus : 502;
+    const message =
+      err.response?.data?.message ||
+      err.message ||
+      "Erreur lors de l'appel à l'API FFAviron";
+
+    return res.status(status).json({ status: "error", message });
+  }
+};
 
 exports.importManifestation = async (req, res) => {
   const startTime = Date.now();

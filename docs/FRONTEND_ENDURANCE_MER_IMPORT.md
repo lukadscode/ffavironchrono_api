@@ -52,6 +52,13 @@ Les **equipages multi-clubs sur une seule cellule** (ex. `C029009(2)/C029028(3)`
 
 ## 2) Regles appliquees par l'API
 
+### Saison mer (global / dashboard)
+
+- **`season=2026`** (4 chiffres) : événements dont **`start_date`** tombe dans l’année calendaire 2026.
+- **`season=2025-2026`** (ou autre libellé) : événements dont **`events.season`** = cette chaîne (comme l’indoor). Penser à renseigner **`season`** sur les événements mer en base.
+
+Les bonus territoriaux (`endurance_mer_territorial_bonus`) utilisent la **même** valeur de `season`. Si la table n’existe pas, les bonus sont ignorés (voir migration `011_create_endurance_mer_territorial_bonus.sql`).
+
 ### ENDURO (territorial)
 
 - Bareme ENDURO officiel

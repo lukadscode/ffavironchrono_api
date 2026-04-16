@@ -8,7 +8,7 @@ Documentation pour le front et les intégrations : **un seul appel** pour récup
 - Centraliser barèmes, filtres et agrégations **côté API**.
 - Exposer pour chaque club une **liste de contributions** (points + compétition / règle) lorsque c’est pertinent.
 
-**Authentification :** Bearer (même middleware que les autres routes `/rankings/*`).
+**Authentification :** aucune — route publique (les autres `/rankings/*` restent protégées par Bearer).
 
 ---
 
@@ -23,7 +23,7 @@ GET /rankings/clubs/dashboard?type={indoor|mer|riviere}&season={...}&include_ter
 | Paramètre | Obligatoire | Défaut | Description |
 |-----------|-------------|--------|-------------|
 | `type` | **Oui** | — | `indoor`, `mer` ou `riviere`. |
-| `season` | Non | Année UTC courante (ex. `2026`) | **Mer :** année calendaire de la saison sportive (filtre sur `events.start_date`). **Indoor :** valeur du champ `events.season` (ex. `2025-2026`). |
+| `season` | Non | Année UTC courante (ex. `2026`) | **Mer :** si la valeur est **4 chiffres** seuls (`2026`), filtre sur `events.start_date` dans cette année calendaire. Sinon (ex. **`2025-2026`**) : filtre sur **`events.season`** = la chaîne exacte (aligné indoor). **Indoor :** `events.season`. Les événements mer doivent avoir **`season` renseigné** pour utiliser le format `2025-2026`. |
 | `include_territorial_bonus` | Non | `true` | **Uniquement pour `type=mer`** : inclut les lignes actives de `endurance_mer_territorial_bonus` pour la saison. |
 
 ### Erreurs
@@ -116,8 +116,23 @@ Les compétitions et formats sont déterminés par les métadonnées enregistré
 
 ```http
 GET /rankings/clubs/dashboard?type=mer&season=2026&include_territorial_bonus=true
-Authorization: Bearer <token>
 ```
+
+Même logique saison que l’indoor :
+
+```http
+GET /rankings/clubs/dashboard?type=mer&season=2025-2026
+```
+
+La réponse mer inclut `season_filter.mode` : `calendar_year` ou `event_season`.
+
+### Bonus territorial et erreur SQL « table doesn’t exist »
+
+Si `include_territorial_bonus=true` (défaut) et que la table **`endurance_mer_territorial_bonus`** n’existe pas, l’API **ignore les bonus** et log un avertissement (le classement continue). Pour activer les bonus, exécuter :
+
+`docs/migrations/011_create_endurance_mer_territorial_bonus.sql`
+
+Les lignes bonus utilisent le **même `season`** que le paramètre (ex. `2025-2026` ou `2026`).
 
 ---
 
@@ -154,7 +169,6 @@ Chaque club peut avoir des entrées de type :
 
 ```http
 GET /rankings/clubs/dashboard?type=indoor&season=2025-2026
-Authorization: Bearer <token>
 ```
 
 **Prérequis indoor :** champs `season` et `indoor_ranking_scope` sur les événements ; migration `012_add_event_season_indoor_ranking_scope.sql` ; template *Points Indoor* en base.
@@ -167,7 +181,6 @@ Placeholder : **`byEvent`** et **`global.rankings`** sont vides ; **`rules_summa
 
 ```http
 GET /rankings/clubs/dashboard?type=riviere&season=2026
-Authorization: Bearer <token>
 ```
 
 ---

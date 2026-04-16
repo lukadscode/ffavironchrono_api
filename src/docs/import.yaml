@@ -5,6 +5,163 @@ tags:
     description: Génération et téléchargement de documents PDF (start list, pesée, etc.)
 
 paths:
+  /import/manifestations:
+    get:
+      tags: [Import]
+      summary: Liste des manifestations FFAviron (proxy intranet)
+      description: |
+        Interroge `https://intranet.ffaviron.fr/api/v1/manifestations` avec le jeton serveur
+        `EXTERNAL_API_TOKEN`. Retourne une liste allégée pour sélection / filtres (id, libelle,
+        type avec disciplines, structure, type mer/rivière depuis `details_type`, dates).
+        Par défaut `par_page=200` (max 500). Utiliser `fetch_all=true` pour enchaîner les pages
+        jusqu’à la dernière (limite de sécurité côté serveur).
+
+        Les filtres ci‑dessous sont **relays tels quels** vers l’intranet (mêmes noms / formats que la doc FFA).
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: query
+          name: date_debut
+          required: false
+          schema:
+            type: string
+            format: date
+            example: "2026-05-01"
+          description: Date de début de manifestation (yyyy-mm-dd), filtre côté intranet
+        - in: query
+          name: date_fin
+          required: false
+          schema:
+            type: string
+            format: date
+            example: "2026-08-31"
+          description: Date de fin de manifestation (yyyy-mm-dd), filtre côté intranet
+        - in: query
+          name: modele_id
+          required: false
+          schema:
+            type: integer
+          description: Type de manifestation (id modèle, voir doc FFA `/modeles-manifestations`)
+        - in: query
+          name: structure_id
+          required: false
+          schema:
+            type: integer
+          description: Organisateur (structure ou enfant)
+        - in: query
+          name: discipline_code
+          required: false
+          schema:
+            type: string
+          description: Code discipline (via le modèle)
+        - in: query
+          name: tour_id
+          required: false
+          schema:
+            type: integer
+          description: Id de tour (voir doc FFA `/tours`)
+        - in: query
+          name: include
+          required: false
+          schema:
+            type: string
+          description: >
+            Champs additionnels demandés à l’intranet, séparés par des virgules **sans espaces**
+            (ex. `lieu_de_pratique,details,epreuves`)
+        - in: query
+          name: par_page
+          required: false
+          schema:
+            type: integer
+            default: 200
+            minimum: 1
+            maximum: 500
+          description: Taille de page côté intranet (équivalent `par_page` FFA)
+        - in: query
+          name: page
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+          description: Ignoré si `fetch_all=true`
+        - in: query
+          name: fetch_all
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: Si true, récupère toutes les pages successivement
+      responses:
+        200:
+          description: Liste des manifestations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        libelle:
+                          type: string
+                          nullable: true
+                        nom:
+                          type: string
+                          nullable: true
+                          description: Alias de libelle (filtre / affichage)
+                        structure:
+                          type: object
+                          nullable: true
+                          properties:
+                            nom:
+                              type: string
+                              nullable: true
+                            code:
+                              type: string
+                              nullable: true
+                        type:
+                          type: object
+                          nullable: true
+                          properties:
+                            id:
+                              type: integer
+                            libelle:
+                              type: string
+                              nullable: true
+                            disciplines:
+                              type: array
+                              items:
+                                type: object
+                        details_type:
+                          type: object
+                          nullable: true
+                          properties:
+                            code:
+                              type: string
+                              example: MER
+                            libelle:
+                              type: string
+                              example: Mer
+                        date_debut:
+                          type: string
+                          nullable: true
+                        date_fin:
+                          type: string
+                          nullable: true
+                  meta:
+                    type: object
+        502:
+          description: Erreur réseau ou réponse invalide de l’intranet
+        503:
+          description: Token serveur FFA non configuré
+
   /import/manifestation/{id}:
     post:
       tags: [Import]

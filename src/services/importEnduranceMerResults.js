@@ -574,6 +574,36 @@ function getIncludedEventFromImportRow(row) {
   return null;
 }
 
+/**
+ * Filtre saison mer aligné indoor :
+ * - `2026` seul → fenêtre calendaire sur `events.start_date` (rétrocompat).
+ * - `2025-2026` ou toute autre chaîne → `events.season = valeur` (même champ que l’indoor).
+ */
+function merSeasonEventWhereClause(season) {
+  const s = String(season ?? "").trim();
+  if (/^\d{4}$/.test(s)) {
+    const y = parseInt(s, 10);
+    const start = new Date(`${y}-01-01T00:00:00.000Z`);
+    const end = new Date(`${y + 1}-01-01T00:00:00.000Z`);
+    return {
+      mode: "calendar_year",
+      where: { start_date: { [Op.gte]: start, [Op.lt]: end } },
+    };
+  }
+  return { mode: "event_season", where: { season: s } };
+}
+
+function isMissingDbTableError(err) {
+  const errno = err?.original?.errno ?? err?.parent?.errno ?? err?.errno;
+  const code = err?.original?.code ?? err?.parent?.code;
+  const msg = String(err?.message || "");
+  return (
+    errno === 1146 ||
+    code === "ER_NO_SUCH_TABLE" ||
+    /doesn't exist|n'existe pas|Base table or view not found/i.test(msg)
+  );
+}
+
 function newMerClubSeasonAccumulator(clubCode, clubName) {
   return {
     club_code: clubCode,
@@ -631,21 +661,31 @@ async function accumulateMerSeasonPerClubFromImportRows(
   }
 
   if (includeTerritorialBonus) {
-    const bonuses = await EnduranceMerTerritorialBonus.findAll({
-      where: { season: String(season), is_active: true },
-    });
-    for (const b of bonuses) {
-      const clubKey = b.club_code || b.club_name;
-      if (!perClub.has(clubKey)) {
-        perClub.set(
-          clubKey,
-          newMerClubSeasonAccumulator(b.club_code, b.club_name),
+    try {
+      const bonuses = await EnduranceMerTerritorialBonus.findAll({
+        where: { season: String(season), is_active: true },
+      });
+      for (const b of bonuses) {
+        const clubKey = b.club_code || b.club_name;
+        if (!perClub.has(clubKey)) {
+          perClub.set(
+            clubKey,
+            newMerClubSeasonAccumulator(b.club_code, b.club_name),
+          );
+        }
+        const c = perClub.get(clubKey);
+        c.territorial_bonus = round2(
+          Number(c.territorial_bonus || 0) + Number(b.points || 67.5),
         );
       }
-      const c = perClub.get(clubKey);
-      c.territorial_bonus = round2(
-        Number(c.territorial_bonus || 0) + Number(b.points || 67.5),
-      );
+    } catch (e) {
+      if (isMissingDbTableError(e)) {
+        console.warn(
+          "[mer] Table endurance_mer_territorial_bonus absente — bonus ignorés. Exécuter docs/migrations/011_create_endurance_mer_territorial_bonus.sql",
+        );
+      } else {
+        throw e;
+      }
     }
   }
 
@@ -750,14 +790,13 @@ function finalizeMerGlobalRankingRows(perClub) {
 }
 
 async function fetchMerImportRowsForSeason(season) {
-  const start = new Date(`${season}-01-01T00:00:00.000Z`);
-  const end = new Date(`${Number(season) + 1}-01-01T00:00:00.000Z`);
+  const { where: eventWhere } = merSeasonEventWhereClause(season);
   return EnduranceMerImportResult.findAll({
     include: [
       {
         model: Event,
         required: true,
-        where: { start_date: { [Op.gte]: start, [Op.lt]: end } },
+        where: eventWhere,
         attributes: [
           "id",
           "name",
@@ -765,6 +804,7 @@ async function fetchMerImportRowsForSeason(season) {
           "start_date",
           "end_date",
           "race_type",
+          "season",
         ],
       },
     ],
@@ -814,6 +854,7 @@ async function getMerClubsDashboard({
             "start_date",
             "end_date",
             "race_type",
+            "season",
           ],
           order: [["start_date", "ASC"]],
         });
@@ -829,14 +870,23 @@ async function getMerClubsDashboard({
         start_date: ev.start_date,
         end_date: ev.end_date,
         race_type: ev.race_type,
+        season: ev.season,
       },
       rankings,
     });
   }
 
+  const seasonMeta = merSeasonEventWhereClause(season);
   return {
     type: "mer",
     season: String(season),
+    season_filter: {
+      mode: seasonMeta.mode,
+      description:
+        seasonMeta.mode === "calendar_year"
+          ? "Événements dont start_date tombe dans l’année calendaire indiquée."
+          : "Événements dont le champ events.season correspond exactement au paramètre (ex. 2025-2026).",
+    },
     rules_summary: {
       enduro_territorial:
         "Somme des points des 4 meilleures compétitions ENDURO de niveau territorial (import).",
