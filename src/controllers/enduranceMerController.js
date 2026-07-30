@@ -1,4 +1,5 @@
 const { v4: uuidv4 } = require("uuid");
+const { Op } = require("sequelize");
 const EnduranceMerImportResult = require("../models/EnduranceMerImportResult");
 const EnduranceMerTerritorialBonus = require("../models/EnduranceMerTerritorialBonus");
 const Event = require("../models/Event");
@@ -7,6 +8,7 @@ const {
   getEnduranceMerRankingForEvent,
   getGlobalMerRanking,
 } = require("../services/importEnduranceMerResults");
+const { clubCodeSearchVariants } = require("../utils/clubCodeUtils");
 
 async function importResults(req, res) {
   try {
@@ -64,7 +66,11 @@ async function getImportResults(req, res) {
 
     const where = { event_id: eventId };
     if (epreuve_code) where.epreuve_code = epreuve_code;
-    if (club_code) where.club_code = club_code;
+    if (club_code) {
+      // Recherche flexible : 77002 trouve aussi C077002
+      const variants = clubCodeSearchVariants(club_code);
+      where.club_code = variants.length > 1 ? { [Op.in]: variants } : club_code;
+    }
 
     const results = await EnduranceMerImportResult.findAll({
       where,

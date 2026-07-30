@@ -7,19 +7,16 @@ const Event = require("../models/Event");
 const { hashPassword } = require("../utils/hash");
 const sendEmail = require("../utils/sendEmail");
 const emailTemplates = require("../utils/emailTemplates");
+const logger = require("../utils/logger");
+const { writeAuditLog } = require("../services/auditLogService");
 
 /**
  * Génère un mot de passe provisoire aléatoire
  */
 function generateTemporaryPassword() {
-  const length = 12;
-  const charset =
-    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
-  let password = "";
-  for (let i = 0; i < length; i++) {
-    password += charset.charAt(Math.floor(Math.random() * charset.length));
-  }
-  return password;
+  // Crypto-safe : évite Math.random()
+  // Format : base64url sans caractères ambigus, longueur ~16
+  return crypto.randomBytes(12).toString("base64url");
 }
 
 /**
@@ -87,7 +84,7 @@ exports.addUserToEvent = async (req, res) => {
       try {
         await sendEmail(email, emailData.subject, emailData.text, emailData.html);
       } catch (emailError) {
-        console.error("Erreur lors de l'envoi de l'email:", emailError);
+        logger.warn({ err: emailError, email }, "Failed to send invitation email");
         // On continue même si l'email n'a pas pu être envoyé
       }
     }
@@ -121,9 +118,21 @@ exports.addUserToEvent = async (req, res) => {
         );
         await sendEmail(user.email, emailData.subject, emailData.text, emailData.html);
       } catch (emailError) {
-        console.error("Erreur lors de l'envoi de l'email:", emailError);
+        logger.warn({ err: emailError, email }, "Failed to send invitation email");
         // On continue même si l'email n'a pas pu être envoyé
       }
+    }
+
+    if (roleChanged || created) {
+      await writeAuditLog({
+        userId: req.user?.userId,
+        action: roleChanged ? "role_change" : "user_event_add",
+        entityType: "user_event",
+        entityId: record.id,
+        eventId: event_id,
+        metadata: { target_user_id: user.id, role, user_created: userCreated },
+        req,
+      });
     }
 
     res.json({
@@ -136,11 +145,12 @@ exports.addUserToEvent = async (req, res) => {
           name: user.name,
         },
         user_created: userCreated,
-        temporary_password: userCreated ? temporaryPassword : null,
+        // Ne jamais renvoyer le mot de passe temporaire dans la réponse.
+        // Il est transmis uniquement par email.
       },
     });
   } catch (err) {
-    console.error("Error adding user to event:", err);
+    logger.error({ err }, "Error adding user to event");
     res.status(500).json({ status: "error", message: err.message });
   }
 };

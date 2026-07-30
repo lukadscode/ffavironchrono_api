@@ -9,9 +9,16 @@ const fetchExternalData = require("../utils/fetchExternalData");
 // CREATE
 exports.createParticipant = async (req, res) => {
   try {
-    const data = req.body;
+    const data = req.body || {};
     const participant = await Participant.create({
-      ...data,
+      // Whitelist (anti mass-assignment)
+      first_name: data.first_name,
+      last_name: data.last_name,
+      license_number: data.license_number ?? null,
+      gender: data.gender,
+      email: data.email ?? null,
+      club_name: data.club_name ?? null,
+      nationality: data.nationality ?? null,
       id: uuidv4(),
     });
     res.status(201).json({ status: "success", data: participant });
@@ -113,7 +120,16 @@ exports.updateParticipant = async (req, res) => {
     const p = await Participant.findByPk(req.params.id);
     if (!p)
       return res.status(404).json({ status: "error", message: "Non trouvé" });
-    await p.update(req.body);
+    const data = req.body || {};
+    await p.update({
+      first_name: data.first_name,
+      last_name: data.last_name,
+      license_number: data.license_number,
+      gender: data.gender,
+      email: data.email,
+      club_name: data.club_name,
+      nationality: data.nationality,
+    });
     res.json({ status: "success", data: p });
   } catch (err) {
     res.status(500).json({ status: "error", message: err.message });

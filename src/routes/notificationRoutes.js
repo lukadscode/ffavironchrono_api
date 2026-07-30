@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const controller = require("../controllers/notificationController");
 const auth = require("../middlewares/authMiddleware");
+const { requireEventRole, resolvers } = require("../middlewares/requireEventRole");
 const validate = require("../middlewares/validateSchema");
 const schema = require("../schemas/notificationSchema");
 
@@ -9,6 +10,10 @@ const schema = require("../schemas/notificationSchema");
 router.post(
   "/",
   auth,
+  requireEventRole({
+    roles: ["editor"],
+    getEventId: resolvers.eventIdFromBody("event_id"),
+  }),
   validate(schema.createSchema),
   controller.createNotification
 );
@@ -26,12 +31,24 @@ router.get("/race/:race_id", controller.getRaceNotifications);
 router.put(
   "/:id",
   auth,
+  requireEventRole({
+    roles: ["editor"],
+    getEventId: resolvers.eventIdFromNotificationIdParam("id"),
+  }),
   validate(schema.updateSchema),
   controller.updateNotification
 );
 
 // Supprimer une notification (nécessite authentification)
-router.delete("/:id", auth, controller.deleteNotification);
+router.delete(
+  "/:id",
+  auth,
+  requireEventRole({
+    roles: ["editor"],
+    getEventId: resolvers.eventIdFromNotificationIdParam("id"),
+  }),
+  controller.deleteNotification
+);
 
 module.exports = router;
 

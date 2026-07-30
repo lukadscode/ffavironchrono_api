@@ -1,12 +1,24 @@
 const { v4: uuidv4 } = require("uuid");
 const Event = require("../models/Event");
+const logger = require("../utils/logger");
+const { writeAuditLog } = require("../services/auditLogService");
 
 // CREATE
 exports.createEvent = async (req, res) => {
   try {
     const data = req.body;
     const event = await Event.create({
-      ...data,
+      // Whitelist (anti mass-assignment)
+      name: data.name,
+      location: data.location,
+      start_date: data.start_date,
+      end_date: data.end_date,
+      race_type: data.race_type,
+      season: data.season,
+      manifestation_id: data.manifestation_id ?? null,
+      is_visible: typeof data.is_visible === "boolean" ? data.is_visible : undefined,
+      is_finished: typeof data.is_finished === "boolean" ? data.is_finished : undefined,
+      indoor_ranking_scope: data.indoor_ranking_scope ?? undefined,
       id: uuidv4(),
       created_by: req.user.userId,
     });
@@ -44,7 +56,21 @@ exports.updateEvent = async (req, res) => {
     const event = await Event.findByPk(req.params.id);
     if (!event)
       return res.status(404).json({ status: "error", message: "Non trouvé" });
-    await event.update(req.body);
+    const data = req.body || {};
+    await event.update({
+      name: data.name,
+      location: data.location,
+      start_date: data.start_date,
+      end_date: data.end_date,
+      race_type: data.race_type,
+      season: data.season,
+      manifestation_id: data.manifestation_id,
+      is_visible: typeof data.is_visible === "boolean" ? data.is_visible : undefined,
+      is_finished: typeof data.is_finished === "boolean" ? data.is_finished : undefined,
+      indoor_ranking_scope: data.indoor_ranking_scope,
+      timing_profile_id:
+        data.timing_profile_id === null ? null : data.timing_profile_id || undefined,
+    });
     res.json({ status: "success", data: event });
   } catch (err) {
     res.status(500).json({ status: "error", message: err.message });
@@ -127,8 +153,21 @@ exports.getEventStatistics = async (req, res) => {
 
     res.json({ status: "success", data: statistics });
   } catch (err) {
-    console.error("Error fetching event statistics:", err);
+    logger.error({ err }, "Error fetching event statistics");
     res.status(500).json({ status: "error", message: err.message });
+  }
+};
+
+// GET /events/:eventId/results-by-category
+exports.getEventResultsByCategory = async (req, res) => {
+  try {
+    const { getEventResultsByCategory } = require("../services/eventResultsService");
+    const data = await getEventResultsByCategory(req.params.eventId);
+    res.json({ status: "success", data });
+  } catch (err) {
+    const status = err.statusCode || 500;
+    logger.error({ err, eventId: req.params.eventId }, "Error fetching event results by category");
+    res.status(status).json({ status: "error", message: err.message });
   }
 };
 
@@ -153,9 +192,7 @@ exports.deleteEvent = async (req, res) => {
     const EventCategory = require("../models/EventCategory");
     const UserEvent = require("../models/UserEvent");
 
-    console.log(
-      `🗑️  Suppression de l'événement ${id} et de toutes ses données...`
-    );
+    logger.info({ event_id: id }, "Deleting event and related data");
 
     // 1. Supprimer les TimingAssignment (via les Crews de l'événement)
     const crews = await Crew.findAll({ where: { event_id: id } });
@@ -166,9 +203,7 @@ exports.deleteEvent = async (req, res) => {
         where: { crew_id: crewIds },
       });
       await TimingAssignment.destroy({ where: { crew_id: crewIds } });
-      console.log(
-        `  ✅ ${timingAssignments.length} TimingAssignment supprimés`
-      );
+      logger.info({ count: timingAssignments.length }, "TimingAssignments deleted");
     }
 
     // 2. Supprimer les Timings (via TimingPoint de l'événement)
@@ -180,7 +215,6 @@ exports.deleteEvent = async (req, res) => {
         where: { timing_point_id: timingPointIds },
       });
       await Timing.destroy({ where: { timing_point_id: timingPointIds } });
-      console.log(`  ✅ ${timings.length} Timings supprimés`);
     }
 
     // 3. Supprimer les RaceCrew (via les Races des phases de l'événement)
@@ -193,55 +227,54 @@ exports.deleteEvent = async (req, res) => {
 
       if (raceIds.length > 0) {
         await RaceCrew.destroy({ where: { race_id: raceIds } });
-        console.log(`  ✅ RaceCrew supprimés`);
       }
 
       // 4. Supprimer les Races
       await Race.destroy({ where: { phase_id: phaseIds } });
-      console.log(`  ✅ ${races.length} Races supprimées`);
     }
 
     // 5. Supprimer les RacePhase
     await RacePhase.destroy({ where: { event_id: id } });
-    console.log(`  ✅ ${phases.length} RacePhase supprimées`);
 
     // 6. Supprimer les CrewParticipant (via les Crews)
     if (crewIds.length > 0) {
       await CrewParticipant.destroy({ where: { crew_id: crewIds } });
-      console.log(`  ✅ CrewParticipant supprimés`);
     }
 
     // 7. Supprimer les Crews
     await Crew.destroy({ where: { event_id: id } });
-    console.log(`  ✅ ${crews.length} Crews supprimés`);
 
     // 8. Supprimer les TimingPoint
     await TimingPoint.destroy({ where: { event_id: id } });
-    console.log(`  ✅ ${timingPoints.length} TimingPoint supprimés`);
 
     // 9. Supprimer les liaisons EventDistance (distances liées à cet événement)
-    const eventDistances = await EventDistance.findAll({ where: { event_id: id } });
     await EventDistance.destroy({ where: { event_id: id } });
-    console.log(`  ✅ ${eventDistances.length} EventDistance supprimés`);
 
     // 10. Supprimer les EventCategory (table de liaison)
     await EventCategory.destroy({ where: { event_id: id } });
-    console.log(`  ✅ EventCategory supprimés`);
 
     // 11. Supprimer les UserEvent (table de liaison)
     await UserEvent.destroy({ where: { event_id: id } });
-    console.log(`  ✅ UserEvent supprimés`);
 
     // 12. Enfin, supprimer l'événement
     await event.destroy();
-    console.log(`  ✅ Événement supprimé`);
+
+    await writeAuditLog({
+      userId: req.user?.userId,
+      action: "event_delete",
+      entityType: "event",
+      entityId: id,
+      eventId: id,
+      metadata: { name: event.name },
+      req,
+    });
 
     res.json({
       status: "success",
       message: "Événement et toutes ses données associées supprimés",
     });
   } catch (err) {
-    console.error("❌ Erreur lors de la suppression:", err);
+    logger.error({ err, event_id: req.params?.id }, "Event deletion failed");
     res.status(500).json({ status: "error", message: err.message });
   }
 };

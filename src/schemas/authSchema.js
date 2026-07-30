@@ -3,7 +3,7 @@ const Joi = require("joi");
 exports.registerSchema = Joi.object({
   name: Joi.string().min(2).max(100).required(),
   email: Joi.string().email().required(),
-  password: Joi.string().min(6).required(),
+  password: Joi.string().min(12).required(),
   num_license: Joi.string().optional(),
 });
 
@@ -22,12 +22,12 @@ exports.passwordResetRequestSchema = Joi.object({
 
 exports.passwordResetSchema = Joi.object({
   token: Joi.string().required(),
-  new_password: Joi.string().min(6).required(),
+  new_password: Joi.string().min(12).required(),
 });
 
 exports.changePasswordSchema = Joi.object({
   currentPassword: Joi.string().required(),
-  newPassword: Joi.string().min(6).required(),
+  newPassword: Joi.string().min(12).required(),
 });
 
 exports.logoutSchema = Joi.object({

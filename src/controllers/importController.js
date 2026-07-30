@@ -9,6 +9,8 @@ const Category = require("../models/Category");
 const Distance = require("../models/Distance");
 const Event = require("../models/Event");
 const { Op } = require("sequelize");
+const logger = require("../utils/logger");
+const { writeAuditLog } = require("../services/auditLogService");
 
 /**
  * GET /import/manifestations — liste proxy depuis l’intranet FFA (sélection import).
@@ -59,22 +61,42 @@ exports.importManifestation = async (req, res) => {
 
   try {
     const { id } = req.params;
-    console.log(`🚀 Début de l'import de la manifestation ${id}...`);
+    logger.info({ manifestation_id: id }, "Starting manifestation import");
 
     const result = await importManifestation(id, req);
     event_id = result.event_id;
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-    console.log(`✅ Import terminé avec succès en ${duration}s`);
-    console.log(
-      `📊 Résumé: ${result.crews_count} équipages, ${result.participants_count} participants, ${result.categories_count} catégories`
+    logger.info(
+      {
+        manifestation_id: id,
+        event_id,
+        duration_s: duration,
+        crews_count: result.crews_count,
+        participants_count: result.participants_count,
+      },
+      "Manifestation import completed"
     );
+
+    await writeAuditLog({
+      userId: req.user?.userId,
+      action: "import_manifestation",
+      entityType: "event",
+      entityId: event_id,
+      eventId: event_id,
+      metadata: {
+        manifestation_id: id,
+        duration_s: duration,
+        crews_count: result.crews_count,
+        participants_count: result.participants_count,
+      },
+      req,
+    });
 
     res.status(201).json({ status: "success", data: result });
   } catch (err) {
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-    console.error(`❌ Import error après ${duration}s:`, err);
-    console.error("Stack trace:", err.stack);
+    logger.error({ err, duration_s: duration, event_id }, "Manifestation import failed");
 
     // Si un événement a été créé, on pourrait le supprimer pour éviter les données partiellement importées
     // Mais on ne le fait pas automatiquement car l'utilisateur pourrait vouloir réessayer

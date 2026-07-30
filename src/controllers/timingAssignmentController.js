@@ -14,6 +14,77 @@ const {
   enrichAssignmentsWithRelativeTime,
   calculateRelativeTime,
 } = require("../utils/relativeTimeCalculator");
+const { assertCrewRaceMutable } = require("../utils/raceLock");
+const logger = require("../utils/logger");
+
+/**
+ * Cœur métier de l'affectation d'un timing à un équipage : crée le lien,
+ * calcule le temps relatif et diffuse la mise à jour temps réel.
+ * Réutilisé par la route HTTP unitaire ET par la synchronisation par lot (offline mobile).
+ */
+async function performAssignment({ timing, crew_id, io }) {
+  await assertCrewRaceMutable(crew_id);
+
+  const existing = await TimingAssignment.findOne({ where: { timing_id: timing.id, crew_id } });
+  if (existing) {
+    return { assignment: existing, alreadyExisted: true };
+  }
+
+  const assignment = await TimingAssignment.create({
+    id: uuidv4(),
+    timing_id: timing.id,
+    crew_id,
+  });
+
+  const raceCrew = await RaceCrew.findOne({
+    where: { crew_id },
+    include: [
+      {
+        model: Race,
+        include: [{ model: RacePhase, include: [Event] }],
+      },
+    ],
+  });
+
+  if (raceCrew?.Race) {
+    const race = raceCrew.Race;
+    const timingPoint = timing.TimingPoint;
+    const event_id = race.RacePhase?.event_id;
+
+    const relativeTimeMs = await calculateRelativeTime(timing, crew_id, event_id, race.id);
+
+    if (io && timingPoint) {
+      const allTimingPoints = await TimingPoint.findAll({
+        where: { event_id },
+        order: [["order_index", "ASC"]],
+      });
+
+      const maxOrderIndex = Math.max(...allTimingPoints.map((tp) => tp.order_index));
+
+      if (timingPoint.order_index === maxOrderIndex) {
+        io.to(`event:${event_id}`).emit("raceFinalUpdate", {
+          race_id: race.id,
+          crew_id,
+          final_time: relativeTimeMs !== null ? relativeTimeMs.toString() : null,
+          relative_time_ms: relativeTimeMs,
+        });
+      } else {
+        io.to(`event:${event_id}`).emit("raceIntermediateUpdate", {
+          race_id: race.id,
+          crew_id,
+          timing_point_id: timingPoint.id,
+          timing_point_label: timingPoint.label,
+          distance_m: timingPoint.distance_m,
+          time_ms: relativeTimeMs !== null ? relativeTimeMs.toString() : null,
+          relative_time_ms: relativeTimeMs,
+          order_index: timingPoint.order_index,
+        });
+      }
+    }
+  }
+
+  return { assignment, alreadyExisted: false };
+}
 
 exports.assignTiming = async (req, res) => {
   try {
@@ -38,72 +109,27 @@ exports.assignTiming = async (req, res) => {
       });
     }
 
-    const assignment = await TimingAssignment.create({
-      id: uuidv4(),
-      timing_id,
+    const { assignment, alreadyExisted } = await performAssignment({
+      timing,
       crew_id,
+      io: req.app.get("io"),
     });
 
-    const raceCrew = await RaceCrew.findOne({
-      where: { crew_id },
-      include: [
-        {
-          model: Race,
-          include: [{ model: RacePhase, include: [Event] }],
-        },
-      ],
-    });
-
-    if (timing && raceCrew && raceCrew.Race) {
-      const race = raceCrew.Race;
-      const timingPoint = timing.TimingPoint;
-      const event_id = race.RacePhase?.event_id;
-
-      // Calculer le temps relatif avec la nouvelle logique (basé sur le timing de départ réel)
-      const relativeTimeMs = await calculateRelativeTime(
-        timing,
-        crew_id,
-        event_id
-      );
-
-      const io = req.app.get("io");
-
-      const allTimingPoints = await TimingPoint.findAll({
-        where: { event_id },
-        order: [["order_index", "ASC"]],
+    if (alreadyExisted) {
+      return res.status(409).json({
+        status: "error",
+        message: "Ce timing est déjà assigné à cet équipage",
       });
-
-      const maxOrderIndex = Math.max(
-        ...allTimingPoints.map((tp) => tp.order_index)
-      );
-
-      if (timingPoint.order_index === maxOrderIndex) {
-        io.to(`event:${event_id}`).emit("raceFinalUpdate", {
-          race_id: race.id,
-          crew_id,
-          final_time:
-            relativeTimeMs !== null ? relativeTimeMs.toString() : null,
-          relative_time_ms: relativeTimeMs, // ← NOUVEAU
-        });
-      } else {
-        io.to(`event:${event_id}`).emit("raceIntermediateUpdate", {
-          race_id: race.id,
-          crew_id,
-          timing_point_id: timingPoint.id,
-          timing_point_label: timingPoint.label,
-          distance_m: timingPoint.distance_m,
-          time_ms: relativeTimeMs !== null ? relativeTimeMs.toString() : null, // ← Modifié pour utiliser relativeTimeMs
-          relative_time_ms: relativeTimeMs, // ← NOUVEAU
-          order_index: timingPoint.order_index,
-        });
-      }
     }
 
     res.status(201).json({ status: "success", data: assignment });
   } catch (err) {
-    res.status(500).json({ status: "error", message: err.message });
+    const status = err.statusCode || 500;
+    res.status(status).json({ status: "error", message: err.message });
   }
 };
+
+exports.performAssignment = performAssignment;
 
 exports.updateAssignment = async (req, res) => {
   try {
@@ -133,10 +159,13 @@ exports.updateAssignment = async (req, res) => {
       }
     }
 
+    await assertCrewRaceMutable(crew_id || assignment.crew_id);
+
     await assignment.update({ timing_id, crew_id });
     res.json({ status: "success", data: assignment });
   } catch (err) {
-    res.status(500).json({ status: "error", message: err.message });
+    const status = err.statusCode || 500;
+    res.status(status).json({ status: "error", message: err.message });
   }
 };
 
@@ -199,10 +228,13 @@ exports.deleteAssignment = async (req, res) => {
       });
     }
 
+    await assertCrewRaceMutable(assignment.crew_id);
+
     await assignment.destroy();
     res.json({ status: "success", message: "Assignation supprimée" });
   } catch (err) {
-    res.status(500).json({ status: "error", message: err.message });
+    const status = err.statusCode || 500;
+    res.status(status).json({ status: "error", message: err.message });
   }
 };
 
@@ -267,7 +299,7 @@ exports.getAssignmentsByEvent = async (req, res) => {
 
     res.json({ status: "success", data: enrichedList });
   } catch (err) {
-    console.error("getAssignmentsByEvent error:", err);
+    logger.error({ err }, "getAssignmentsByEvent error");
     res.status(500).json({ status: "error", message: err.message });
   }
 };
@@ -340,7 +372,7 @@ exports.getAssignmentsByRace = async (req, res) => {
 
     res.json({ status: "success", data: enrichedList });
   } catch (err) {
-    console.error("getAssignmentsByRace error:", err);
+    logger.error({ err }, "getAssignmentsByRace error");
     res.status(500).json({ status: "error", message: err.message });
   }
 };

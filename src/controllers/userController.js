@@ -126,7 +126,8 @@ exports.createUser = async (req, res) => {
         id: newUser.id,
         email: newUser.email,
         name: newUser.name,
-        temporary_password: temporaryPassword,
+        // Ne jamais renvoyer le mot de passe temporaire dans la réponse.
+        // Il est transmis uniquement par email.
       },
     });
   } catch (err) {

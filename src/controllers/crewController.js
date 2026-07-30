@@ -103,7 +103,62 @@ exports.updateCrew = async (req, res) => {
     const crew = await Crew.findByPk(req.params.id);
     if (!crew)
       return res.status(404).json({ status: "error", message: "Non trouvé" });
-    await crew.update(req.body);
+    const data = req.body || {};
+
+    let normalizedStatus = data.status;
+    if (typeof normalizedStatus === "number") {
+      if (normalizedStatus === 8) normalizedStatus = CREW_STATUS.REGISTERED;
+      else normalizedStatus = CREW_STATUS.REGISTERED;
+    }
+    if (
+      typeof normalizedStatus === "string" &&
+      normalizedStatus &&
+      !CREW_STATUS.VALID_STATUSES.includes(normalizedStatus)
+    ) {
+      normalizedStatus = CREW_STATUS.REGISTERED;
+    }
+
+    await crew.update({
+      club_name: data.club_name,
+      club_code: data.club_code,
+      crew_name: data.crew_name,
+      coach_name: data.coach_name,
+      temps_pronostique: data.temps_pronostique,
+      category_id: data.category_id,
+      // Ne pas écraser si absent
+      ...(normalizedStatus ? { status: normalizedStatus } : {}),
+    });
+    res.json({ status: "success", data: crew });
+  } catch (err) {
+    res.status(500).json({ status: "error", message: err.message });
+  }
+};
+
+/**
+ * Statut rapide DNS / DNF / DSQ depuis le poste de chronométrage.
+ * Endpoint volontairement restreint (un seul champ) pour rester accessible
+ * aux appareils authentifiés par token de point de chronométrage.
+ */
+exports.updateCrewStatus = async (req, res) => {
+  try {
+    const crew = await Crew.findByPk(req.params.id);
+    if (!crew) return res.status(404).json({ status: "error", message: "Non trouvé" });
+
+    const { status } = req.body || {};
+    if (!CREW_STATUS.VALID_STATUSES.includes(status)) {
+      return res.status(400).json({ status: "error", message: "Statut invalide" });
+    }
+
+    await crew.update({ status });
+
+    const io = req.app.get("io");
+    if (io) {
+      io.to(`event:${crew.event_id}`).emit("crewStatusUpdate", {
+        crew_id: crew.id,
+        status,
+      });
+    }
+
     res.json({ status: "success", data: crew });
   } catch (err) {
     res.status(500).json({ status: "error", message: err.message });

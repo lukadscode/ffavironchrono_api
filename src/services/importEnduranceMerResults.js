@@ -10,6 +10,10 @@ const {
   calculatePointsFromConfig,
   inferBRSGroup,
 } = require("../constants/enduranceMerBaremes");
+const {
+  resolveClubCode,
+  loadClubLookupMaps,
+} = require("../utils/clubCodeUtils");
 
 const SHEET_ORGANISATEUR = "Organisateur";
 const DATA_START_ROW_SIMPLE = 5;
@@ -286,6 +290,8 @@ async function importEnduranceMerExcel(eventId, fileBuffer, options = {}) {
 
   const scoringConfig = await getEnduranceMerScoringConfig();
   const importBatchId = uuidv4();
+  // Cache clubs pour résoudre 77002 / C77002 / C077002 → club FFAviron existant
+  const clubsByCode = await loadClubLookupMaps();
 
   for (const sheetName of sheetNames) {
     const rows = getSheetRows(workbook, sheetName);
@@ -303,6 +309,18 @@ async function importEnduranceMerExcel(eventId, fileBuffer, options = {}) {
 
     dataRows.sort((a, b) => a.place - b.place);
     const clubsCrewCount = Object.create(null);
+
+    const resolveCode = async (rawCode, rawName) => {
+      if (!rawCode || String(rawCode).trim() === "") {
+        return { code: null, name: rawName || null };
+      }
+      const resolved = await resolveClubCode(rawCode, { clubsByCode });
+      return {
+        code: resolved.code,
+        // Garder le nom Excel s'il est fourni ; sinon nom du club résolu
+        name: (rawName && String(rawName).trim()) || resolved.name || null,
+      };
+    };
 
     for (const row of dataRows) {
       try {
@@ -336,10 +354,12 @@ async function importEnduranceMerExcel(eventId, fileBuffer, options = {}) {
         });
 
         if (eventFormat === "enduro" && row.is_mixed) {
-          const code1 = row.club_code;
-          const code2 = row.club_code_2;
-          const name1 = row.club_name;
-          const name2 = row.club_name_2;
+          const resolved1 = await resolveCode(row.club_code, row.club_name);
+          const resolved2 = await resolveCode(row.club_code_2, row.club_name_2);
+          const code1 = resolved1.code;
+          const code2 = resolved2.code;
+          const name1 = resolved1.name;
+          const name2 = resolved2.name;
           const mixedCodes = [code1, code2].filter(Boolean).join(",");
 
           const isTwoClubs = !!(
@@ -414,9 +434,10 @@ async function importEnduranceMerExcel(eventId, fileBuffer, options = {}) {
           continue;
         }
 
+        const resolved = await resolveCode(row.club_code, row.club_name);
         const clubKey =
-          (row.club_code && String(row.club_code).trim()) ||
-          (row.club_name && String(row.club_name).trim()) ||
+          resolved.code ||
+          (resolved.name && String(resolved.name).trim()) ||
           null;
         let finalPoints = basePoints;
         if (clubKey) {
@@ -431,11 +452,11 @@ async function importEnduranceMerExcel(eventId, fileBuffer, options = {}) {
           eventId,
           sheetName: epreuveLabel,
           place: row.place,
-          clubCode: row.club_code,
-          clubName: row.club_name,
+          clubCode: resolved.code,
+          clubName: resolved.name,
           isMixedClubs: !!row.is_mixed,
           clubCodesMixed: row.is_mixed
-            ? [row.club_code, row.club_code_2].filter(Boolean).join(",")
+            ? [resolved.code, row.club_code_2].filter(Boolean).join(",")
             : null,
           points: finalPoints,
           eventFormat,

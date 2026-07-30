@@ -2,9 +2,10 @@ const express = require("express");
 const router = express.Router();
 const controller = require("../controllers/clubController");
 const auth = require("../middlewares/authMiddleware");
+const requireAdmin = require("../middlewares/requireAdmin");
 
 // Synchroniser les clubs depuis l'API FFAviron (nécessite authentification)
-router.post("/sync", auth, controller.syncClubs);
+router.post("/sync", auth, requireAdmin, controller.syncClubs);
 
 // Récupérer tous les clubs (avec filtres optionnels : ?code=xxx&nom_court=yyy&code_court=zzz&type=CLU)
 router.get("/", controller.getClubs);
@@ -19,6 +20,6 @@ router.get("/nom-court/:nom_court", controller.getClubByNomCourt);
 router.get("/code-court/:code_court", controller.getClubByCodeCourt);
 
 // Importer les codes courts depuis un fichier JSON
-router.post("/import-code-court", auth, controller.importCodeCourt);
+router.post("/import-code-court", auth, requireAdmin, controller.importCodeCourt);
 
 module.exports = router;

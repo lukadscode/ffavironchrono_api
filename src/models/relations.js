@@ -19,6 +19,7 @@ const IndoorParticipantResult = require("./IndoorParticipantResult");
 const EventDistance = require("./EventDistance");
 const Club = require("./Club");
 const EnduranceMerImportResult = require("./EnduranceMerImportResult");
+const TimingProfile = require("./TimingProfile");
 
 // Relations User
 User.hasMany(UserSession, { foreignKey: "user_id" });
@@ -219,3 +220,14 @@ Distance.hasMany(EventDistance, {
   foreignKey: "distance_id",
   as: "events",
 });
+
+// Relations TimingProfile (liberté organisateur : profil par défaut de l'événement,
+// surchargeable au niveau de chaque course)
+Event.belongsTo(TimingProfile, { foreignKey: "timing_profile_id", as: "timing_profile" });
+TimingProfile.hasMany(Event, { foreignKey: "timing_profile_id" });
+
+Race.belongsTo(TimingProfile, { foreignKey: "timing_profile_id", as: "timing_profile" });
+TimingProfile.hasMany(Race, { foreignKey: "timing_profile_id" });
+
+TimingProfile.belongsTo(Event, { foreignKey: "event_id", as: "event" });
+Event.hasMany(TimingProfile, { foreignKey: "event_id", as: "timing_profiles" });

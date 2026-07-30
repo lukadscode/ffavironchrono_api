@@ -24,6 +24,15 @@ const RaceCrew = sequelize.define(
       type: DataTypes.STRING,
       allowNull: true,
     },
+    adjustment_ms: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 0,
+    },
+    adjustment_reason: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+    },
   },
   {
     tableName: "race_crews",

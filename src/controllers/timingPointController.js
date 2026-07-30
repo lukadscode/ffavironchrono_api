@@ -1,10 +1,18 @@
 const { v4: uuidv4 } = require("uuid");
 const TimingPoint = require("../models/TimingPoint");
+const crypto = require("crypto");
 
-// Fonction utilitaire pour générer un token de type 123-456-789
+// Token timing point : haute entropie (partage humain + anti bruteforce)
+// Format : xxxx-xxxx-xxxx (base32, sans caractères ambigus)
 const generateToken = () => {
-  const part = () => Math.floor(100 + Math.random() * 900).toString();
-  return `${part()}-${part()}-${part()}`;
+  const alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // sans I,L,O,0,1
+  const chunk = (n) => {
+    const bytes = crypto.randomBytes(n);
+    let out = "";
+    for (let i = 0; i < bytes.length; i++) out += alphabet[bytes[i] % alphabet.length];
+    return out;
+  };
+  return `${chunk(4)}-${chunk(4)}-${chunk(4)}`;
 };
 
 exports.createTimingPoint = async (req, res) => {
@@ -57,20 +65,20 @@ exports.updateTimingPoint = async (req, res) => {
     if (!tp)
       return res.status(404).json({ status: "error", message: "Non trouvé" });
 
-    // Si on veut modifier le token, on doit vérifier qu’il est unique
-    if (req.body.token) {
-      const existing = await TimingPoint.findOne({
-        where: { token: req.body.token },
+    const data = req.body || {};
+    // Par sécurité, on n'autorise pas la modification du token via l'API (rotation à implémenter séparément).
+    if (data.token) {
+      return res.status(400).json({
+        status: "error",
+        message: "La rotation du token n'est pas supportée via cet endpoint",
       });
-      if (existing && existing.id !== req.params.id) {
-        return res.status(400).json({
-          status: "error",
-          message: "Token déjà utilisé",
-        });
-      }
     }
 
-    await tp.update(req.body);
+    await tp.update({
+      label: data.label,
+      order_index: data.order_index,
+      distance_m: data.distance_m,
+    });
     res.json({ status: "success", data: tp });
   } catch (err) {
     res.status(500).json({ status: "error", message: err.message });

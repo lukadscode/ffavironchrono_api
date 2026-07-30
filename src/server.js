@@ -1,11 +1,24 @@
 const app = require("./app");
 const sequelize = require("./models/index");
+const logger = require("./utils/logger");
 
 const http = require("http").createServer(app);
 const { Server } = require("socket.io");
+require("dotenv").config();
+
+const corsOrigins = (process.env.CORS_ORIGINS || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
 const io = new Server(http, {
   cors: {
-    origin: "*", // à restreindre en prod
+    origin:
+      corsOrigins.length === 0
+        ? process.env.NODE_ENV === "production"
+          ? false
+          : "*"
+        : corsOrigins,
     methods: ["GET", "POST"],
   },
 });
@@ -19,8 +32,8 @@ require("./socket")(io);
 const PORT = process.env.PORT || 3010;
 
 sequelize.authenticate().then(() => {
-  console.log("✅ DB connected");
+  logger.info("DB connected");
   http.listen(PORT, () =>
-    console.log(`🚀 Server running with WebSocket on port ${PORT}`)
+    logger.info({ port: PORT }, "Server running with WebSocket")
   );
 });

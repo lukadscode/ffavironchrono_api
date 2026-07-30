@@ -5,13 +5,28 @@ const authMiddleware = require("../middlewares/authMiddleware");
 const ensureActiveUser = require("../middlewares/ensureActiveUser");
 const validate = require("../middlewares/validateSchema");
 const authSchema = require("../schemas/authSchema");
+const rateLimit = require("express-rate-limit");
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: Number(process.env.RATE_LIMIT_LOGIN_PER_15M || 30),
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+});
+
+const resetLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: Number(process.env.RATE_LIMIT_RESET_PER_15M || 10),
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+});
 
 router.post(
   "/register",
   validate(authSchema.registerSchema),
   authController.register
 );
-router.post("/login", validate(authSchema.loginSchema), authController.login);
+router.post("/login", loginLimiter, validate(authSchema.loginSchema), authController.login);
 router.post(
   "/refresh-token",
   validate(authSchema.refreshTokenSchema),
@@ -25,11 +40,13 @@ router.post(
 );
 router.post(
   "/request-password-reset",
+  resetLimiter,
   validate(authSchema.passwordResetRequestSchema),
   authController.requestPasswordReset
 );
 router.post(
   "/reset-password",
+  resetLimiter,
   validate(authSchema.passwordResetSchema),
   authController.resetPassword
 );

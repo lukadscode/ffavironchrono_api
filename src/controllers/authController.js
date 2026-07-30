@@ -14,6 +14,12 @@ const {
 const sendEmail = require("../utils/sendEmail");
 const emailTemplates = require("../utils/emailTemplates");
 
+const {
+  makeSessionBoundRefreshToken,
+  parseSessionBoundRefreshToken,
+} = require("../utils/refreshTokenFormat");
+const { writeAuditLog } = require("../services/auditLogService");
+
 // REGISTER
 exports.register = async (req, res) => {
   try {
@@ -205,6 +211,13 @@ exports.login = async (req, res) => {
         .status(401)
         .json({ status: "error", message: "Invalid credentials" });
 
+    if (user.status !== "active") {
+      return res.status(403).json({
+        status: "error",
+        message: "Email non vérifié ou compte inactif",
+      });
+    }
+
     const valid = await comparePassword(password, user.password);
     if (!valid)
       return res
@@ -212,9 +225,6 @@ exports.login = async (req, res) => {
         .json({ status: "error", message: "Invalid credentials" });
 
     const accessToken = generateAccessToken(user.id);
-    const refreshToken = generateRefreshToken();
-    const hashedRefresh = await hashToken(refreshToken);
-
     const userAgent = req.headers["user-agent"];
     const ipAddress = req.ip;
 
@@ -227,6 +237,11 @@ exports.login = async (req, res) => {
       },
     });
 
+    // Toujours retourner un refresh token lié à une session, pour permettre un lookup O(1)
+    const sessionId = existingSession ? existingSession.id : uuidv4();
+    const { token: refreshToken, secret } = makeSessionBoundRefreshToken(sessionId);
+    const hashedRefresh = await hashToken(secret);
+
     if (existingSession) {
       existingSession.refresh_token_hash = hashedRefresh;
       existingSession.expires_at = new Date(
@@ -235,7 +250,7 @@ exports.login = async (req, res) => {
       await existingSession.save();
     } else {
       await UserSession.create({
-        id: uuidv4(),
+        id: sessionId,
         user_id: user.id,
         refresh_token_hash: hashedRefresh,
         user_agent: userAgent,
@@ -251,6 +266,15 @@ exports.login = async (req, res) => {
         refresh_token: refreshToken,
       },
     });
+
+    await writeAuditLog({
+      userId: user.id,
+      action: "login",
+      entityType: "user",
+      entityId: user.id,
+      metadata: { user_agent: userAgent },
+      req,
+    });
   } catch (err) {
     res.status(500).json({ status: "error", message: err.message });
   }
@@ -264,12 +288,42 @@ exports.refreshToken = async (req, res) => {
       .status(400)
       .json({ status: "error", message: "Missing refresh token" });
 
+  // Nouveau format: sessionId.secret -> lookup O(1)
+  const parsed = parseSessionBoundRefreshToken(refresh_token);
+  if (parsed) {
+    const session = await UserSession.findOne({
+      where: { id: parsed.sessionId, is_active: true },
+    });
+    if (!session) {
+      return res
+        .status(401)
+        .json({ status: "error", message: "Invalid refresh token" });
+    }
+    const match = await comparePassword(parsed.secret, session.refresh_token_hash);
+    if (!match) {
+      return res
+        .status(401)
+        .json({ status: "error", message: "Invalid refresh token" });
+    }
+
+    // Rotation refresh token
+    const { token: newRefreshToken, secret: newSecret } =
+      makeSessionBoundRefreshToken(session.id);
+    session.refresh_token_hash = await hashToken(newSecret);
+    session.expires_at = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7);
+    await session.save();
+
+    const newAccess = generateAccessToken(session.user_id);
+    return res.json({
+      status: "success",
+      data: { access_token: newAccess, refresh_token: newRefreshToken },
+    });
+  }
+
+  // Ancien format (compat): scan O(n)
   const sessions = await UserSession.findAll({ where: { is_active: true } });
   for (const session of sessions) {
-    const match = await comparePassword(
-      refresh_token,
-      session.refresh_token_hash
-    );
+    const match = await comparePassword(refresh_token, session.refresh_token_hash);
     if (match) {
       const newAccess = generateAccessToken(session.user_id);
       return res.json({ status: "success", data: { access_token: newAccess } });
@@ -284,12 +338,26 @@ exports.refreshToken = async (req, res) => {
 // LOGOUT
 exports.logout = async (req, res) => {
   const { refresh_token } = req.body;
-  const sessions = await UserSession.findAll({ where: { is_active: true } });
+  const parsed = parseSessionBoundRefreshToken(refresh_token);
+  if (parsed) {
+    const session = await UserSession.findOne({
+      where: { id: parsed.sessionId, is_active: true, user_id: req.user.userId },
+    });
+    if (!session) {
+      return res.status(400).json({ status: "error", message: "Token not found" });
+    }
+    const match = await comparePassword(parsed.secret, session.refresh_token_hash);
+    if (!match) {
+      return res.status(400).json({ status: "error", message: "Token not found" });
+    }
+    session.is_active = false;
+    await session.save();
+    return res.json({ status: "success", message: "Logged out" });
+  }
+
+  const sessions = await UserSession.findAll({ where: { is_active: true, user_id: req.user.userId } });
   for (const session of sessions) {
-    const match = await comparePassword(
-      refresh_token,
-      session.refresh_token_hash
-    );
+    const match = await comparePassword(refresh_token, session.refresh_token_hash);
     if (match) {
       session.is_active = false;
       await session.save();
@@ -368,53 +436,11 @@ exports.verifyEmail = async (req, res) => {
       where: { email_verification_token: cleanToken },
     });
 
-    // Si pas trouvé, faire des logs de débogage détaillés
     if (!user) {
-      console.log("🔍 Token recherché:", cleanToken);
-      console.log("📏 Longueur du token recherché:", cleanToken.length);
-      console.log("🔤 Token (hex):", Buffer.from(cleanToken).toString('hex'));
-      
-      // Chercher tous les utilisateurs avec un token non null pour comparaison
-      const usersWithTokens = await User.findAll({
-        where: {
-          email_verification_token: { [Op.ne]: null }
-        },
-        attributes: ["id", "email", "email_verification_token"],
-        limit: 10
+      return res.status(400).json({
+        status: "error",
+        message: "Token invalide ou déjà utilisé",
       });
-      
-      console.log("📋 Tokens existants en base (échantillon):");
-      let foundMatch = false;
-      usersWithTokens.forEach(u => {
-        const dbToken = u.email_verification_token;
-        if (dbToken) {
-          const dbTokenClean = dbToken.trim().replace(/\s+/g, '');
-          console.log(`  - ${u.email}:`);
-          console.log(`    Token (premiers 30 chars): ${dbToken.substring(0, 30)}...`);
-          console.log(`    Longueur: ${dbToken.length}`);
-          console.log(`    Longueur nettoyée: ${dbTokenClean.length}`);
-          
-          // Comparaison exacte
-          if (dbToken === cleanToken || dbTokenClean === cleanToken) {
-            console.log(`    ✅ MATCH TROUVÉ !`);
-            foundMatch = true;
-            // Réessayer avec le token exact de la base
-            user = u;
-          }
-        }
-      });
-
-      if (!user && !foundMatch) {
-        return res.status(400).json({ 
-          status: "error", 
-          message: "Token invalide ou déjà utilisé",
-          debug: process.env.NODE_ENV === "development" ? {
-            tokenLength: cleanToken.length,
-            tokenPreview: cleanToken.substring(0, 20) + "...",
-            tokensInDb: usersWithTokens.length
-          } : undefined
-        });
-      }
     }
 
     // Vérifier si le compte est déjà actif

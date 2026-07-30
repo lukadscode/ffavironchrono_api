@@ -49,6 +49,19 @@ const Race = sequelize.define(
       type: DataTypes.DATE,
       allowNull: true,
     },
+    validated_by: {
+      type: DataTypes.CHAR(36),
+      allowNull: true,
+    },
+    validated_at: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    timing_profile_id: {
+      type: DataTypes.CHAR(36),
+      allowNull: true,
+      comment: "Surcharge du profil de chronométrage de l'événement pour cette course",
+    },
   },
   {
     tableName: "races",

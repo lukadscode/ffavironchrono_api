@@ -5,10 +5,30 @@ const Distance = require("../models/Distance");
 const RaceCrew = require("../models/RaceCrew");
 const RankingPoint = require("../models/RankingPoint");
 const Notification = require("../models/Notification");
+const TimingAssignment = require("../models/TimingAssignment");
+const Timing = require("../models/Timing");
+const TimingPoint = require("../models/TimingPoint");
+const { getStartTimingPoint } = require("../utils/relativeTimeCalculator");
+const { assertRaceMutable } = require("../utils/raceLock");
+const { writeAuditLog } = require("../services/auditLogService");
+const logger = require("../utils/logger");
+const { assignDeadHeatPositions } = require("../utils/rankingUtils");
 
 exports.createRace = async (req, res) => {
   try {
-    const race = await Race.create({ ...req.body, id: uuidv4() });
+    const data = req.body || {};
+    const race = await Race.create({
+      // Whitelist (anti mass-assignment)
+      phase_id: data.phase_id,
+      name: data.name ?? null,
+      race_type: data.race_type ?? null,
+      lane_count: data.lane_count ?? null,
+      race_number: data.race_number ?? null,
+      distance_id: data.distance_id ?? null,
+      status: data.status ?? undefined,
+      start_time: data.start_time ?? null,
+      id: uuidv4(),
+    });
     res.status(201).json({ status: "success", data: race });
   } catch (err) {
     res.status(500).json({ status: "error", message: err.message });
@@ -70,7 +90,26 @@ exports.getRacesByEvent = async (req, res) => {
 exports.getRace = async (req, res) => {
   try {
     const race = await Race.findByPk(req.params.id, {
-      include: [RacePhase, Distance],
+      include: [
+        RacePhase,
+        Distance,
+        {
+          model: require("../models/RaceCrew"),
+          as: "race_crews",
+          include: [
+            {
+              model: require("../models/Crew"),
+              as: "crew",
+              include: [
+                {
+                  model: require("../models/Category"),
+                  as: "category",
+                },
+              ],
+            },
+          ],
+        },
+      ],
     });
     if (!race)
       return res.status(404).json({ status: "error", message: "Non trouvé" });
@@ -89,7 +128,18 @@ exports.updateRace = async (req, res) => {
       return res.status(404).json({ status: "error", message: "Non trouvé" });
 
     const oldStatus = race.status;
-    await race.update(req.body);
+    const data = req.body || {};
+    await race.update({
+      name: data.name,
+      race_type: data.race_type,
+      lane_count: data.lane_count,
+      race_number: data.race_number,
+      distance_id: data.distance_id,
+      status: data.status,
+      start_time: data.start_time,
+      timing_profile_id:
+        data.timing_profile_id === null ? null : data.timing_profile_id || undefined,
+    });
 
     if (req.body.status && req.body.status !== oldStatus && race.RacePhase) {
       const io = req.app.get("io");
@@ -349,9 +399,20 @@ exports.getRaceResults = async (req, res) => {
         }
       }
 
+      const adjustmentMs = Number(raceCrew.adjustment_ms) || 0;
+      const rawDurationMs = duration_ms;
+      if (duration_ms !== null) {
+        duration_ms += adjustmentMs;
+      }
+
       results.push({
         crew_id: raceCrew.crew_id,
+        race_crew_id: raceCrew.id,
         lane: raceCrew.lane,
+        status: raceCrew.status || "registered",
+        adjustment_ms: adjustmentMs,
+        adjustment_reason: raceCrew.adjustment_reason || null,
+        raw_duration_ms: rawDurationMs,
         club_name: raceCrew.crew?.club_name || null,
         club_code: raceCrew.crew?.club_code || null,
         category: raceCrew.crew?.category
@@ -370,19 +431,17 @@ exports.getRaceResults = async (req, res) => {
     }
 
     // Trier par temps et calculer les positions
-    const sortedResults = results
-      .filter((r) => r.has_timing)
-      .sort((a, b) => {
-        const timeA = parseInt(a.final_time || "999999999", 10);
-        const timeB = parseInt(b.final_time || "999999999", 10);
-        return timeA - timeB;
-      });
+    const sortedResults = assignDeadHeatPositions(
+      results
+        .filter((r) => r.has_timing)
+        .sort((a, b) => {
+          const timeA = parseInt(a.final_time || "999999999", 10);
+          const timeB = parseInt(b.final_time || "999999999", 10);
+          return timeA - timeB;
+        }),
+      (r) => (r.final_time !== null ? parseInt(r.final_time, 10) : null)
+    );
 
-    sortedResults.forEach((r, index) => {
-      r.position = index + 1;
-    });
-
-    // Ajouter les résultats sans timing à la fin
     const resultsWithoutTiming = results
       .filter((r) => !r.has_timing)
       .map((r) => ({ ...r, position: null }));
@@ -391,7 +450,184 @@ exports.getRaceResults = async (req, res) => {
 
     res.json({ status: "success", data: allResults });
   } catch (err) {
-    console.error("Error fetching race results:", err);
+    logger.error({ err }, "Error fetching race results");
     res.status(500).json({ status: "error", message: err.message });
+  }
+};
+
+exports.gunStart = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { start_time } = req.body || {};
+
+    const race = await assertRaceMutable(id);
+    const raceWithPhase = await Race.findByPk(id, { include: [RacePhase] });
+    const gunTime = start_time ? new Date(start_time) : new Date();
+
+    await race.update({ start_time: gunTime, status: "in_progress" });
+
+    const event_id = raceWithPhase?.RacePhase?.event_id;
+    const io = req.app.get("io");
+    if (io && event_id) {
+      const payload = {
+        race_id: race.id,
+        start_time: gunTime,
+        status: "in_progress",
+      };
+      io.to(`event:${event_id}`).emit("gunStart", payload);
+      io.to(`race:${race.id}`).emit("gunStart", payload);
+    }
+
+    await writeAuditLog({
+      userId: req.user?.userId,
+      action: "gun_start",
+      entityType: "race",
+      entityId: race.id,
+      eventId: event_id,
+      metadata: { start_time: gunTime.toISOString() },
+      req,
+    });
+
+    res.json({ status: "success", data: race });
+  } catch (err) {
+    const status = err.statusCode || 500;
+    res.status(status).json({ status: "error", message: err.message });
+  }
+};
+
+exports.falseStart = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const race = await assertRaceMutable(id);
+    const raceWithPhase = await Race.findByPk(id, { include: [RacePhase] });
+    const event_id = raceWithPhase?.RacePhase?.event_id;
+
+    const startPoint = event_id ? await getStartTimingPoint(event_id) : null;
+    const raceCrews = await RaceCrew.findAll({ where: { race_id: id } });
+    const crewIds = raceCrews.map((rc) => rc.crew_id);
+
+    if (startPoint && crewIds.length > 0) {
+      const assignments = await TimingAssignment.findAll({
+        where: { crew_id: crewIds },
+        include: [
+          {
+            model: Timing,
+            as: "timing",
+            where: { timing_point_id: startPoint.id },
+            required: true,
+          },
+        ],
+      });
+
+      for (const assignment of assignments) {
+        await Timing.update({ status: "hidden" }, { where: { id: assignment.timing_id } });
+        await assignment.destroy();
+      }
+    }
+
+    await race.update({ status: "not_started", start_time: null });
+
+    const io = req.app.get("io");
+    if (io && event_id) {
+      const payload = { race_id: race.id, status: "not_started" };
+      io.to(`event:${event_id}`).emit("falseStart", payload);
+      io.to(`race:${race.id}`).emit("falseStart", payload);
+    }
+
+    await writeAuditLog({
+      userId: req.user?.userId,
+      action: "false_start",
+      entityType: "race",
+      entityId: race.id,
+      eventId: event_id,
+      metadata: { cleared_start_assignments: crewIds.length },
+      req,
+    });
+
+    res.json({ status: "success", data: race });
+  } catch (err) {
+    const status = err.statusCode || 500;
+    res.status(status).json({ status: "error", message: err.message });
+  }
+};
+
+exports.validateRace = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const User = require("../models/User");
+
+    const race = await Race.findByPk(id, {
+      include: [{ model: RacePhase, include: [require("../models/Event")] }],
+    });
+
+    if (!race) {
+      return res.status(404).json({ status: "error", message: "Course non trouvée" });
+    }
+
+    if (race.status === "official") {
+      return res.status(400).json({
+        status: "error",
+        message: "Course déjà validée officiellement",
+      });
+    }
+
+    if (race.status !== "non_official") {
+      return res.status(400).json({
+        status: "error",
+        message: "Seules les courses non officielles peuvent être validées",
+      });
+    }
+
+    const validatedAt = new Date();
+    await race.update({
+      status: "official",
+      validated_by: req.user?.userId || null,
+      validated_at: validatedAt,
+    });
+
+    const event_id = race.RacePhase?.event_id;
+    const io = req.app.get("io");
+    if (io && event_id) {
+      io.to(`event:${event_id}`).emit("raceStatusUpdate", {
+        race_id: race.id,
+        status: "official",
+        validated_by: req.user?.userId,
+        validated_at: validatedAt,
+      });
+    }
+
+    await writeAuditLog({
+      userId: req.user?.userId,
+      action: "validate_race",
+      entityType: "race",
+      entityId: race.id,
+      eventId: event_id,
+      metadata: { validated_at: validatedAt.toISOString() },
+      req,
+    });
+
+    let validator = null;
+    if (req.user?.userId) {
+      const user = await User.findByPk(req.user.userId, {
+        attributes: ["id", "email", "first_name", "last_name"],
+      });
+      if (user) {
+        validator = user.toJSON ? user.toJSON() : user;
+      }
+    }
+
+    res.json({
+      status: "success",
+      data: {
+        ...race.toJSON(),
+        status: "official",
+        validated_by: req.user?.userId,
+        validated_at: validatedAt,
+        validator,
+      },
+    });
+  } catch (err) {
+    const status = err.statusCode || 500;
+    res.status(status).json({ status: "error", message: err.message });
   }
 };

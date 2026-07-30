@@ -4,6 +4,13 @@ const Event = require("../models/Event");
 const Race = require("../models/Race");
 const { Op } = require("sequelize");
 
+function sanitizeNotificationMessage(value) {
+  if (value === null || value === undefined) return value;
+  const s = String(value);
+  // Basique mais efficace: neutralise tout HTML. On pourra évoluer vers une allowlist plus tard.
+  return s.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 /**
  * Créer une nouvelle notification
  */
@@ -53,7 +60,7 @@ exports.createNotification = async (req, res) => {
       id: uuidv4(),
       event_id: event_id || null,
       race_id: race_id || null,
-      message,
+      message: sanitizeNotificationMessage(message),
       importance,
       is_active,
       start_date: start_date ? new Date(start_date) : null,
@@ -253,7 +260,7 @@ exports.updateNotification = async (req, res) => {
 
     const wasActive = notification.is_active;
     const updates = {};
-    if (message !== undefined) updates.message = message;
+    if (message !== undefined) updates.message = sanitizeNotificationMessage(message);
     if (importance !== undefined) updates.importance = importance;
     if (is_active !== undefined) updates.is_active = is_active;
     if (start_date !== undefined) updates.start_date = start_date ? new Date(start_date) : null;

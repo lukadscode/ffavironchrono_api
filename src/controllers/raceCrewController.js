@@ -5,6 +5,7 @@ const Category = require("../models/Category");
 const CrewParticipant = require("../models/CrewParticipant");
 const Participant = require("../models/Participant");
 const Club = require("../models/Club");
+const { assertRaceMutable } = require("../utils/raceLock");
 
 exports.assignCrewToRace = async (req, res) => {
   try {
@@ -77,5 +78,59 @@ exports.removeRaceCrew = async (req, res) => {
     res.json({ status: "success", message: "Désassigné" });
   } catch (err) {
     res.status(500).json({ status: "error", message: err.message });
+  }
+};
+
+exports.updateAdjustment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { adjustment_ms, adjustment_reason } = req.body;
+
+    const rc = await RaceCrew.findByPk(id);
+    if (!rc) {
+      return res.status(404).json({ status: "error", message: "Non trouvé" });
+    }
+
+    await assertRaceMutable(rc.race_id);
+
+    await rc.update({
+      adjustment_ms,
+      adjustment_reason: adjustment_reason || null,
+    });
+
+    res.json({ status: "success", data: rc });
+  } catch (err) {
+    const status = err.statusCode || 500;
+    res.status(status).json({ status: "error", message: err.message });
+  }
+};
+
+exports.updateStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    const rc = await RaceCrew.findByPk(id);
+    if (!rc) {
+      return res.status(404).json({ status: "error", message: "Non trouvé" });
+    }
+
+    await assertRaceMutable(rc.race_id);
+    await rc.update({ status });
+
+    const io = req.app.get("io");
+    if (io) {
+      io.to(`race:${rc.race_id}`).emit("raceCrewStatusUpdate", {
+        race_crew_id: rc.id,
+        race_id: rc.race_id,
+        crew_id: rc.crew_id,
+        status,
+      });
+    }
+
+    res.json({ status: "success", data: rc });
+  } catch (err) {
+    const status = err.statusCode || 500;
+    res.status(status).json({ status: "error", message: err.message });
   }
 };

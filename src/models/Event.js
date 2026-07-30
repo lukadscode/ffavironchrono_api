@@ -76,6 +76,11 @@ const Event = sequelize.define(
       comment:
         "standard | championnat_france_indoor | defi_capitaux — pour agrégation saison",
     },
+    timing_profile_id: {
+      type: DataTypes.CHAR(36),
+      allowNull: true,
+      comment: "Profil de chronométrage par défaut appliqué aux courses de l'événement",
+    },
   },
   {
     tableName: "events",

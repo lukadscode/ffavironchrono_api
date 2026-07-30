@@ -1,6 +1,10 @@
 const TimingAssignment = require("../models/TimingAssignment");
 const Timing = require("../models/Timing");
 const TimingPoint = require("../models/TimingPoint");
+const Crew = require("../models/Crew");
+const RaceCrew = require("../models/RaceCrew");
+const logger = require("./logger");
+const { calculateSegmentMetrics } = require("./segmentCalculator");
 
 /**
  * Trouve le point de départ pour un événement
@@ -20,7 +24,22 @@ async function getStartTimingPoint(eventId) {
  * @param {string} startPointId - ID du point de départ
  * @returns {Promise<Timing|null>} Le timing de départ ou null
  */
-async function getStartTiming(crewId, startPointId) {
+async function getStartTiming(crewId, startPointId, raceId = null) {
+  const crewInclude = {
+    model: Crew,
+    required: !!raceId,
+    include: [],
+  };
+
+  if (raceId) {
+    crewInclude.include.push({
+      model: RaceCrew,
+      as: "RaceCrews",
+      where: { race_id: raceId },
+      required: true,
+    });
+  }
+
   const assignment = await TimingAssignment.findOne({
     where: { crew_id: crewId },
     include: [
@@ -30,8 +49,10 @@ async function getStartTiming(crewId, startPointId) {
         where: { timing_point_id: startPointId },
         required: true,
       },
+      ...(raceId ? [crewInclude] : []),
     ],
-    order: [[{ model: Timing, as: "timing" }, "timestamp", "DESC"]],
+    // Premier départ au point de départ pour la course concernée
+    order: [[{ model: Timing, as: "timing" }, "timestamp", "ASC"]],
   });
 
   return assignment?.timing || null;
@@ -44,7 +65,7 @@ async function getStartTiming(crewId, startPointId) {
  * @param {string} eventId - ID de l'événement
  * @returns {Promise<number|null>} Temps relatif en ms ou null
  */
-async function calculateRelativeTime(timing, crewId, eventId) {
+async function calculateRelativeTime(timing, crewId, eventId, raceId = null) {
   // Si pas d'équipage assigné, pas de calcul possible
   if (!crewId) {
     return null;
@@ -68,7 +89,7 @@ async function calculateRelativeTime(timing, crewId, eventId) {
     }
 
     // 3. Trouver le timing de départ pour cet équipage
-    const startTiming = await getStartTiming(crewId, startPoint.id);
+    const startTiming = await getStartTiming(crewId, startPoint.id, raceId);
     if (!startTiming || !startTiming.timestamp) {
       return null;
     }
@@ -91,7 +112,7 @@ async function calculateRelativeTime(timing, crewId, eventId) {
 
     return diffMs;
   } catch (error) {
-    console.error("Error calculating relative time:", error);
+    logger.warn({ err: error, crewId, eventId, raceId }, "Error calculating relative time");
     return null;
   }
 }
@@ -189,7 +210,22 @@ async function enrichTimingWithRelativeTime(timing) {
 
   if (eventId && crewId) {
     // Timing assigné à un équipage - calculer le temps relatif
-    relativeTimeMs = await calculateRelativeTime(timing, crewId, eventId);
+    relativeTimeMs = await calculateRelativeTime(timing, crewId, eventId, raceId);
+  }
+
+  let segmentMetrics = {
+    segment_time_ms: null,
+    segment_distance_m: null,
+    speed_mps: null,
+  };
+
+  if (eventId && crewId && relativeTimeMs !== null) {
+    segmentMetrics = await calculateSegmentMetrics(
+      timingData.timing_point_id,
+      crewId,
+      eventId,
+      relativeTimeMs
+    );
   }
 
   // Retourner l'objet enrichi
@@ -198,6 +234,7 @@ async function enrichTimingWithRelativeTime(timing) {
     relative_time_ms: relativeTimeMs,
     crew_id: crewId,
     race_id: raceId,
+    ...segmentMetrics,
   };
 }
 
@@ -261,7 +298,7 @@ async function enrichAssignmentWithRelativeTime(assignment) {
   // Calculer le temps relatif
   const relativeTimeMs =
     timing && eventId
-      ? await calculateRelativeTime(timing, crewId, eventId)
+      ? await calculateRelativeTime(timing, crewId, eventId, raceId)
       : null;
 
   // Retourner l'objet enrichi
