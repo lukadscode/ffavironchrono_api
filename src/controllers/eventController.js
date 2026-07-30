@@ -34,6 +34,7 @@ exports.getEvents = async (req, res) => {
     const events = await Event.findAll({ order: [["start_date", "DESC"]] });
     res.json({ status: "success", data: events });
   } catch (err) {
+    logger.error({ err }, "Error listing events");
     res.status(500).json({ status: "error", message: err.message });
   }
 };
