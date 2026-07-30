@@ -134,10 +134,14 @@ app.use(
 
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: Number(process.env.RATE_LIMIT_PER_15M || 600),
+  // Backoffice chronométrage : beaucoup d’endpoints légers par page (catégories, courses…).
+  // Override via RATE_LIMIT_PER_15M. Défaut relevé car 600 était trop bas en prod réelle.
+  limit: Number(process.env.RATE_LIMIT_PER_15M || 5000),
   standardHeaders: "draft-8",
   legacyHeaders: false,
   skip: (req) => {
+    // Les preflight CORS ne doivent pas consommer le quota
+    if (req.method === "OPTIONS") return true;
     if (process.env.NODE_ENV === "production") return false;
     const ip = req.ip || req.socket?.remoteAddress || "";
     return (
