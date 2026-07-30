@@ -40,6 +40,19 @@ const logger = require("./utils/logger");
 require("dotenv").config();
 require("./models/relations");
 
+// Derrière Coolify / reverse proxy : nécessaire pour rate-limit + IP réelle
+const trustProxy = process.env.TRUST_PROXY;
+app.set(
+  "trust proxy",
+  trustProxy === "false" || trustProxy === "0"
+    ? false
+    : trustProxy
+      ? Number.isNaN(Number(trustProxy))
+        ? trustProxy
+        : Number(trustProxy)
+      : 1
+);
+
 // Logger HTTP structuré (avec request id)
 app.use(
   pinoHttp({
@@ -70,20 +83,35 @@ app.use(
 
 const corsOrigins = (process.env.CORS_ORIGINS || "")
   .split(",")
-  .map((s) => s.trim())
+  .map((s) => s.trim().replace(/\/$/, ""))
   .filter(Boolean);
+
+// Fallback utile si CORS_ORIGINS n'est pas renseigné (ex. FRONTEND_URL=https://timing.ffaviron.fr)
+if (corsOrigins.length === 0 && process.env.FRONTEND_URL) {
+  corsOrigins.push(String(process.env.FRONTEND_URL).trim().replace(/\/$/, ""));
+}
 
 app.use(
   cors({
     origin: (origin, cb) => {
       // Pas d'Origin (curl, mobile natif, server-to-server) : on autorise.
       if (!origin) return cb(null, true);
-      // Si pas de liste configurée, on refuse par défaut en prod.
+
+      const normalized = origin.replace(/\/$/, "");
+
+      // Dev local permissif si aucune liste configurée
       if (corsOrigins.length === 0) {
-        if (process.env.NODE_ENV === "production") return cb(new Error("CORS blocked"));
-        return cb(null, true); // dev local permissif
+        if (process.env.NODE_ENV === "production") {
+          logger.warn({ origin }, "CORS blocked: CORS_ORIGINS is empty in production");
+          return cb(new Error("CORS blocked"));
+        }
+        return cb(null, true);
       }
-      return cb(null, corsOrigins.includes(origin));
+
+      if (corsOrigins.includes(normalized)) return cb(null, true);
+
+      logger.warn({ origin: normalized, allowed: corsOrigins }, "CORS blocked: origin not in whitelist");
+      return cb(new Error("CORS blocked"));
     },
     credentials: true,
   })

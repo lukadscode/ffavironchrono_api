@@ -8,8 +8,12 @@ require("dotenv").config();
 
 const corsOrigins = (process.env.CORS_ORIGINS || "")
   .split(",")
-  .map((s) => s.trim())
+  .map((s) => s.trim().replace(/\/$/, ""))
   .filter(Boolean);
+
+if (corsOrigins.length === 0 && process.env.FRONTEND_URL) {
+  corsOrigins.push(String(process.env.FRONTEND_URL).trim().replace(/\/$/, ""));
+}
 
 const io = new Server(http, {
   cors: {
