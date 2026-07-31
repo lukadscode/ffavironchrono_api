@@ -413,7 +413,7 @@ function parseBaseFlatRows(workbook) {
   return { rows: out, errors };
 }
 
-async function importEnduranceMerBaseExcel(eventId, fileBuffer, options = {}) {
+async function importEnduranceMerFlatExcel(eventId, fileBuffer, options = {}) {
   const {
     event_format: inputFormat = "enduro",
     event_level: eventLevel = "championnat_france",
@@ -518,7 +518,11 @@ async function importEnduranceMerBaseExcel(eventId, fileBuffer, options = {}) {
         if (clubKey) {
           const next = (clubsCrewCount[clubKey] || 0) + 1;
           clubsCrewCount[clubKey] = next;
-          if (basePoints != null) {
+          // Cap 2 équipages / club : territorial uniquement (pas au CF)
+          if (
+            basePoints != null &&
+            String(eventLevel).toLowerCase() !== "championnat_france"
+          ) {
             finalPoints = next <= 2 ? basePoints : 0;
           }
         }
@@ -558,16 +562,22 @@ async function importEnduranceMerBaseExcel(eventId, fileBuffer, options = {}) {
 }
 
 async function importEnduranceMerExcel(eventId, fileBuffer, options = {}) {
-  const source = String(options.import_source || options.source || "time_team")
+  const source = String(options.import_source || options.source || "base")
     .toLowerCase()
     .trim();
-  if (source === "base" || source === "cdfadm" || source === "flat") {
-    return importEnduranceMerBaseExcel(eventId, fileBuffer, options);
+  // BASE = fichier FF historique (une feuille / épreuve)
+  // Time Team = export plat cdfadm (event_code / position / club_ref)
+  if (
+    source === "time_team" ||
+    source === "cdfadm" ||
+    source === "flat"
+  ) {
+    return importEnduranceMerFlatExcel(eventId, fileBuffer, options);
   }
-  return importEnduranceMerTimeTeamExcel(eventId, fileBuffer, options);
+  return importEnduranceMerSheetsExcel(eventId, fileBuffer, options);
 }
 
-async function importEnduranceMerTimeTeamExcel(eventId, fileBuffer, options = {}) {
+async function importEnduranceMerSheetsExcel(eventId, fileBuffer, options = {}) {
   const {
     event_format: inputFormat = "enduro",
     event_level: eventLevel = "territorial",
@@ -708,10 +718,12 @@ async function importEnduranceMerTimeTeamExcel(eventId, fileBuffer, options = {}
           clubsCrewCount[code1] = next1;
           clubsCrewCount[code2] = next2;
 
+          const isCf =
+            String(eventLevel).toLowerCase() === "championnat_france";
           const p1 =
-            next1 <= 2 ? round2(Number(basePoints) * r1) : 0;
+            isCf || next1 <= 2 ? round2(Number(basePoints) * r1) : 0;
           const p2 =
-            next2 <= 2 ? round2(Number(basePoints) * r2) : 0;
+            isCf || next2 <= 2 ? round2(Number(basePoints) * r2) : 0;
 
           await insertRow({
             eventId,
@@ -754,7 +766,11 @@ async function importEnduranceMerTimeTeamExcel(eventId, fileBuffer, options = {}
         if (clubKey) {
           const next = (clubsCrewCount[clubKey] || 0) + 1;
           clubsCrewCount[clubKey] = next;
-          if (basePoints != null) {
+          // Cap 2 équipages / club : territorial uniquement (pas au CF)
+          if (
+            basePoints != null &&
+            String(eventLevel).toLowerCase() !== "championnat_france"
+          ) {
             finalPoints = next <= 2 ? basePoints : 0;
           }
         }

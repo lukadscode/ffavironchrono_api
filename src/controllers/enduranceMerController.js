@@ -30,7 +30,7 @@ async function importResults(req, res) {
     const importSource = (
       req.body.import_source ||
       req.body.source ||
-      "time_team"
+      "base"
     ).toLowerCase();
     const replacePrevious =
       req.body.replace_previous === "true" ||

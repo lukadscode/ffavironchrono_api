@@ -177,8 +177,8 @@ function calculatePointsFromConfig({ config, eventFormat, eventLevel, epreuveCod
     const table = config?.championnat_france?.table || CHAMP_FRANCE_TABLE;
     const bruts = getPointsByColumn(table, col, place, 20);
     if (bruts == null) return null;
-    // Règle 2026 §4.1 : même pondération < 7 partants (75 %) qu'ENDURO / BRS (absente avant pour le CF).
-    return applyPonderationFromConfig(config, bruts, partantsCount);
+    // National : barème brut, sans pondération < 7 partants
+    return bruts;
   }
 
   if (fmt === "enduro") {
