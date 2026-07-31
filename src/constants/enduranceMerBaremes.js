@@ -227,4 +227,5 @@ module.exports = {
   calculatePointsFromConfig,
   applyPonderationFromConfig,
   inferBRSGroup,
+  normalizeCode,
 };

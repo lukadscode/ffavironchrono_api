@@ -27,6 +27,11 @@ async function importResults(req, res) {
 
     const eventFormat = (req.body.event_format || "enduro").toLowerCase();
     const eventLevel = (req.body.event_level || "territorial").toLowerCase();
+    const importSource = (
+      req.body.import_source ||
+      req.body.source ||
+      "time_team"
+    ).toLowerCase();
     const replacePrevious =
       req.body.replace_previous === "true" ||
       req.body.replace_previous === true;
@@ -34,6 +39,7 @@ async function importResults(req, res) {
     const result = await importEnduranceMerExcel(eventId, req.file.buffer, {
       event_format: eventFormat,
       event_level: eventLevel,
+      import_source: importSource,
       replace_previous: replacePrevious,
     });
 

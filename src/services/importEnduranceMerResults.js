@@ -9,6 +9,7 @@ const {
   DEFAULT_ENDURANCE_MER_TEMPLATE_CONFIG,
   calculatePointsFromConfig,
   inferBRSGroup,
+  normalizeCode,
 } = require("../constants/enduranceMerBaremes");
 const {
   resolveClubCode,
@@ -63,9 +64,28 @@ function normalizeInlineMixedSlashes(s) {
     .replace(/\u00A0/g, " ");
 }
 
+/**
+ * Certains fichiers FF (ex. CLAOUEY) ont un !ref gonflé jusqu’à la col. AMJ (1024)
+ * sans aucune donnée réelle → sheet_to_json alloue des millions de cellules vides.
+ */
+function clampSheetUsedRange(sheet, maxCol = 16) {
+  if (!sheet || !sheet["!ref"]) return sheet;
+  try {
+    const range = XLSX.utils.decode_range(sheet["!ref"]);
+    if (range.e.c > maxCol) {
+      range.e.c = maxCol;
+      sheet["!ref"] = XLSX.utils.encode_range(range);
+    }
+  } catch (_) {
+    /* ignore */
+  }
+  return sheet;
+}
+
 function getSheetRows(workbook, sheetName) {
   const sheet = workbook.Sheets[sheetName];
   if (!sheet) return [];
+  clampSheetUsedRange(sheet);
   return XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
 }
 
@@ -233,7 +253,7 @@ async function insertRow(payload) {
     id: uuidv4(),
     event_id: payload.eventId,
     epreuve_code: truncateStr(payload.sheetName, MAX_EPREUVE_CODE_LEN),
-    epreuve_libelle: null,
+    epreuve_libelle: truncateStr(payload.epreuveLibelle, 255) || null,
     place: payload.place,
     club_code:
       payload.clubCode != null && String(payload.clubCode).trim() !== ""
@@ -241,8 +261,8 @@ async function insertRow(payload) {
         : null,
     club_name: truncateStr(payload.clubName, MAX_CLUB_NAME_LEN) || null,
     crew_name: truncateStr(payload.crewName, MAX_CREW_NAME_LEN) || null,
-    time_raw: null,
-    time_seconds: null,
+    time_raw: truncateStr(payload.timeRaw, 50) || null,
+    time_seconds: payload.timeSeconds ?? null,
     is_mixed_clubs: !!payload.isMixedClubs,
     club_codes_mixed: truncateStr(
       payload.clubCodesMixed,
@@ -256,7 +276,298 @@ async function insertRow(payload) {
   });
 }
 
+/**
+ * Codes épreuve export BASE (cdfadm) → code feuille Time Team / barème.
+ * Ex. "SM4+ 50%H/F" → "SM4+", "SM2x AP 50%H/F" → "SM2X", "M40H1x" → "M40H1X"
+ */
+function normalizeBaseEpreuveCode(raw) {
+  let s = String(raw || "").trim();
+  if (!s) return "";
+  s = s.replace(/\s+AP\b/gi, "");
+  s = s.replace(/\s*50%\s*H\s*\/\s*F.*$/i, "");
+  s = s.replace(/\s+/g, "");
+  return normalizeCode(s);
+}
+
+function findHeaderIndex(rows, names) {
+  const targets = names.map((n) => String(n).toLowerCase());
+  for (let i = 0; i < Math.min(rows.length, 5); i++) {
+    const row = rows[i];
+    if (!row || !Array.isArray(row)) continue;
+    const cells = row.map((c) => String(c ?? "").trim().toLowerCase());
+    if (targets.every((t) => cells.some((c) => c === t || c.includes(t)))) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+function colIndexByHeader(headerRow, candidates) {
+  const cells = (headerRow || []).map((c) => String(c ?? "").trim().toLowerCase());
+  for (const cand of candidates) {
+    const idx = cells.findIndex((c) => c === cand || c.startsWith(cand));
+    if (idx >= 0) return idx;
+  }
+  return -1;
+}
+
+/**
+ * Parse un export « BASE » (une ligne = un équipage, colonnes event_code / result / position / club_ref).
+ */
+function parseBaseFlatRows(workbook) {
+  const sheetName = (workbook.SheetNames || [])[0];
+  if (!sheetName) return { rows: [], errors: ["Aucune feuille dans le fichier"] };
+
+  const sheet = workbook.Sheets[sheetName];
+  clampSheetUsedRange(sheet, 60);
+  const aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: false });
+  if (!aoa.length) return { rows: [], errors: ["Feuille vide"] };
+
+  const headerIdx = findHeaderIndex(aoa, ["event_code", "position"]);
+  const header = headerIdx >= 0 ? aoa[headerIdx] : aoa[0];
+  const dataStart = headerIdx >= 0 ? headerIdx + 1 : 1;
+
+  const idxEvent =
+    colIndexByHeader(header, ["event_code"]) >= 0
+      ? colIndexByHeader(header, ["event_code"])
+      : 3;
+  const idxEventName =
+    colIndexByHeader(header, ["event_name"]) >= 0
+      ? colIndexByHeader(header, ["event_name"])
+      : 4;
+  const idxResult =
+    colIndexByHeader(header, ["result"]) >= 0
+      ? colIndexByHeader(header, ["result"])
+      : 6;
+  const idxPosition =
+    colIndexByHeader(header, ["position"]) >= 0
+      ? colIndexByHeader(header, ["position"])
+      : 7;
+  const idxStatus =
+    colIndexByHeader(header, ["status"]) >= 0
+      ? colIndexByHeader(header, ["status"])
+      : 8;
+  const idxEntry =
+    colIndexByHeader(header, ["entry_name"]) >= 0
+      ? colIndexByHeader(header, ["entry_name"])
+      : 1;
+  const idxClub1 =
+    colIndexByHeader(header, ["club_ref rower 1", "club_ref"]) >= 0
+      ? colIndexByHeader(header, ["club_ref rower 1", "club_ref"])
+      : 12;
+
+  const clubColIndexes = (header || [])
+    .map((h, i) => [i, String(h ?? "").trim().toLowerCase()])
+    .filter(([, h]) => h.startsWith("club_ref"))
+    .map(([i]) => i);
+  if (clubColIndexes.length === 0 && idxClub1 >= 0) clubColIndexes.push(idxClub1);
+
+  const out = [];
+  const errors = [];
+
+  for (let i = dataStart; i < aoa.length; i++) {
+    const row = aoa[i];
+    if (!row || !Array.isArray(row)) continue;
+
+    const eventRaw = getCellString(row[idxEvent]);
+    if (!eventRaw) continue;
+
+    const epreuveCode = normalizeBaseEpreuveCode(eventRaw);
+    if (!epreuveCode) {
+      errors.push(`Ligne ${i + 1}: code épreuve invalide (${eventRaw})`);
+      continue;
+    }
+
+    const placeRaw = getCellString(row[idxPosition]);
+    let place = placeRaw != null ? parseInt(placeRaw, 10) : NaN;
+    // Si pas de position, on n'importe pas (DNS/DNF/exclu) — pas de points
+    if (Number.isNaN(place) || place < 1) continue;
+
+    const clubPrimary = getCellString(row[idxClub1]);
+    const allClubs = clubColIndexes
+      .map((ci) => getCellString(row[ci]))
+      .filter(Boolean)
+      .map((c) => String(c).trim().toUpperCase());
+    const uniqueClubs = [...new Set(allClubs)];
+    const isMixed = uniqueClubs.length > 1;
+
+    if (!clubPrimary && uniqueClubs.length === 0) {
+      errors.push(`Ligne ${i + 1} (${epreuveCode} #${place}): club manquant`);
+      continue;
+    }
+
+    out.push({
+      epreuve_code: epreuveCode,
+      epreuve_libelle: getCellString(row[idxEventName]),
+      place,
+      club_code: clubPrimary || uniqueClubs[0] || null,
+      club_name: getCellString(row[idxEntry]),
+      crew_name: getCellString(row[idxEntry]),
+      time_raw: getCellString(row[idxResult]),
+      status: getCellString(row[idxStatus]),
+      is_mixed: isMixed,
+      club_codes_mixed: isMixed ? uniqueClubs.join(",") : null,
+    });
+  }
+
+  return { rows: out, errors };
+}
+
+async function importEnduranceMerBaseExcel(eventId, fileBuffer, options = {}) {
+  const {
+    event_format: inputFormat = "enduro",
+    event_level: eventLevel = "championnat_france",
+    replace_previous: replacePrevious = false,
+  } = options;
+  const eventFormat = String(inputFormat || "enduro").toLowerCase();
+  const errors = [];
+  let inserted = 0;
+
+  const event = await Event.findByPk(eventId);
+  if (!event) throw new Error("Evenement introuvable");
+
+  let workbook;
+  try {
+    workbook = XLSX.read(fileBuffer, { type: "buffer" });
+  } catch (e) {
+    throw new Error(
+      "Fichier Excel invalide : " + (e.message || "erreur de lecture"),
+    );
+  }
+
+  const parsed = parseBaseFlatRows(workbook);
+  errors.push(...parsed.errors);
+  if (parsed.rows.length === 0) {
+    throw new Error(
+      "Aucune ligne exploitable (colonnes event_code / position / club_ref attendues).",
+    );
+  }
+
+  if (replacePrevious)
+    await EnduranceMerImportResult.destroy({ where: { event_id: eventId } });
+
+  const scoringConfig = await getEnduranceMerScoringConfig();
+  const importBatchId = uuidv4();
+  const clubsByCode = await loadClubLookupMaps();
+
+  const byEpreuve = new Map();
+  for (const row of parsed.rows) {
+    if (!byEpreuve.has(row.epreuve_code)) byEpreuve.set(row.epreuve_code, []);
+    byEpreuve.get(row.epreuve_code).push(row);
+  }
+
+  const epreuves = [...byEpreuve.keys()].sort();
+
+  const resolveCode = async (rawCode, rawName) => {
+    if (!rawCode || String(rawCode).trim() === "") {
+      return { code: null, name: rawName || null };
+    }
+    const resolved = await resolveClubCode(rawCode, { clubsByCode });
+    return {
+      code: resolved.code,
+      name: (rawName && String(rawName).trim()) || resolved.name || null,
+    };
+  };
+
+  for (const epreuveCode of epreuves) {
+    const dataRows = byEpreuve.get(epreuveCode);
+    dataRows.sort((a, b) => a.place - b.place);
+    const partantsCount = dataRows.length;
+    const clubsCrewCount = Object.create(null);
+
+    for (const row of dataRows) {
+      try {
+        const resolved = await resolveCode(row.club_code, row.club_name);
+        const basePoints = calculatePointsFromConfig({
+          config: scoringConfig,
+          eventFormat,
+          eventLevel,
+          epreuveCode,
+          place: row.place,
+          partantsCount,
+        });
+
+        // Mixte multi-clubs : 0 pt (même règle que Time Team hors U17 détaillé)
+        if (row.is_mixed) {
+          await insertRow({
+            eventId,
+            sheetName: epreuveCode,
+            epreuveLibelle: row.epreuve_libelle,
+            place: row.place,
+            clubCode: resolved.code || "MIXTE",
+            clubName: resolved.name,
+            crewName: row.crew_name,
+            timeRaw: row.time_raw,
+            isMixedClubs: true,
+            clubCodesMixed: row.club_codes_mixed,
+            points: 0,
+            eventFormat,
+            eventLevel,
+            partantsCount,
+            importBatchId,
+          });
+          inserted++;
+          continue;
+        }
+
+        const clubKey =
+          resolved.code ||
+          (resolved.name && String(resolved.name).trim()) ||
+          null;
+        let finalPoints = basePoints;
+        if (clubKey) {
+          const next = (clubsCrewCount[clubKey] || 0) + 1;
+          clubsCrewCount[clubKey] = next;
+          if (basePoints != null) {
+            finalPoints = next <= 2 ? basePoints : 0;
+          }
+        }
+
+        await insertRow({
+          eventId,
+          sheetName: epreuveCode,
+          epreuveLibelle: row.epreuve_libelle,
+          place: row.place,
+          clubCode: resolved.code,
+          clubName: resolved.name,
+          crewName: row.crew_name,
+          timeRaw: row.time_raw,
+          isMixedClubs: false,
+          clubCodesMixed: null,
+          points: finalPoints,
+          eventFormat,
+          eventLevel,
+          partantsCount,
+          importBatchId,
+        });
+        inserted++;
+      } catch (e) {
+        const sqlMsg =
+          e.original?.sqlMessage ||
+          e.parent?.sqlMessage ||
+          e.sqlMessage ||
+          null;
+        errors.push(
+          `${epreuveCode} place ${row.place}: ${sqlMsg || e.message || String(e)}`,
+        );
+      }
+    }
+  }
+
+  return { inserted, epreuves, errors };
+}
+
 async function importEnduranceMerExcel(eventId, fileBuffer, options = {}) {
+  const source = String(options.import_source || options.source || "time_team")
+    .toLowerCase()
+    .trim();
+  if (source === "base" || source === "cdfadm" || source === "flat") {
+    return importEnduranceMerBaseExcel(eventId, fileBuffer, options);
+  }
+  return importEnduranceMerTimeTeamExcel(eventId, fileBuffer, options);
+}
+
+async function importEnduranceMerTimeTeamExcel(eventId, fileBuffer, options = {}) {
   const {
     event_format: inputFormat = "enduro",
     event_level: eventLevel = "territorial",
