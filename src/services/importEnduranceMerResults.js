@@ -937,19 +937,33 @@ function getIncludedEventFromImportRow(row) {
 }
 
 /**
- * Filtre saison mer aligné indoor :
- * - `2026` seul → fenêtre calendaire sur `events.start_date` (rétrocompat).
- * - `2025-2026` ou toute autre chaîne → `events.season = valeur` (même champ que l’indoor).
+ * Filtre saison mer :
+ * - `2026` (4 chiffres) → saison sportive du 01/09/(N-1) au 31/08/N
+ *   (ex. 2026 = 01/09/2025 inclus → 01/09/2026 exclu), via `events.start_date`.
+ * - `2025-2026` ou autre chaîne → `events.season = valeur` (comme l’indoor).
  */
 function merSeasonEventWhereClause(season) {
   const s = String(season ?? "").trim();
   if (/^\d{4}$/.test(s)) {
     const y = parseInt(s, 10);
-    const start = new Date(`${y}-01-01T00:00:00.000Z`);
-    const end = new Date(`${y + 1}-01-01T00:00:00.000Z`);
+    // Saison N : 1er sept. année N-1 → fin août année N
+    const start = new Date(Date.UTC(y - 1, 8, 1, 0, 0, 0, 0)); // 01/09/(N-1)
+    const end = new Date(Date.UTC(y, 8, 1, 0, 0, 0, 0)); // 01/09/N (exclu)
     return {
-      mode: "calendar_year",
-      where: { start_date: { [Op.gte]: start, [Op.lt]: end } },
+      mode: "sporting_season",
+      where: {
+        [Op.or]: [
+          { start_date: { [Op.gte]: start, [Op.lt]: end } },
+          // Événements tagués explicitement sur la saison (si dates absentes / hors plage)
+          { season: s },
+          { season: `${y - 1}-${y}` },
+        ],
+      },
+      range: {
+        from: `${y - 1}-09-01`,
+        to_exclusive: `${y}-09-01`,
+        label: `01/09/${y - 1} → 31/08/${y}`,
+      },
     };
   }
   return { mode: "event_season", where: { season: s } };
@@ -1245,9 +1259,12 @@ async function getMerClubsDashboard({
     season_filter: {
       mode: seasonMeta.mode,
       description:
-        seasonMeta.mode === "calendar_year"
-          ? "Événements dont start_date tombe dans l’année calendaire indiquée."
-          : "Événements dont le champ events.season correspond exactement au paramètre (ex. 2025-2026).",
+        seasonMeta.mode === "sporting_season"
+          ? `Événements dont start_date tombe dans la saison sportive ${seasonMeta.range?.label || ""} (ou events.season = ${season} / ${Number(season) - 1}-${season}).`
+          : seasonMeta.mode === "calendar_year"
+            ? "Événements dont start_date tombe dans l’année calendaire indiquée."
+            : "Événements dont le champ events.season correspond exactement au paramètre (ex. 2025-2026).",
+      ...(seasonMeta.range ? { range: seasonMeta.range } : {}),
     },
     rules_summary: {
       enduro_territorial:
