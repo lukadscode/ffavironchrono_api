@@ -65,21 +65,55 @@ function normalizeInlineMixedSlashes(s) {
 }
 
 /**
- * Certains fichiers FF (ex. CLAOUEY) ont un !ref gonflé jusqu’à la col. AMJ (1024)
- * sans aucune donnée réelle → sheet_to_json alloue des millions de cellules vides.
+ * Certains fichiers FF ont un !ref gonflé (ex. A1:AMJ235 ou A1:Z1000)
+ * sans données réelles → sheet_to_json alloue des centaines de milliers de cellules.
+ * On recadre sur le contenu réellement non vide (plafonné).
  */
-function clampSheetUsedRange(sheet, maxCol = 16) {
+function clampSheetUsedRange(sheet, maxCol = 16, maxRow = 300) {
   if (!sheet || !sheet["!ref"]) return sheet;
   try {
-    const range = XLSX.utils.decode_range(sheet["!ref"]);
-    if (range.e.c > maxCol) {
-      range.e.c = maxCol;
-      sheet["!ref"] = XLSX.utils.encode_range(range);
+    let maxC = 0;
+    let maxR = 0;
+    let has = false;
+    for (const addr of Object.keys(sheet)) {
+      if (addr[0] === "!") continue;
+      const cell = sheet[addr];
+      if (cell == null || cell.v == null || cell.v === "") continue;
+      const m = XLSX.utils.decode_cell(addr);
+      has = true;
+      if (m.c > maxC) maxC = m.c;
+      if (m.r > maxR) maxR = m.r;
     }
+    if (has) {
+      sheet["!ref"] = XLSX.utils.encode_range({
+        s: { r: 0, c: 0 },
+        e: {
+          r: Math.min(maxR, maxRow),
+          c: Math.min(Math.max(maxC, 3), maxCol),
+        },
+      });
+      return sheet;
+    }
+    const range = XLSX.utils.decode_range(sheet["!ref"]);
+    if (range.e.c > maxCol) range.e.c = maxCol;
+    if (range.e.r > maxRow) range.e.r = maxRow;
+    sheet["!ref"] = XLSX.utils.encode_range(range);
   } catch (_) {
     /* ignore */
   }
   return sheet;
+}
+
+function cleanWorkbookInflatedRanges(workbook) {
+  let trimmed = 0;
+  for (const name of workbook.SheetNames || []) {
+    const sheet = workbook.Sheets[name];
+    if (!sheet) continue;
+    const before = sheet["!ref"];
+    clampSheetUsedRange(sheet);
+    if (before !== sheet["!ref"]) trimmed += 1;
+  }
+  return trimmed;
 }
 
 function getSheetRows(workbook, sheetName) {
@@ -434,6 +468,7 @@ async function importEnduranceMerFlatExcel(eventId, fileBuffer, options = {}) {
       "Fichier Excel invalide : " + (e.message || "erreur de lecture"),
     );
   }
+  cleanWorkbookInflatedRanges(workbook);
 
   const parsed = parseBaseFlatRows(workbook);
   errors.push(...parsed.errors);
@@ -599,6 +634,7 @@ async function importEnduranceMerSheetsExcel(eventId, fileBuffer, options = {}) 
       "Fichier Excel invalide : " + (e.message || "erreur de lecture"),
     );
   }
+  cleanWorkbookInflatedRanges(workbook);
 
   const sheetNames = (workbook.SheetNames || []).filter(
     (n) => n !== SHEET_ORGANISATEUR,
