@@ -189,10 +189,54 @@ async function loadClubLookupMaps() {
   return byCode;
 }
 
+/**
+ * Remplace `club_name` par le nom officiel du registre `clubs` (nom_court || nom)
+ * quand `club_code` matche. Conserve le libellé d'origine sinon.
+ *
+ * @param {Array<{ club_code?: string|null, club_name?: string|null }>} items
+ * @param {Map|null} clubsByCode - cache optionnel (loadClubLookupMaps)
+ */
+async function applyOfficialClubNames(items, clubsByCode = null) {
+  if (!Array.isArray(items) || items.length === 0) return items || [];
+  const map = clubsByCode || (await loadClubLookupMaps());
+
+  const out = [];
+  for (const row of items) {
+    if (!row || row.club_code == null || String(row.club_code).trim() === "") {
+      out.push(row);
+      continue;
+    }
+    const resolved = await resolveClubCode(row.club_code, { clubsByCode: map });
+    if (!resolved?.matched || !resolved.code) {
+      out.push(row);
+      continue;
+    }
+    // Affichage classement : nom officiel complet du registre (fallback nom_court)
+    const hit =
+      map.get(String(resolved.code).toUpperCase()) ||
+      null;
+    const officialName =
+      (hit && (hit.nom || hit.nom_court)) || resolved.name || null;
+    if (!officialName) {
+      out.push(row);
+      continue;
+    }
+    out.push({
+      ...row,
+      club_code: resolved.code || row.club_code,
+      club_name: officialName,
+      club_name_source: "registry",
+      club_name_import: row.club_name ?? null,
+    });
+  }
+  return out;
+}
+
 module.exports = {
   canonicalizeClubCode,
   clubCodeSearchVariants,
   resolveClubCode,
   loadClubLookupMaps,
+  applyOfficialClubNames,
   extractDigits,
 };

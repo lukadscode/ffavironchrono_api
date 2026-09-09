@@ -14,6 +14,7 @@ const {
 const {
   resolveClubCode,
   loadClubLookupMaps,
+  applyOfficialClubNames,
 } = require("../utils/clubCodeUtils");
 
 const SHEET_ORGANISATEUR = "Organisateur";
@@ -955,7 +956,7 @@ async function getEnduranceMerRankingForEvent(eventId) {
     ],
   });
   const agg = aggregateEventRows(rows);
-  return Array.from(agg.values())
+  const rankings = Array.from(agg.values())
     .sort((a, b) => b.total - a.total)
     .map((r, i) => ({
       club_code: r.club_code,
@@ -963,6 +964,7 @@ async function getEnduranceMerRankingForEvent(eventId) {
       total_points: r.total,
       rank: i + 1,
     }));
+  return applyOfficialClubNames(rankings);
 }
 
 function getIncludedEventFromImportRow(row) {
@@ -1272,8 +1274,10 @@ async function getMerClubsDashboard({
         });
 
   const byEventPayload = [];
+  const clubsByCode = await loadClubLookupMaps();
   for (const ev of eventsOrdered) {
-    const rankings = await getEnduranceMerRankingForEvent(ev.id);
+    // getEnduranceMerRankingForEvent applique déjà le registre ; on passe le cache via enrichissement local
+    const rankingsRaw = await getEnduranceMerRankingForEvent(ev.id);
     byEventPayload.push({
       event: {
         id: ev.id,
@@ -1284,11 +1288,16 @@ async function getMerClubsDashboard({
         race_type: ev.race_type,
         season: ev.season,
       },
-      rankings,
+      rankings: rankingsRaw,
     });
   }
 
   const seasonMeta = merSeasonEventWhereClause(season);
+  const globalRankings = await applyOfficialClubNames(
+    finalizeMerGlobalRankingRows(perClub),
+    clubsByCode,
+  );
+
   return {
     type: "mer",
     season: String(season),
@@ -1316,7 +1325,7 @@ async function getMerClubsDashboard({
     },
     byEvent: byEventPayload,
     global: {
-      rankings: finalizeMerGlobalRankingRows(perClub),
+      rankings: globalRankings,
     },
   };
 }

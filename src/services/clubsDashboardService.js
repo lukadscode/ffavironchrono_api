@@ -1,5 +1,9 @@
 const rankingService = require("./rankingService");
 const { getMerClubsDashboard } = require("./importEnduranceMerResults");
+const {
+  applyOfficialClubNames,
+  loadClubLookupMaps,
+} = require("../utils/clubCodeUtils");
 
 function enrichIndoorRankingsWithContributions(rankings) {
   if (!Array.isArray(rankings)) return [];
@@ -50,18 +54,33 @@ async function getClubsDashboard(opts) {
   }
 
   if (type === "indoor") {
-    const [byEvent, globalRaw] = await Promise.all([
+    const [byEvent, globalRaw, clubsByCode] = await Promise.all([
       rankingService.getIndoorEventsWithClubRankingsForSeason(season),
       rankingService.getSeasonIndoorClubRanking(season),
+      loadClubLookupMaps(),
     ]);
+    const globalRankings = await applyOfficialClubNames(
+      enrichIndoorRankingsWithContributions(globalRaw.rankings),
+      clubsByCode,
+    );
+    const byEventWithNames = [];
+    for (const item of byEvent || []) {
+      byEventWithNames.push({
+        ...item,
+        rankings: await applyOfficialClubNames(
+          item.rankings || [],
+          clubsByCode,
+        ),
+      });
+    }
     return {
       type: "indoor",
       season: globalRaw.season,
       rules_summary: globalRaw.rules_summary,
       defis_capitaux_template: globalRaw.defis_capitaux_template,
-      byEvent,
+      byEvent: byEventWithNames,
       global: {
-        rankings: enrichIndoorRankingsWithContributions(globalRaw.rankings),
+        rankings: globalRankings,
       },
     };
   }
