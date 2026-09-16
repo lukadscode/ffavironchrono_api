@@ -882,6 +882,8 @@ async function getClubRankingsByEventType(eventType, rankingType = "indoor_point
  */
 async function getSeasonIndoorClubRanking(season) {
   const Event = require("../models/Event");
+  const DefisCapitauxSeasonRanking = require("../models/DefisCapitauxSeasonRanking");
+  const { canonicalizeClubCode, clubCodeSearchVariants } = require("../utils/clubCodeUtils");
 
   if (!season || String(season).trim() === "") {
     throw new Error("Paramètre season requis");
@@ -897,11 +899,25 @@ async function getSeasonIndoorClubRanking(season) {
 
   const defisTemplate = await getDefisCapitauxTemplateOrNull();
   const defisTopN = getDefisCapitauxSeasonTopN(defisTemplate);
+  const seasonKey = String(season).trim();
 
   const events = await Event.findAll({
-    where: { season: String(season).trim() },
+    where: { season: seasonKey },
     order: [["start_date", "ASC"]],
   });
+  let importedDefisRows = [];
+  try {
+    importedDefisRows = await DefisCapitauxSeasonRanking.findAll({
+      where: { season: seasonKey },
+      order: [["imported_rank", "ASC"]],
+    });
+  } catch (e) {
+    const msg = String(e?.message || e?.original?.message || "");
+    if (!/no such table|doesn't exist|ER_NO_SUCH_TABLE|Unknown table/i.test(msg)) {
+      throw e;
+    }
+  }
+  const useImportedDefis = importedDefisRows.length > 0;
 
   const agg = new Map();
 
@@ -915,15 +931,44 @@ async function getSeasonIndoorClubRanking(season) {
         bestStandardEventName: null,
         championnatFrance: 0,
         defisScores: [],
+        defisImported: 0,
       });
     }
     return agg.get(clubKey);
+  }
+
+  function findAggKey(club_code, club_name) {
+    const variants = clubCodeSearchVariants(club_code);
+    for (const v of variants) {
+      if (agg.has(v)) return v;
+      const upper = String(v).toUpperCase();
+      if (agg.has(upper)) return upper;
+    }
+    const canon = canonicalizeClubCode(club_code);
+    if (canon) {
+      for (const [k, e] of agg) {
+        if (canonicalizeClubCode(e.club_code) === canon) return k;
+      }
+    }
+    const name = String(club_name || "").trim().toLowerCase();
+    if (name) {
+      for (const [k, e] of agg) {
+        if (String(e.club_name || "").trim().toLowerCase() === name) return k;
+      }
+    }
+    return (
+      (canon && String(canon)) ||
+      String(club_code || club_name || "").trim()
+    );
   }
 
   for (const event of events) {
     const scope = normalizeIndoorRankingScope(event.indoor_ranking_scope);
 
     if (scope === INDOOR_SCOPE_DEFIS) {
+      if (useImportedDefis) {
+        continue;
+      }
       const defisMap = await computeDefisCapitauxClubPointsForEvent(
         event,
         scoringTemplate,
@@ -981,12 +1026,29 @@ async function getSeasonIndoorClubRanking(season) {
     }
   }
 
+  if (useImportedDefis) {
+    for (const row of importedDefisRows) {
+      const key = findAggKey(row.club_code, row.club_name);
+      const entry = ensureEntry(key, {
+        club_code: row.club_code,
+        club_name: row.club_name,
+      });
+      if (row.club_name) {
+        entry.club_name = row.club_name;
+      }
+      if (row.club_code) {
+        entry.club_code = row.club_code;
+      }
+      entry.defisImported = Number(row.points) || 0;
+    }
+  }
+
   const rankings = [...agg.values()]
     .map((e) => {
       const defisSorted = [...e.defisScores].sort((a, b) => b - a);
-      const defisCapitaux = defisSorted
-        .slice(0, defisTopN)
-        .reduce((s, x) => s + x, 0);
+      const defisCapitaux = useImportedDefis
+        ? Number(e.defisImported) || 0
+        : defisSorted.slice(0, defisTopN).reduce((s, x) => s + x, 0);
       const total = e.maxStandard + e.championnatFrance + defisCapitaux;
       return {
         club_code: e.club_code,
@@ -1003,8 +1065,11 @@ async function getSeasonIndoorClubRanking(season) {
               : null,
           championnat_france_indoor_points: e.championnatFrance,
           defis_capitaux_points: defisCapitaux,
-          defis_capitaux_events_count: e.defisScores.length,
-          defis_capitaux_top_n_applied: defisTopN,
+          defis_capitaux_source: useImportedDefis ? "import" : "events",
+          defis_capitaux_events_count: useImportedDefis
+            ? importedDefisRows.length
+            : e.defisScores.length,
+          defis_capitaux_top_n_applied: useImportedDefis ? null : defisTopN,
         },
       };
     })
@@ -1013,7 +1078,7 @@ async function getSeasonIndoorClubRanking(season) {
     .map((r, i) => ({ ...r, rank: i + 1 }));
 
   return {
-    season: String(season).trim(),
+    season: seasonKey,
     defis_capitaux_template: defisTemplate
       ? {
           id: defisTemplate.id,
@@ -1021,13 +1086,22 @@ async function getSeasonIndoorClubRanking(season) {
           nombre_defis_comptabilises: defisTopN,
         }
       : null,
+    defis_capitaux_import: useImportedDefis
+      ? {
+          source: "import_tableau_annuel",
+          imported_at: importedDefisRows[0].imported_at,
+          source_filename: importedDefisRows[0].source_filename,
+          rows_count: importedDefisRows.length,
+        }
+      : null,
     rules_summary: {
       standard:
         "Parmi les événements avec indoor_ranking_scope=standard (ou null), on retient le maximum des points obtenus sur un seul événement (barème Points Indoor).",
       championnat_france_indoor:
         "Somme des points sur tous les événements marqués championnat_france_indoor (barème Points Indoor).",
-      defi_capitaux:
-        "Pour chaque événement defi_capitaux : classement général du meeting = totaux clubs au barème Points Indoor, puis points du barème `classement_defis_capitaux` du template type defis_capitaux en BDD. Sur la saison : somme des N meilleurs scores défi (N = `nombre_defis_comptabilises` dans le template, défaut 7).",
+      defi_capitaux: useImportedDefis
+        ? "Points du classement annuel 7 défis capitaux importé (tableau final : rang → barème défis capitaux), ajoutés au total indoor."
+        : "Pour chaque événement defi_capitaux : classement général du meeting = totaux clubs au barème Points Indoor, puis points du barème `classement_defis_capitaux`. Sur la saison : somme des N meilleurs scores défi.",
     },
     rankings,
   };
@@ -1089,5 +1163,7 @@ module.exports = {
   getIndoorEventsWithClubRankingsForSeason,
   isCategoryExcludedFromIndoorClubRanking,
   assignIndoorByCategoryResultsPositionsAndClubPoints,
+  getDefisCapitauxTemplateOrNull,
+  getDefisCapitauxPointsForRank,
 };
 

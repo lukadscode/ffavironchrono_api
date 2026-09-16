@@ -9,8 +9,8 @@ paths:
       summary: Classement indoor des clubs agrégé par saison
       description: |
         Total par club = meilleur meeting `standard` (barème Points Indoor) + somme des événements
-        `championnat_france_indoor` + somme des N meilleurs scores `defi_capitaux` (template BDD).
-        Prérequis : champs `season` et `indoor_ranking_scope` sur les événements ; migration `012_add_event_season_indoor_ranking_scope.sql`.
+        `championnat_france_indoor` + points du classement annuel 7 défis capitaux (tableau Excel importé,
+        barème `classement_defis_capitaux`). Fallback historique : événements `defi_capitaux` si aucun import.
       security: [{ bearerAuth: [] }]
       parameters:
         - name: season
@@ -57,7 +57,7 @@ paths:
         Agrège pour la saison : liste des compétitions avec classement clubs, plus le classement général
         avec détail des points (contributions par compétition / règle).
         - `type=mer` : règlement mer (4 meilleurs enduro territoriaux + 1 BRS territorial + somme CF enduro + somme CF BRS + bonus).
-        - `type=indoor` : règlement indoor saison (meilleur standard + CF indoor + défis capitaux).
+        - `type=indoor` : règlement indoor saison (meilleur standard + CF indoor + 7 défis capitaux importés).
         - `type=riviere` : réservé (réponse vide / message) jusqu'à spécification.
       security: []
       parameters:
@@ -87,6 +87,101 @@ paths:
           description: type manquant ou invalide
         500:
           description: Erreur serveur
+
+  /rankings/indoor/defis-capitaux/preview:
+    post:
+      tags: [rankings]
+      summary: Prévisualise un tableau final 7 défis capitaux (Excel)
+      description: |
+        Parse le fichier (colonnes Rang, Code club, Club) et applique le barème
+        `classement_defis_capitaux` (rang → points) sans enregistrer.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                season:
+                  type: string
+      responses:
+        200:
+          description: Lignes avec points calculés
+        400:
+          description: Fichier invalide
+
+  /rankings/indoor/defis-capitaux/import:
+    post:
+      tags: [rankings]
+      summary: Enregistre le classement annuel 7 défis capitaux
+      description: |
+        Remplace l’import de la saison. Les points sont ensuite ajoutés au classement
+        indoor (`GET /rankings/clubs/dashboard?type=indoor`).
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [season, rows]
+              properties:
+                season:
+                  type: string
+                source_filename:
+                  type: string
+                rows:
+                  type: array
+                  items:
+                    type: object
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, season]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                season:
+                  type: string
+      responses:
+        201:
+          description: Import enregistré
+        400:
+          description: Paramètres manquants
+
+  /rankings/indoor/defis-capitaux:
+    get:
+      tags: [rankings]
+      summary: Classement 7 défis capitaux importé pour une saison
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: season
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Import courant (ou imported=false)
+    delete:
+      tags: [rankings]
+      summary: Supprime l’import 7 défis capitaux d’une saison
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: season
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Import supprimé
 
   /rankings/event/{event_id}/ranking:
     get:

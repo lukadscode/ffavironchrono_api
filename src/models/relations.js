@@ -19,6 +19,7 @@ const IndoorParticipantResult = require("./IndoorParticipantResult");
 const EventDistance = require("./EventDistance");
 const Club = require("./Club");
 const EnduranceMerImportResult = require("./EnduranceMerImportResult");
+require("./DefisCapitauxSeasonRanking");
 const TimingProfile = require("./TimingProfile");
 
 // Relations User

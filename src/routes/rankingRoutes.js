@@ -3,8 +3,20 @@ const router = express.Router();
 const controller = require("../controllers/rankingController");
 const auth = require("../middlewares/authMiddleware");
 const requireAdmin = require("../middlewares/requireAdmin");
+const requireCommission = require("../middlewares/requireCommission");
 const { requireEventRole, resolvers } = require("../middlewares/requireEventRole");
 const validate = require("../middlewares/validateSchema");
+const { createUploadMiddleware } = require("../middlewares/validateUpload");
+
+const uploadSpreadsheet = createUploadMiddleware();
+
+function optionalSpreadsheetUpload(req, res, next) {
+  const ct = String(req.headers["content-type"] || "");
+  if (ct.includes("multipart/form-data")) {
+    return uploadSpreadsheet(req, res, next);
+  }
+  return next();
+}
 
 // Routes pour les classements
 router.get("/clubs/dashboard", controller.getClubsDashboard);
@@ -54,6 +66,33 @@ router.post(
   requireAdmin,
   validate(require("../schemas/rankingSchema").createScoringTemplateSchema),
   controller.createScoringTemplate
+);
+
+router.get(
+  "/indoor/defis-capitaux",
+  auth,
+  requireCommission,
+  controller.getDefisCapitauxSeasonRanking
+);
+router.post(
+  "/indoor/defis-capitaux/preview",
+  auth,
+  requireCommission,
+  uploadSpreadsheet,
+  controller.previewDefisCapitauxImport
+);
+router.post(
+  "/indoor/defis-capitaux/import",
+  auth,
+  requireCommission,
+  optionalSpreadsheetUpload,
+  controller.importDefisCapitauxRanking
+);
+router.delete(
+  "/indoor/defis-capitaux",
+  auth,
+  requireCommission,
+  controller.deleteDefisCapitauxSeasonRanking
 );
 
 module.exports = router;

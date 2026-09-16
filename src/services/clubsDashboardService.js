@@ -27,9 +27,13 @@ function enrichIndoorRankingsWithContributions(rankings) {
       });
     }
     if (Number(b.defis_capitaux_points) > 0) {
+      const imported = b.defis_capitaux_source === "import";
       contributions.push({
         kind: "defis_capitaux",
-        rule: `top_${b.defis_capitaux_top_n_applied ?? "?"}_meilleurs_defis_saison`,
+        rule: imported
+          ? "import_tableau_annuel"
+          : `top_${b.defis_capitaux_top_n_applied ?? "?"}_meilleurs_defis_saison`,
+        event_name: imported ? "7 défis capitaux" : undefined,
         points: b.defis_capitaux_points,
         defis_events_rencontres: b.defis_capitaux_events_count,
       });
@@ -78,6 +82,7 @@ async function getClubsDashboard(opts) {
       season: globalRaw.season,
       rules_summary: globalRaw.rules_summary,
       defis_capitaux_template: globalRaw.defis_capitaux_template,
+      defis_capitaux_import: globalRaw.defis_capitaux_import || null,
       byEvent: byEventWithNames,
       global: {
         rankings: globalRankings,
