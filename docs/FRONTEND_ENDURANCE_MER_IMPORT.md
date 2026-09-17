@@ -75,6 +75,7 @@ Les bonus territoriaux (`endurance_mer_territorial_bonus`) utilisent la **même*
 ### Championnat de France
 
 - Bareme Championnats officiel (1x U19, 1x Senior, 2x U19, 2x Senior, 4x U17/U19, 4x Senior)
+- **BRS national — mixtes toutes catégories** : points répartis au prorata des rameurs (ex. 3+1 → 75%/25%, jusqu’à 4 clubs). Pas de contrainte 50/50.
 
 ### Classement global saison (club)
 

@@ -176,6 +176,99 @@ function parseInlineMixedCrewCell(cell) {
   return null;
 }
 
+function detectInlineMixedFromRow(clubCode, clubName) {
+  return parseInlineMixedCrewCell(clubCode) || parseInlineMixedCrewCell(clubName);
+}
+
+function isBrsChampionnatFrance(eventFormat, eventLevel) {
+  return (
+    String(eventFormat || "").toLowerCase() === "brs" &&
+    String(eventLevel || "").toLowerCase() === "championnat_france"
+  );
+}
+
+/**
+ * Regroupe les segments inline par club (ex. C078018(1)/C078018(1)/C094005(1)/C078018(1)
+ * → [{ code: C078018, count: 3 }, { code: C094005, count: 1 }]).
+ */
+function groupInlineMixedPartsByClub(parts) {
+  if (!Array.isArray(parts) || parts.length < 2) return [];
+  const map = new Map();
+  for (const p of parts) {
+    const code = String(p?.code || "").trim().toUpperCase();
+    const count = Number(p?.count) || 0;
+    if (!code || code === "MIXTE" || count <= 0) continue;
+    const prev = map.get(code) || { code, count: 0 };
+    prev.count += count;
+    map.set(code, prev);
+  }
+  return [...map.values()];
+}
+
+function canScoreBrsNationalMixed(eventFormat, eventLevel, grouped) {
+  return (
+    isBrsChampionnatFrance(eventFormat, eventLevel) &&
+    Array.isArray(grouped) &&
+    grouped.length >= 2 &&
+    grouped.every((g) => g.code && Number(g.count) > 0)
+  );
+}
+
+/** Ancienne règle : U17, 2 clubs, effectifs égaux (50/50). */
+function canScoreLegacyU17FiftyFifty(u17, grouped) {
+  if (!u17 || !Array.isArray(grouped) || grouped.length !== 2) return false;
+  const n1 = Number(grouped[0].count);
+  const n2 = Number(grouped[1].count);
+  return n1 > 0 && n1 === n2;
+}
+
+async function insertMixedClubShareRows({
+  grouped,
+  mixedCodes,
+  basePoints,
+  eventFormat,
+  eventLevel,
+  resolveCode,
+  clubsCrewCount,
+  eventId,
+  sheetName,
+  epreuveLibelle,
+  place,
+  partantsCount,
+  importBatchId,
+}) {
+  const totalCount = grouped.reduce((s, g) => s + Number(g.count), 0);
+  if (totalCount <= 0 || basePoints == null) return 0;
+  const applyCap =
+    String(eventLevel || "").toLowerCase() !== "championnat_france";
+  let inserted = 0;
+  for (const g of grouped) {
+    const resolved = await resolveCode(g.code, null);
+    const code = resolved.code;
+    const pts = round2(Number(basePoints) * (Number(g.count) / totalCount));
+    const next = (clubsCrewCount[code] || 0) + 1;
+    clubsCrewCount[code] = next;
+    const finalPts = applyCap && next > 2 ? 0 : pts;
+    await insertRow({
+      eventId,
+      sheetName,
+      epreuveLibelle,
+      place,
+      clubCode: code,
+      clubName: resolved.name,
+      isMixedClubs: true,
+      clubCodesMixed: mixedCodes,
+      points: finalPts,
+      eventFormat,
+      eventLevel,
+      partantsCount,
+      importBatchId,
+    });
+    inserted += 1;
+  }
+  return inserted;
+}
+
 function getDataRowsSimple(rows) {
   const out = [];
   for (let i = DATA_START_ROW_SIMPLE; i < rows.length; i++) {
@@ -187,7 +280,7 @@ function getDataRowsSimple(rows) {
     const clubCode2 = getCellString(row[3]);
     const clubName2 = getCellString(row[4]);
     if (Number.isNaN(place)) continue;
-    const inline = clubCode ? parseInlineMixedCrewCell(clubCode) : null;
+    const inline = detectInlineMixedFromRow(clubCode, clubName);
     if (inline) {
       out.push({
         place,
@@ -237,7 +330,7 @@ function getDataRowsU17(rows) {
     const nb1 = row[5] != null ? parseInt(row[5], 10) : null;
     const nb2 = row[6] != null ? parseInt(row[6], 10) : null;
     if (Number.isNaN(place)) continue;
-    const inline = clubCode ? parseInlineMixedCrewCell(clubCode) : null;
+    const inline = detectInlineMixedFromRow(clubCode, clubName);
     if (inline) {
       out.push({
         place,
@@ -456,6 +549,9 @@ function parseBaseFlatRows(workbook) {
       status: getCellString(row[idxStatus]),
       is_mixed: isMixed,
       club_codes_mixed: isMixed ? uniqueClubs.join(",") : null,
+      mixed_parts: isMixed
+        ? allClubs.map((code) => ({ code, count: 1 }))
+        : null,
     });
   }
 
@@ -537,8 +633,32 @@ async function importEnduranceMerFlatExcel(eventId, fileBuffer, options = {}) {
           partantsCount,
         });
 
-        // Mixte multi-clubs : 0 pt (même règle que Time Team hors U17 détaillé)
+        // Mixte multi-clubs : BRS national = prorata rameurs ; sinon 0 pt
         if (row.is_mixed) {
+          const grouped = groupInlineMixedPartsByClub(row.mixed_parts);
+          const scoreBrs = canScoreBrsNationalMixed(
+            eventFormat,
+            eventLevel,
+            grouped
+          );
+          if (scoreBrs && basePoints != null) {
+            inserted += await insertMixedClubShareRows({
+              grouped,
+              mixedCodes: row.club_codes_mixed,
+              basePoints,
+              eventFormat,
+              eventLevel,
+              resolveCode,
+              clubsCrewCount,
+              eventId,
+              sheetName: epreuveCode,
+              epreuveLibelle: row.epreuve_libelle,
+              place: row.place,
+              partantsCount,
+              importBatchId,
+            });
+            continue;
+          }
           await insertRow({
             eventId,
             sheetName: epreuveCode,
@@ -705,21 +825,18 @@ async function importEnduranceMerSheetsExcel(eventId, fileBuffer, options = {}) 
           partantsCount,
         });
 
-        // Mixte inline : C030011(1)/C030014(1) ou (2)/(2) — U17 + 50/50 uniquement
+        // Mixte inline : C078018(1)/C078018(1)/C094005(1)/C078018(1)
+        // BRS national : toutes catégories, prorata rameurs, 2 à 4 clubs.
+        // Hors BRS CF : ancienne règle U17 50/50 (2 clubs, effectifs égaux).
         if (row.inline_mixed) {
-          const parts = row.inline_mixed_parts;
-          const n1 = Array.isArray(parts) ? Number(parts[0]?.count) || 0 : 0;
-          const n2 = Array.isArray(parts) ? Number(parts[1]?.count) || 0 : 0;
-          const isFiftyFifty = n1 > 0 && n1 === n2;
-          const canScoreInline =
-            u17 &&
-            Array.isArray(parts) &&
-            parts.length === 2 &&
-            parts.every((p) => p.code && Number(p.count) > 0) &&
-            isFiftyFifty &&
-            basePoints != null;
-
-          if (!canScoreInline) {
+          const grouped = groupInlineMixedPartsByClub(row.inline_mixed_parts);
+          const scoreBrs = canScoreBrsNationalMixed(
+            eventFormat,
+            eventLevel,
+            grouped
+          );
+          const scoreU17 = canScoreLegacyU17FiftyFifty(u17, grouped);
+          if ((!scoreBrs && !scoreU17) || basePoints == null) {
             await insertRow({
               eventId,
               sheetName: epreuveLabel,
@@ -739,79 +856,60 @@ async function importEnduranceMerSheetsExcel(eventId, fileBuffer, options = {}) 
             continue;
           }
 
-          const resolved1 = await resolveCode(parts[0].code, null);
-          const resolved2 = await resolveCode(parts[1].code, null);
-          const code1 = resolved1.code;
-          const code2 = resolved2.code;
-          const name1 = resolved1.name;
-          const name2 = resolved2.name;
-          const mixedCodes = row.inline_mixed_raw;
-
-          const next1 = (clubsCrewCount[code1] || 0) + 1;
-          const next2 = (clubsCrewCount[code2] || 0) + 1;
-          clubsCrewCount[code1] = next1;
-          clubsCrewCount[code2] = next2;
-
-          const isCf =
-            String(eventLevel).toLowerCase() === "championnat_france";
-          const half = round2(Number(basePoints) * 0.5);
-          const p1 = isCf || next1 <= 2 ? half : 0;
-          const p2 = isCf || next2 <= 2 ? half : 0;
-
-          await insertRow({
+          inserted += await insertMixedClubShareRows({
+            grouped,
+            mixedCodes: row.inline_mixed_raw,
+            basePoints,
+            eventFormat,
+            eventLevel,
+            resolveCode,
+            clubsCrewCount,
             eventId,
             sheetName: epreuveLabel,
             place: row.place,
-            clubCode: code1,
-            clubName: name1,
-            isMixedClubs: true,
-            clubCodesMixed: mixedCodes,
-            points: p1,
-            eventFormat,
-            eventLevel,
             partantsCount,
             importBatchId,
           });
-          await insertRow({
-            eventId,
-            sheetName: epreuveLabel,
-            place: row.place,
-            clubCode: code2,
-            clubName: name2,
-            isMixedClubs: true,
-            clubCodesMixed: mixedCodes,
-            points: p2,
-            eventFormat,
-            eventLevel,
-            partantsCount,
-            importBatchId,
-          });
-          inserted += 2;
           continue;
         }
 
-        // Mixte colonnes (Club1 / Club2) : U17 + 2 clubs + 50/50 uniquement
+        // Mixte colonnes (Club1 / Club2) : mêmes règles que l’inline
         if (row.is_mixed) {
           const resolved1 = await resolveCode(row.club_code, row.club_name);
           const resolved2 = await resolveCode(row.club_code_2, row.club_name_2);
           const code1 = resolved1.code;
           const code2 = resolved2.code;
           const name1 = resolved1.name;
-          const name2 = resolved2.name;
           const mixedCodes = [code1, code2].filter(Boolean).join(",");
 
           const isTwoClubs = !!(
             code1 &&
             code2 &&
-            String(code1).toUpperCase() !== "MIXTE"
+            String(code1).toUpperCase() !== "MIXTE" &&
+            String(code2).toUpperCase() !== "MIXTE"
           );
           const n1 = row.nb_club1;
           const n2 = row.nb_club2;
           const hasCounts =
-            n1 != null && n2 != null && !Number.isNaN(Number(n1)) && !Number.isNaN(Number(n2));
-          // Sans effectifs → 50/50 implicite ; avec effectifs → uniquement si égaux
-          const isFiftyFifty = !hasCounts || (Number(n1) > 0 && Number(n1) === Number(n2));
-          if (!u17 || !isTwoClubs || !isFiftyFifty || basePoints == null) {
+            n1 != null &&
+            n2 != null &&
+            !Number.isNaN(Number(n1)) &&
+            !Number.isNaN(Number(n2)) &&
+            Number(n1) > 0 &&
+            Number(n2) > 0;
+          const grouped = isTwoClubs
+            ? groupInlineMixedPartsByClub([
+                { code: code1, count: hasCounts ? Number(n1) : 1 },
+                { code: code2, count: hasCounts ? Number(n2) : 1 },
+              ])
+            : [];
+          const scoreBrs = canScoreBrsNationalMixed(
+            eventFormat,
+            eventLevel,
+            grouped
+          );
+          const scoreU17 = canScoreLegacyU17FiftyFifty(u17, grouped);
+          if ((!scoreBrs && !scoreU17) || basePoints == null) {
             await insertRow({
               eventId,
               sheetName: epreuveLabel,
@@ -830,46 +928,20 @@ async function importEnduranceMerSheetsExcel(eventId, fileBuffer, options = {}) 
             continue;
           }
 
-          const next1 = (clubsCrewCount[code1] || 0) + 1;
-          const next2 = (clubsCrewCount[code2] || 0) + 1;
-          clubsCrewCount[code1] = next1;
-          clubsCrewCount[code2] = next2;
-
-          const isCf =
-            String(eventLevel).toLowerCase() === "championnat_france";
-          const half = round2(Number(basePoints) * 0.5);
-          const p1 = isCf || next1 <= 2 ? half : 0;
-          const p2 = isCf || next2 <= 2 ? half : 0;
-
-          await insertRow({
+          inserted += await insertMixedClubShareRows({
+            grouped,
+            mixedCodes,
+            basePoints,
+            eventFormat,
+            eventLevel,
+            resolveCode,
+            clubsCrewCount,
             eventId,
             sheetName: epreuveLabel,
             place: row.place,
-            clubCode: code1,
-            clubName: name1,
-            isMixedClubs: true,
-            clubCodesMixed: mixedCodes,
-            points: p1,
-            eventFormat,
-            eventLevel,
             partantsCount,
             importBatchId,
           });
-          await insertRow({
-            eventId,
-            sheetName: epreuveLabel,
-            place: row.place,
-            clubCode: code2,
-            clubName: name2,
-            isMixedClubs: true,
-            clubCodesMixed: mixedCodes,
-            points: p2,
-            eventFormat,
-            eventLevel,
-            partantsCount,
-            importBatchId,
-          });
-          inserted += 2;
           continue;
         }
 
