@@ -180,11 +180,33 @@ function detectInlineMixedFromRow(clubCode, clubName) {
   return parseInlineMixedCrewCell(clubCode) || parseInlineMixedCrewCell(clubName);
 }
 
-function isBrsChampionnatFrance(eventFormat, eventLevel) {
-  return (
-    String(eventFormat || "").toLowerCase() === "brs" &&
-    String(eventLevel || "").toLowerCase() === "championnat_france"
+function isChampionnatFrance(eventLevel) {
+  return String(eventLevel || "").toLowerCase() === "championnat_france";
+}
+
+/**
+ * Nom de fichier type « BRS 2026 CHAMP DE FRANCE.xlsx » → options d'import.
+ * Évite les mixtes à 0 pt quand l'UI reste sur Enduro / Territorial.
+ */
+function inferMerImportOptionsFromFileName(fileName) {
+  const n = String(fileName || "")
+    .toLowerCase()
+    .replace(/[_-]+/g, " ");
+  const format = /\bbrs\b/.test(n) ? "brs" : /enduro/.test(n) ? "enduro" : null;
+  const level = /champ(?:ionnat)?|\bcdf\b/.test(n)
+    ? "championnat_france"
+    : null;
+  return { format, level };
+}
+
+function applyInferredMerImportOptions(options = {}) {
+  const inferred = inferMerImportOptionsFromFileName(
+    options.original_filename || options.filename || ""
   );
+  const next = { ...options };
+  if (inferred.format) next.event_format = inferred.format;
+  if (inferred.level) next.event_level = inferred.level;
+  return { options: next, inferred };
 }
 
 /**
@@ -205,21 +227,26 @@ function groupInlineMixedPartsByClub(parts) {
   return [...map.values()];
 }
 
-function canScoreBrsNationalMixed(eventFormat, eventLevel, grouped) {
-  return (
-    isBrsChampionnatFrance(eventFormat, eventLevel) &&
-    Array.isArray(grouped) &&
-    grouped.length >= 2 &&
-    grouped.every((g) => g.code && Number(g.count) > 0)
-  );
-}
-
 /** Ancienne règle : U17, 2 clubs, effectifs égaux (50/50). */
 function canScoreLegacyU17FiftyFifty(u17, grouped) {
   if (!u17 || !Array.isArray(grouped) || grouped.length !== 2) return false;
   const n1 = Number(grouped[0].count);
   const n2 = Number(grouped[1].count);
   return n1 > 0 && n1 === n2;
+}
+
+/**
+ * Points mixtes :
+ * - 1 club (notation C###### (n) / C###### (n)) → 100 %
+ * - Championnat de France (barème CF, Enduro ou BRS) → prorata, toutes catégories
+ * - sinon U17 50/50 uniquement
+ */
+function canScoreMixedClubShares(eventFormat, eventLevel, u17, grouped) {
+  if (!Array.isArray(grouped) || grouped.length === 0) return false;
+  if (!grouped.every((g) => g.code && Number(g.count) > 0)) return false;
+  if (grouped.length === 1) return true;
+  if (isChampionnatFrance(eventLevel)) return true;
+  return canScoreLegacyU17FiftyFifty(u17, grouped);
 }
 
 async function insertMixedClubShareRows({
@@ -633,15 +660,17 @@ async function importEnduranceMerFlatExcel(eventId, fileBuffer, options = {}) {
           partantsCount,
         });
 
-        // Mixte multi-clubs : BRS national = prorata rameurs ; sinon 0 pt
+        // Mixte multi-clubs : CF = prorata ; 1 club = 100 % ; sinon 0 pt
         if (row.is_mixed) {
           const grouped = groupInlineMixedPartsByClub(row.mixed_parts);
-          const scoreBrs = canScoreBrsNationalMixed(
+          const u17 = isU17Sheet(epreuveCode);
+          const scoreMixed = canScoreMixedClubShares(
             eventFormat,
             eventLevel,
+            u17,
             grouped
           );
-          if (scoreBrs && basePoints != null) {
+          if (scoreMixed && basePoints != null) {
             inserted += await insertMixedClubShareRows({
               grouped,
               mixedCodes: row.club_codes_mixed,
@@ -732,7 +761,8 @@ async function importEnduranceMerFlatExcel(eventId, fileBuffer, options = {}) {
 }
 
 async function importEnduranceMerExcel(eventId, fileBuffer, options = {}) {
-  const source = String(options.import_source || options.source || "base")
+  const { options: merged } = applyInferredMerImportOptions(options);
+  const source = String(merged.import_source || merged.source || "base")
     .toLowerCase()
     .trim();
   // BASE = fichier FF historique (une feuille / épreuve)
@@ -742,9 +772,9 @@ async function importEnduranceMerExcel(eventId, fileBuffer, options = {}) {
     source === "cdfadm" ||
     source === "flat"
   ) {
-    return importEnduranceMerFlatExcel(eventId, fileBuffer, options);
+    return importEnduranceMerFlatExcel(eventId, fileBuffer, merged);
   }
-  return importEnduranceMerSheetsExcel(eventId, fileBuffer, options);
+  return importEnduranceMerSheetsExcel(eventId, fileBuffer, merged);
 }
 
 async function importEnduranceMerSheetsExcel(eventId, fileBuffer, options = {}) {
@@ -756,6 +786,7 @@ async function importEnduranceMerSheetsExcel(eventId, fileBuffer, options = {}) 
   const eventFormat = String(inputFormat || "enduro").toLowerCase();
   const errors = [];
   let inserted = 0;
+  let mixedZeroed = 0;
   const epreuves = [];
 
   const event = await Event.findByPk(eventId);
@@ -826,17 +857,17 @@ async function importEnduranceMerSheetsExcel(eventId, fileBuffer, options = {}) 
         });
 
         // Mixte inline : C078018(1)/C078018(1)/C094005(1)/C078018(1)
-        // BRS national : toutes catégories, prorata rameurs, 2 à 4 clubs.
-        // Hors BRS CF : ancienne règle U17 50/50 (2 clubs, effectifs égaux).
+        // CF : toutes catégories, prorata rameurs. Hors CF : U17 50/50.
         if (row.inline_mixed) {
           const grouped = groupInlineMixedPartsByClub(row.inline_mixed_parts);
-          const scoreBrs = canScoreBrsNationalMixed(
+          const scoreMixed = canScoreMixedClubShares(
             eventFormat,
             eventLevel,
+            u17,
             grouped
           );
-          const scoreU17 = canScoreLegacyU17FiftyFifty(u17, grouped);
-          if ((!scoreBrs && !scoreU17) || basePoints == null) {
+          if (!scoreMixed || basePoints == null) {
+            mixedZeroed += 1;
             await insertRow({
               eventId,
               sheetName: epreuveLabel,
@@ -903,13 +934,14 @@ async function importEnduranceMerSheetsExcel(eventId, fileBuffer, options = {}) 
                 { code: code2, count: hasCounts ? Number(n2) : 1 },
               ])
             : [];
-          const scoreBrs = canScoreBrsNationalMixed(
+          const scoreMixed = canScoreMixedClubShares(
             eventFormat,
             eventLevel,
+            u17,
             grouped
           );
-          const scoreU17 = canScoreLegacyU17FiftyFifty(u17, grouped);
-          if ((!scoreBrs && !scoreU17) || basePoints == null) {
+          if (!scoreMixed || basePoints == null) {
+            mixedZeroed += 1;
             await insertRow({
               eventId,
               sheetName: epreuveLabel,
@@ -988,6 +1020,12 @@ async function importEnduranceMerSheetsExcel(eventId, fileBuffer, options = {}) 
         errors.push(`Feuille ${epreuveLabel} place ${row.place}: ${msg}`);
       }
     }
+  }
+
+  if (mixedZeroed > 0 && !isChampionnatFrance(eventLevel)) {
+    errors.push(
+      `${mixedZeroed} équipage(s) mixte(s) importé(s) à 0 pt : le partage des points s'applique au Championnat de France. Réimportez avec Niveau = Championnat de France (et Format = BRS) + « remplacer les résultats ».`
+    );
   }
 
   return { inserted, epreuves, errors };

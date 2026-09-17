@@ -41,6 +41,7 @@ async function importResults(req, res) {
       event_level: eventLevel,
       import_source: importSource,
       replace_previous: replacePrevious,
+      original_filename: req.file.originalname,
     });
 
     return res.status(201).json({
