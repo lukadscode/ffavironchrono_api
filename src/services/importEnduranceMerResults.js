@@ -1037,6 +1037,14 @@ function isInlineMixedCrewRow(r) {
   return code === "MIXTE" || code === "0" || code === "";
 }
 
+/** Somme des meilleurs scores. `cap` null = tous les équipages (championnat de France). */
+function sumBestCrewPoints(points, cap) {
+  if (!Array.isArray(points) || points.length === 0) return 0;
+  const sorted = points.slice().sort((a, b) => b - a);
+  const kept = cap == null ? sorted : sorted.slice(0, cap);
+  return kept.reduce((s, p) => s + p, 0);
+}
+
 function aggregateEventRows(rows) {
   const perClubEpreuve = new Map();
   for (const r of rows) {
@@ -1052,6 +1060,7 @@ function aggregateEventRows(rows) {
         club_name: r.club_name,
         epreuve_code: r.epreuve_code,
         event_format: String(r.event_format || "enduro").toLowerCase(),
+        event_level: String(r.event_level || "territorial").toLowerCase(),
         points: [],
         juniors: [],
         seniors: [],
@@ -1060,6 +1069,9 @@ function aggregateEventRows(rows) {
     const pts = Number(r.points_attributed) || 0;
     if (pts <= 0) continue;
     const b = perClubEpreuve.get(epreuveKey);
+    if (String(r.event_level || "").toLowerCase() === "championnat_france") {
+      b.event_level = "championnat_france";
+    }
     b.points.push(pts);
     if (b.event_format === "brs") {
       const grp = inferBRSGroup(r.epreuve_code);
@@ -1071,21 +1083,14 @@ function aggregateEventRows(rows) {
   const byClub = new Map();
   for (const [, b] of perClubEpreuve) {
     let epreuveTotal = 0;
+    // Plafond 2 équipages / club / épreuve : territorial uniquement.
+    const crewCap = b.event_level === "championnat_france" ? null : 2;
     if (b.event_format === "brs") {
-      const j = b.juniors
-        .sort((a, c) => c - a)
-        .slice(0, 2)
-        .reduce((s, p) => s + p, 0);
-      const s = b.seniors
-        .sort((a, c) => c - a)
-        .slice(0, 2)
-        .reduce((s1, p) => s1 + p, 0);
-      epreuveTotal = j + s;
+      epreuveTotal =
+        sumBestCrewPoints(b.juniors, crewCap) +
+        sumBestCrewPoints(b.seniors, crewCap);
     } else {
-      epreuveTotal = b.points
-        .sort((a, c) => c - a)
-        .slice(0, 2)
-        .reduce((s, p) => s + p, 0);
+      epreuveTotal = sumBestCrewPoints(b.points, crewCap);
     }
 
     if (!byClub.has(b.club_key)) {
@@ -1093,6 +1098,7 @@ function aggregateEventRows(rows) {
         club_code: b.club_code,
         club_name: b.club_name,
         event_format: b.event_format,
+        event_level: b.event_level,
         epreuves_juniors: [],
         epreuves_seniors: [],
         epreuves_all: [],
@@ -1100,6 +1106,9 @@ function aggregateEventRows(rows) {
     }
 
     const club = byClub.get(b.club_key);
+    if (b.event_level === "championnat_france") {
+      club.event_level = "championnat_france";
+    }
     if (b.event_format === "brs") {
       const grp = inferBRSGroup(b.epreuve_code);
       if (grp === "junior") club.epreuves_juniors.push(epreuveTotal);
@@ -1111,7 +1120,9 @@ function aggregateEventRows(rows) {
   const result = new Map();
   for (const [k, c] of byClub) {
     let total = 0;
-    if (c.event_format === "brs") {
+    // BRS territorial : 2 meilleures épreuves juniors + 2 meilleures seniors.
+    // Championnat de France : toutes les épreuves comptent.
+    if (c.event_format === "brs" && c.event_level !== "championnat_france") {
       const topJ = c.epreuves_juniors
         .sort((a, b) => b - a)
         .slice(0, 2)
