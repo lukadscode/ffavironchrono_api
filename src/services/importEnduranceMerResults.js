@@ -180,6 +180,32 @@ function detectInlineMixedFromRow(clubCode, clubName) {
   return parseInlineMixedCrewCell(clubCode) || parseInlineMixedCrewCell(clubName);
 }
 
+/** Reprend les parts mixtes déjà stockées (inline C######(n)/… ou liste Time Team). */
+function parseStoredMixedParts(clubCodesMixed, memberRows) {
+  const raw = clubCodesMixed != null ? String(clubCodesMixed).trim() : "";
+  if (raw) {
+    const inline = parseInlineMixedCrewCell(raw);
+    if (inline?.parts?.length) return inline.parts;
+    if (raw.includes(",")) {
+      const codes = raw
+        .split(",")
+        .map((s) => s.trim().toUpperCase())
+        .filter((c) => c && c !== "MIXTE");
+      if (codes.length >= 2) return codes.map((code) => ({ code, count: 1 }));
+    }
+  }
+  const fromRows = [];
+  for (const r of memberRows || []) {
+    const code = String(r.club_code || "")
+      .trim()
+      .toUpperCase();
+    if (code && code !== "MIXTE" && code !== "0") {
+      fromRows.push({ code, count: 1 });
+    }
+  }
+  return fromRows;
+}
+
 function isChampionnatFrance(eventLevel) {
   return String(eventLevel || "").toLowerCase() === "championnat_france";
 }
@@ -1018,6 +1044,202 @@ function isInlineMixedCrewRow(r) {
   return code === "MIXTE" || code === "0" || code === "";
 }
 
+function pointsDiffer(a, b) {
+  return round2(a) !== round2(b);
+}
+
+/**
+ * Recalcule `points_attributed` sur les lignes déjà importées (sans Excel).
+ * Les mixtes BRS CF sont répartis au prorata ; le territorial reprend U17 50/50
+ * uniquement, et le plafond 2 équipages est réappliqué sans compter les mixtes à 0.
+ */
+async function recalculateMerImportPointsForEvent(eventId, caches = {}) {
+  const scoringConfig =
+    caches.scoringConfig || (await getEnduranceMerScoringConfig());
+  const clubsByCode = caches.clubsByCode || (await loadClubLookupMaps());
+  const rows = await EnduranceMerImportResult.findAll({
+    where: { event_id: eventId },
+    order: [
+      ["epreuve_code", "ASC"],
+      ["place", "ASC"],
+    ],
+  });
+  if (!rows.length) return { updated: 0, inserted: 0 };
+
+  const byEpreuve = new Map();
+  for (const r of rows) {
+    const key = r.epreuve_code || "";
+    if (!byEpreuve.has(key)) byEpreuve.set(key, []);
+    byEpreuve.get(key).push(r);
+  }
+
+  let updated = 0;
+  let inserted = 0;
+
+  for (const [epreuveCode, eRows] of byEpreuve) {
+    const eventFormat = String(eRows[0].event_format || "enduro").toLowerCase();
+    const eventLevel = String(
+      eRows[0].event_level || "territorial",
+    ).toLowerCase();
+    const u17 = isU17Sheet(epreuveCode);
+    const uniquePlaces = new Set(eRows.map((r) => r.place));
+    const partantsCount = Number(eRows[0].partants_count) || uniquePlaces.size;
+    const applyCap = !isChampionnatFrance(eventLevel);
+
+    const mixedGroups = new Map();
+    const solos = [];
+    for (const r of eRows) {
+      if (r.is_mixed_clubs) {
+        const mk = `${r.place}|${String(r.club_codes_mixed || "").trim()}`;
+        if (!mixedGroups.has(mk)) mixedGroups.set(mk, []);
+        mixedGroups.get(mk).push(r);
+      } else {
+        solos.push(r);
+      }
+    }
+    const crews = [
+      ...solos.map((r) => ({ place: r.place, mixed: false, rows: [r] })),
+      ...[...mixedGroups.values()].map((rs) => ({
+        place: rs[0].place,
+        mixed: true,
+        rows: rs,
+      })),
+    ].sort((a, b) => a.place - b.place);
+
+    const clubsCrewCount = Object.create(null);
+
+    for (const crew of crews) {
+      const basePoints = calculatePointsFromConfig({
+        config: scoringConfig,
+        eventFormat,
+        eventLevel,
+        epreuveCode,
+        place: crew.place,
+        partantsCount,
+      });
+
+      if (crew.mixed) {
+        const sample = crew.rows[0];
+        const parts = parseStoredMixedParts(sample.club_codes_mixed, crew.rows);
+        const grouped = groupInlineMixedPartsByClub(parts);
+        const scoreMixed = canScoreMixedClubShares(
+          eventFormat,
+          eventLevel,
+          u17,
+          grouped,
+        );
+
+        if (!scoreMixed || basePoints == null) {
+          for (const r of crew.rows) {
+            if (pointsDiffer(r.points_attributed, 0)) {
+              r.points_attributed = 0;
+              await r.save({ fields: ["points_attributed"] });
+              updated += 1;
+            }
+          }
+          continue;
+        }
+
+        const totalCount = grouped.reduce((s, g) => s + Number(g.count), 0);
+        const desired = [];
+        for (const g of grouped) {
+          const pts = round2(Number(basePoints) * (Number(g.count) / totalCount));
+          const next = (clubsCrewCount[g.code] || 0) + 1;
+          clubsCrewCount[g.code] = next;
+          desired.push({
+            code: g.code,
+            points: applyCap && next > 2 ? 0 : pts,
+          });
+        }
+
+        const mixteRows = crew.rows.filter((r) => isInlineMixedCrewRow(r));
+        const clubRows = crew.rows.filter((r) => !isInlineMixedCrewRow(r));
+        const unused = [...clubRows];
+
+        for (const d of desired) {
+          const idx = unused.findIndex(
+            (r) =>
+              String(r.club_code || "")
+                .trim()
+                .toUpperCase() === d.code,
+          );
+          if (idx >= 0) {
+            const r = unused.splice(idx, 1)[0];
+            if (pointsDiffer(r.points_attributed, d.points)) {
+              r.points_attributed = d.points;
+              await r.save({ fields: ["points_attributed"] });
+              updated += 1;
+            }
+          } else {
+            const resolved = await resolveClubCode(d.code, { clubsByCode });
+            await insertRow({
+              eventId,
+              sheetName: epreuveCode,
+              epreuveLibelle: sample.epreuve_libelle,
+              place: crew.place,
+              clubCode: resolved.code || d.code,
+              clubName: resolved.name,
+              isMixedClubs: true,
+              clubCodesMixed: sample.club_codes_mixed,
+              points: d.points,
+              eventFormat,
+              eventLevel,
+              partantsCount,
+              importBatchId: sample.import_batch_id,
+            });
+            inserted += 1;
+          }
+        }
+        for (const r of unused.concat(mixteRows)) {
+          if (pointsDiffer(r.points_attributed, 0)) {
+            r.points_attributed = 0;
+            await r.save({ fields: ["points_attributed"] });
+            updated += 1;
+          }
+        }
+        continue;
+      }
+
+      const r = crew.rows[0];
+      const clubKey =
+        (r.club_code && String(r.club_code).trim()) ||
+        (r.club_name && String(r.club_name).trim()) ||
+        null;
+      let finalPoints = basePoints == null ? 0 : basePoints;
+      if (clubKey) {
+        const next = (clubsCrewCount[clubKey] || 0) + 1;
+        clubsCrewCount[clubKey] = next;
+        if (applyCap) finalPoints = next <= 2 ? finalPoints : 0;
+      }
+      if (pointsDiffer(r.points_attributed, finalPoints)) {
+        r.points_attributed = finalPoints;
+        await r.save({ fields: ["points_attributed"] });
+        updated += 1;
+      }
+    }
+  }
+
+  return { updated, inserted };
+}
+
+async function recalculateMerImportPointsForEvents(eventIds, caches = {}) {
+  const scoringConfig =
+    caches.scoringConfig || (await getEnduranceMerScoringConfig());
+  const clubsByCode = caches.clubsByCode || (await loadClubLookupMaps());
+  const unique = [...new Set((eventIds || []).filter(Boolean))];
+  let updated = 0;
+  let inserted = 0;
+  for (const eventId of unique) {
+    const res = await recalculateMerImportPointsForEvent(eventId, {
+      scoringConfig,
+      clubsByCode,
+    });
+    updated += res.updated;
+    inserted += res.inserted;
+  }
+  return { updated, inserted, scoringConfig, clubsByCode };
+}
+
 /** Somme des meilleurs scores. `cap` null = tous les équipages (championnat de France). */
 function sumBestCrewPoints(points, cap) {
   if (!Array.isArray(points) || points.length === 0) return 0;
@@ -1127,6 +1349,7 @@ function aggregateEventRows(rows) {
 }
 
 async function getEnduranceMerRankingForEvent(eventId) {
+  await recalculateMerImportPointsForEvent(eventId);
   const rows = await EnduranceMerImportResult.findAll({
     where: { event_id: eventId },
     order: [
@@ -1409,11 +1632,21 @@ async function fetchMerImportRowsForSeason(season) {
   });
 }
 
+async function fetchMerImportRowsForSeasonRecalculated(season) {
+  let rows = await fetchMerImportRowsForSeason(season);
+  const eventIds = [...new Set(rows.map((r) => r.event_id).filter(Boolean))];
+  if (eventIds.length) {
+    await recalculateMerImportPointsForEvents(eventIds);
+    rows = await fetchMerImportRowsForSeason(season);
+  }
+  return rows;
+}
+
 async function getGlobalMerRanking({
   season = "2026",
   includeTerritorialBonus = true,
 }) {
-  const rows = await fetchMerImportRowsForSeason(season);
+  const rows = await fetchMerImportRowsForSeasonRecalculated(season);
   const { perClub } = await accumulateMerSeasonPerClubFromImportRows(rows, {
     season,
     includeTerritorialBonus,
@@ -1428,7 +1661,7 @@ async function getMerClubsDashboard({
   season = "2026",
   includeTerritorialBonus = true,
 }) {
-  const rows = await fetchMerImportRowsForSeason(season);
+  const rows = await fetchMerImportRowsForSeasonRecalculated(season);
   const { perClub, byEvent } = await accumulateMerSeasonPerClubFromImportRows(
     rows,
     { season, includeTerritorialBonus },
@@ -1514,4 +1747,5 @@ module.exports = {
   getEnduranceMerRankingForEvent,
   getGlobalMerRanking,
   getMerClubsDashboard,
+  recalculateMerImportPointsForEvent,
 };

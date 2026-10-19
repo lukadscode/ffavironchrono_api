@@ -7,6 +7,7 @@ const {
   importEnduranceMerExcel,
   getEnduranceMerRankingForEvent,
   getGlobalMerRanking,
+  recalculateMerImportPointsForEvent,
 } = require("../services/importEnduranceMerResults");
 const { clubCodeSearchVariants } = require("../utils/clubCodeUtils");
 
@@ -77,6 +78,8 @@ async function getImportResults(req, res) {
       const variants = clubCodeSearchVariants(club_code);
       where.club_code = variants.length > 1 ? { [Op.in]: variants } : club_code;
     }
+
+    await recalculateMerImportPointsForEvent(eventId);
 
     const results = await EnduranceMerImportResult.findAll({
       where,
