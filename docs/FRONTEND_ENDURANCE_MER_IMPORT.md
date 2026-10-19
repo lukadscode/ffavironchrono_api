@@ -75,7 +75,7 @@ Les bonus territoriaux (`endurance_mer_territorial_bonus`) utilisent la **même*
 ### Championnat de France
 
 - Bareme Championnats officiel (1x U19, 1x Senior, 2x U19, 2x Senior, 4x U17/U19, 4x Senior)
-- **Championnat de France — mixtes toutes catégories** : points répartis au prorata des rameurs (ex. 3+1 → 75%/25%, jusqu’à 4 clubs). Un bateau noté mixte mais d’un seul club (ex. `C064021 (1) / C064021 (1)`) reçoit 100 %. Le barème CF s’applique même si le format UI est Enduro. Un fichier nommé `BRS … CHAMP DE FRANCE` force BRS + Championnat de France.
+- **BRS Championnat de France — mixtes toutes catégories** : points répartis au prorata des rameurs (ex. 3+1 → 75%/25%, jusqu’à 4 clubs). Un bateau noté mixte mais d’un seul club (ex. `C064021 (1) / C064021 (1)`) reçoit 100 %. Hors BRS national, seule la règle U17 50/50 s’applique (territorial inchangé). Format et niveau viennent uniquement des sélecteurs d’import.
 
 ### Classement global saison (club)
 

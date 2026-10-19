@@ -184,29 +184,11 @@ function isChampionnatFrance(eventLevel) {
   return String(eventLevel || "").toLowerCase() === "championnat_france";
 }
 
-/**
- * Nom de fichier type « BRS 2026 CHAMP DE FRANCE.xlsx » → options d'import.
- * Évite les mixtes à 0 pt quand l'UI reste sur Enduro / Territorial.
- */
-function inferMerImportOptionsFromFileName(fileName) {
-  const n = String(fileName || "")
-    .toLowerCase()
-    .replace(/[_-]+/g, " ");
-  const format = /\bbrs\b/.test(n) ? "brs" : /enduro/.test(n) ? "enduro" : null;
-  const level = /champ(?:ionnat)?|\bcdf\b/.test(n)
-    ? "championnat_france"
-    : null;
-  return { format, level };
-}
-
-function applyInferredMerImportOptions(options = {}) {
-  const inferred = inferMerImportOptionsFromFileName(
-    options.original_filename || options.filename || ""
+function isBrsChampionnatFrance(eventFormat, eventLevel) {
+  return (
+    String(eventFormat || "").toLowerCase() === "brs" &&
+    isChampionnatFrance(eventLevel)
   );
-  const next = { ...options };
-  if (inferred.format) next.event_format = inferred.format;
-  if (inferred.level) next.event_level = inferred.level;
-  return { options: next, inferred };
 }
 
 /**
@@ -237,15 +219,14 @@ function canScoreLegacyU17FiftyFifty(u17, grouped) {
 
 /**
  * Points mixtes :
- * - 1 club (notation C###### (n) / C###### (n)) → 100 %
- * - Championnat de France (barème CF, Enduro ou BRS) → prorata, toutes catégories
- * - sinon U17 50/50 uniquement
+ * - BRS Championnat de France uniquement : prorata, toutes catégories
+ *   (1 club noté C###### (n)/C###### (n) → 100 %)
+ * - Hors BRS CF : U17 50/50 uniquement (territorial inchangé)
  */
 function canScoreMixedClubShares(eventFormat, eventLevel, u17, grouped) {
   if (!Array.isArray(grouped) || grouped.length === 0) return false;
   if (!grouped.every((g) => g.code && Number(g.count) > 0)) return false;
-  if (grouped.length === 1) return true;
-  if (isChampionnatFrance(eventLevel)) return true;
+  if (isBrsChampionnatFrance(eventFormat, eventLevel)) return true;
   return canScoreLegacyU17FiftyFifty(u17, grouped);
 }
 
@@ -761,20 +742,20 @@ async function importEnduranceMerFlatExcel(eventId, fileBuffer, options = {}) {
 }
 
 async function importEnduranceMerExcel(eventId, fileBuffer, options = {}) {
-  const { options: merged } = applyInferredMerImportOptions(options);
-  const source = String(merged.import_source || merged.source || "base")
+  const source = String(options.import_source || options.source || "base")
     .toLowerCase()
     .trim();
   // BASE = fichier FF historique (une feuille / épreuve)
   // Time Team = export plat cdfadm (event_code / position / club_ref)
+  // Format et niveau = sélecteurs d’import uniquement.
   if (
     source === "time_team" ||
     source === "cdfadm" ||
     source === "flat"
   ) {
-    return importEnduranceMerFlatExcel(eventId, fileBuffer, merged);
+    return importEnduranceMerFlatExcel(eventId, fileBuffer, options);
   }
-  return importEnduranceMerSheetsExcel(eventId, fileBuffer, merged);
+  return importEnduranceMerSheetsExcel(eventId, fileBuffer, options);
 }
 
 async function importEnduranceMerSheetsExcel(eventId, fileBuffer, options = {}) {
@@ -1022,9 +1003,9 @@ async function importEnduranceMerSheetsExcel(eventId, fileBuffer, options = {}) 
     }
   }
 
-  if (mixedZeroed > 0 && !isChampionnatFrance(eventLevel)) {
+  if (mixedZeroed > 0 && !isBrsChampionnatFrance(eventFormat, eventLevel)) {
     errors.push(
-      `${mixedZeroed} équipage(s) mixte(s) importé(s) à 0 pt : le partage des points s'applique au Championnat de France. Réimportez avec Niveau = Championnat de France (et Format = BRS) + « remplacer les résultats ».`
+      `${mixedZeroed} équipage(s) mixte(s) importé(s) à 0 pt : le partage des points mixtes s'applique uniquement au BRS Championnat de France (territorial inchangé).`
     );
   }
 
